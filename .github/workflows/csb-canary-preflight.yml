@@ -15,6 +15,12 @@ jobs:
     runs-on: ${{ matrix.image }}
     timeout-minutes: 5
     steps:
+      - name: Install required signed Ubuntu sandbox package
+        shell: bash
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends bubblewrap
+          dpkg-query -W bubblewrap
       - name: Verify required credential-free sandbox
         shell: bash
         run: |
