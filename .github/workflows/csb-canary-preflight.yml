@@ -1,0 +1,22 @@
+name: CodeShouldBehave canary sandbox preflight
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sandbox:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Verify required credential-free sandbox
+        shell: bash
+        run: |
+          if test -x /usr/bin/bwrap && /usr/bin/bwrap --unshare-all --clearenv --ro-bind /usr /usr --ro-bind-try /lib /lib --ro-bind-try /lib64 /lib64 --proc /proc --dev /dev -- /usr/bin/true >/dev/null 2>&1; then
+            echo 'PASS: required sandbox available'
+          else
+            echo 'FAIL: required sandbox unavailable'
+            exit 1
+          fi
