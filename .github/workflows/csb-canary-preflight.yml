@@ -8,13 +8,22 @@ permissions:
 
 jobs:
   sandbox:
-    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [ubuntu-24.04, ubuntu-22.04]
+    runs-on: ${{ matrix.image }}
     timeout-minutes: 5
     steps:
       - name: Verify required credential-free sandbox
         shell: bash
         run: |
-          if test -x /usr/bin/bwrap && /usr/bin/bwrap --unshare-all --clearenv --ro-bind /usr /usr --ro-bind-try /lib /lib --ro-bind-try /lib64 /lib64 --proc /proc --dev /dev -- /usr/bin/true >/dev/null 2>&1; then
+          if ! test -x /usr/bin/bwrap; then
+            echo 'FAIL: required /usr/bin/bwrap is missing'
+            exit 1
+          fi
+          /usr/bin/bwrap --version
+          if /usr/bin/bwrap --unshare-all --clearenv --ro-bind /usr /usr --ro-bind-try /lib /lib --ro-bind-try /lib64 /lib64 --proc /proc --dev /dev -- /usr/bin/true; then
             echo 'PASS: required sandbox available'
           else
             echo 'FAIL: required sandbox unavailable'
