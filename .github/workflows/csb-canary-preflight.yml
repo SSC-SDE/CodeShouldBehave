@@ -8,13 +8,13 @@ permissions:
 
 jobs:
   sandbox:
-    strategy:
-      fail-fast: false
-      matrix:
-        image: [ubuntu-24.04, ubuntu-22.04]
-    runs-on: ${{ matrix.image }}
+    runs-on: ubuntu-22.04
     timeout-minutes: 5
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
       - name: Install required signed Ubuntu sandbox package
         shell: bash
         run: |
@@ -35,3 +35,11 @@ jobs:
             echo 'FAIL: required sandbox unavailable'
             exit 1
           fi
+      - name: Verify fixed public Linux package before use
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 templates/public-ci/bootstrap.py --config .codeshouldbehave/engine-pins.json --output "$RUNNER_TEMP/csb-engine"
+      - name: Verify trusted ELF compatibility inside the required sandbox
+        shell: bash
+        run: |
+          /usr/bin/bwrap --unshare-all --clearenv --ro-bind /usr /usr --ro-bind-try /lib /lib --ro-bind-try /lib64 /lib64 --ro-bind "$RUNNER_TEMP/csb-engine/bin" /engine --proc /proc --dev /dev -- /engine/flowdiff --version
