@@ -1,0 +1,192 @@
+# Inactive template. Install only after explicit public-source/Pages consent and
+# attested Linux release pins. Never consume artifacts from the nudge run.
+name: CodeShouldBehave public controller
+on:
+  workflow_run:
+    workflows: [CodeShouldBehave nudge]
+    types: [completed]
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+permissions: {}
+concurrency:
+  group: csb-public-controller-${{ github.repository_id }}
+  cancel-in-progress: false
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+      deployments: read
+      attestations: read
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+      count: ${{ steps.matrix.outputs.count }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - name: Load the attested fixed engine
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .codeshouldbehave/bootstrap.py --config .codeshouldbehave/public-ci.json --output "$RUNNER_TEMP/csb-engine"
+      - name: Resolve current provider identities and bounded queue
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 "$RUNNER_TEMP/csb-engine/scripts/public_ci.py" github-plan --config .codeshouldbehave/public-ci.json --trusted-root "$GITHUB_WORKSPACE" --output "$RUNNER_TEMP/plan.json" --budget-dir "$RUNNER_TEMP/csb-rest-budget" --budget-output "$RUNNER_TEMP/budget.json" --budget-snapshot "$RUNNER_TEMP/plan-budget.json"
+          python3 "$RUNNER_TEMP/csb-engine/scripts/public_ci.py" prepare-matrix --plan "$RUNNER_TEMP/plan.json" --output "$RUNNER_TEMP/requests"
+      - id: matrix
+        name: Publish source-free matrix metadata
+        run: |
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          value=json.loads((Path(os.environ['RUNNER_TEMP'])/'requests/matrix.json').read_text())
+          with open(os.environ['GITHUB_OUTPUT'],'a') as output:
+              output.write('matrix='+json.dumps(value,separators=(',',':'))+'\ncount='+str(len(value['include']))+'\n')
+          PY
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: csb-public-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/plan.json
+            ${{ runner.temp }}/requests
+            ${{ runner.temp }}/budget.json
+            ${{ runner.temp }}/plan-budget.json
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: error
+  analyze:
+    needs: plan
+    if: needs.plan.outputs.count != '0'
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+      deployments: read
+      attestations: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with: {ref: '${{ github.workflow_sha }}', persist-credentials: false}
+      - env: {GH_TOKEN: '${{ github.token }}'}
+        run: python3 .codeshouldbehave/bootstrap.py --config .codeshouldbehave/public-ci.json --output "$RUNNER_TEMP/csb-engine"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: csb-public-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/plan
+          digest-mismatch: error
+      - name: Parse exact Git objects as data in a networkless sandbox
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUEST_ID: ${{ matrix.request_id }}
+        run: |
+          test -x /usr/bin/bwrap
+          /usr/bin/bwrap --unshare-all --clearenv --ro-bind /usr /usr --ro-bind-try /lib /lib --ro-bind-try /lib64 /lib64 --proc /proc --dev /dev -- /usr/bin/true
+          python3 "$RUNNER_TEMP/csb-engine/scripts/public_ci.py" analyze-request --config .codeshouldbehave/public-ci.json --trusted-root "$GITHUB_WORKSPACE" --request "$RUNNER_TEMP/plan/requests/$REQUEST_ID.json" --bin-dir "$RUNNER_TEMP/csb-engine/bin" --output "$RUNNER_TEMP/handoff" --budget-manifest "$RUNNER_TEMP/plan/budget.json" --budget-dir "$RUNNER_TEMP/csb-rest-budget"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: csb-public-handoff-${{ matrix.request_id }}
+          path: ${{ runner.temp }}/handoff
+          retention-days: 1
+          compression-level: 0
+          if-no-files-found: error
+  publish:
+    needs: [plan, analyze]
+    if: always() && needs.plan.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: github-pages
+    permissions:
+      contents: read
+      actions: write
+      deployments: write
+      attestations: write
+      id-token: write
+      pages: write
+      checks: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with: {ref: '${{ github.workflow_sha }}', persist-credentials: false}
+      - env: {GH_TOKEN: '${{ github.token }}'}
+        run: python3 .codeshouldbehave/bootstrap.py --config .codeshouldbehave/public-ci.json --output "$RUNNER_TEMP/csb-engine"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: csb-public-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/plan
+          digest-mismatch: error
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          pattern: csb-public-handoff-*
+          path: ${{ runner.temp }}/handoffs
+          merge-multiple: false
+          digest-mismatch: error
+      - name: Start one trusted publisher with its durable REST ticket
+        env: {GH_TOKEN: '${{ github.token }}'}
+        run: |
+          mkdir -p "$RUNNER_TEMP/handoffs"
+          nohup python3 "$RUNNER_TEMP/csb-engine/scripts/public_ci.py" publisher-server --config .codeshouldbehave/public-ci.json --trusted-root "$GITHUB_WORKSPACE" --plan "$RUNNER_TEMP/plan/plan.json" --budget-manifest "$RUNNER_TEMP/plan/budget.json" --budget-dir "$RUNNER_TEMP/csb-rest-budget" --handoffs "$RUNNER_TEMP/handoffs" --project-root "$RUNNER_TEMP/csb-engine" --verifier "$RUNNER_TEMP/csb-engine/bin/csb-public-report" --work "$RUNNER_TEMP/csb-publisher" --allow-remote-writes >"$RUNNER_TEMP/csb-publisher.log" 2>&1 &
+      - id: stage
+        name: Verify exact public evidence and reserve the whole new snapshot
+        run: |
+          python3 "$RUNNER_TEMP/csb-engine/scripts/public_ci.py" publisher-call --socket "$RUNNER_TEMP/csb-publisher/control.sock" --phase stage --output "$RUNNER_TEMP/stage.json"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          value=json.loads((Path(os.environ['RUNNER_TEMP'])/'stage.json').read_text())
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out: out.write('site='+str(value['site']).lower()+'\n')
+          PY
+      - if: steps.stage.outputs.site == 'true'
+        id: pages
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          name: csb-public-pages-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/csb-publisher/publication/site
+          retention-days: 1
+      - if: steps.stage.outputs.site == 'true'
+        name: Prepare the pre-deployment intent
+        env:
+          ARTIFACT_ID: ${{ steps.pages.outputs.artifact_id }}
+        run: python3 "$RUNNER_TEMP/csb-engine/scripts/public_ci.py" publisher-call --socket "$RUNNER_TEMP/csb-publisher/control.sock" --phase intent --artifact-id "$ARTIFACT_ID" --output "$RUNNER_TEMP/intent-prepared.json"
+      - if: steps.stage.outputs.site == 'true'
+        id: intent-proof
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: ${{ runner.temp }}/csb-publisher/intent.json
+          predicate-type: https://codeshouldbehave.dev/attestations/public-state/v1
+          predicate-path: ${{ runner.temp }}/csb-publisher/intent.json
+          create-storage-record: false
+      - if: steps.stage.outputs.site == 'true'
+        name: Commit intent before creating the exact Pages deployment
+        env:
+          PROOF: ${{ steps.intent-proof.outputs.bundle-path }}
+        run: python3 "$RUNNER_TEMP/csb-engine/scripts/public_ci.py" publisher-call --socket "$RUNNER_TEMP/csb-publisher/control.sock" --phase deploy --proof "$PROOF" --output "$RUNNER_TEMP/deployed.json"
+      - name: Verify live readback or prepare cursor-only progress
+        run: python3 "$RUNNER_TEMP/csb-engine/scripts/public_ci.py" publisher-call --socket "$RUNNER_TEMP/csb-publisher/control.sock" --phase finalize --output "$RUNNER_TEMP/final-prepared.json"
+      - id: final-proof
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
+        with:
+          subject-path: ${{ runner.temp }}/csb-publisher/final.json
+          predicate-type: https://codeshouldbehave.dev/attestations/public-state/v1
+          predicate-path: ${{ runner.temp }}/csb-publisher/final.json
+          create-storage-record: false
+      - name: Commit durable evidence before creating Architecture checks
+        env:
+          PROOF: ${{ steps.final-proof.outputs.bundle-path }}
+        run: python3 "$RUNNER_TEMP/csb-engine/scripts/public_ci.py" publisher-call --socket "$RUNNER_TEMP/csb-publisher/control.sock" --phase commit --proof "$PROOF" --output "$RUNNER_TEMP/final-committed.json"
+      - if: always()
+        name: Stop only this job's publisher and retain its REST counter
+        run: |
+          if test -S "$RUNNER_TEMP/csb-publisher/control.sock"; then
+            python3 "$RUNNER_TEMP/csb-engine/scripts/public_ci.py" publisher-call --socket "$RUNNER_TEMP/csb-publisher/control.sock" --phase stop --output "$RUNNER_TEMP/publisher-stopped.json"
+          fi
+      - name: Verify all assigned REST stage evidence
+        run: python3 "$RUNNER_TEMP/csb-engine/scripts/public_ci.py" audit-budget --manifest "$RUNNER_TEMP/plan/budget.json" --plan-snapshot "$RUNNER_TEMP/plan/plan-budget.json" --handoffs "$RUNNER_TEMP/handoffs" --publish-snapshot "$RUNNER_TEMP/csb-publisher/budget.json" --output "$RUNNER_TEMP/pass-budget.json"

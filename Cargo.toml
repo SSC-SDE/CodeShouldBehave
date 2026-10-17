@@ -1,0 +1,47 @@
+[package]
+name = "flowdiff"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.87"
+description = "Lightweight local behavioral Git review with flowchart diffs"
+license = "MIT"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
+
+[features]
+default = []
+server = ["dep:axum", "dep:serde", "dep:serde_json", "dep:tokio", "dep:toml"]
+
+[[example]]
+name = "workspace_preview"
+required-features = ["server"]
+
+[[bin]]
+name = "csb-public-report"
+path = "src/bin/csb_public_report.rs"
+required-features = ["server"]
+
+[dependencies]
+sha2 = { version = "=0.11.0", default-features = false }
+rusqlite = { version = "=0.40.2", default-features = false, features = ["bundled", "backup"] }
+tree-sitter = { version = "=0.25.10", default-features = false }
+tree-sitter-rust = "=0.24.2"
+axum = { version = "=0.8.9", default-features = false, features = ["http1", "json", "query", "tokio"], optional = true }
+serde = { version = "=1.0.229", features = ["derive"], optional = true }
+serde_json = { version = "=1.0.151", optional = true }
+tokio = { version = "~1.51", default-features = false, features = ["macros", "net", "rt-multi-thread"], optional = true }
+toml = { version = "=0.9.8", default-features = false, features = ["parse", "serde", "std"], optional = true }
+
+[dev-dependencies]
+http-body-util = "=0.1.5"
+tower = { version = "=0.5.3", default-features = false, features = ["util"] }
+
+[[bin]]
+name = "csb-onboarding"
+path = "src/bin/csb_onboarding.rs"
+required-features = ["server"]

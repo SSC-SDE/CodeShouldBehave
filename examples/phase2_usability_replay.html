@@ -1,0 +1,28 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Phase 2 reviewer journey replay</title>
+<style>body{font:14px system-ui;margin:20px;background:#f4f5f8;color:#20242d}#result{font-weight:750;margin-bottom:8px}.steps{margin:0 0 12px;padding-left:22px}.pass{color:#176a41}.fail{color:#a21d2f}iframe{width:min(1400px,100%);height:820px;border:2px solid #5b4bce;border-radius:10px;background:white}</style>
+<div id="result" role="status">RUNNING · deterministic reviewer journey</div><ol id="steps" class="steps"></ol><iframe id="workspace" title="Phase 2 reviewer workspace" src="/workspace"></iframe>
+<script>
+const frame=document.getElementById('workspace'),result=document.getElementById('result'),steps=document.getElementById('steps');
+const wait=async predicate=>{for(let i=0;i<150;i++){if(predicate())return true;await new Promise(resolve=>setTimeout(resolve,20));}return false};
+const check=(label,passed)=>{const item=document.createElement('li');item.className=passed?'pass':'fail';item.textContent=`${passed?'PASS':'FAIL'} · ${label}`;steps.append(item);return passed};
+frame.addEventListener('load',async()=>{const doc=frame.contentDocument;let passed=true;
+  doc.getElementById('session-token').value='local-preview-session-token';doc.getElementById('session-form').requestSubmit();
+  await wait(()=>doc.getElementById('connection').textContent==='Connected');doc.querySelector('.pr-card')?.click();
+  await wait(()=>doc.getElementById('analysis-status').textContent==='Ready');
+  passed&=check('analysis, provider and human statuses stay separate',doc.getElementById('provider-status').textContent.includes('PR')&&doc.getElementById('human-status').textContent.includes('files inspected'));
+  passed&=check('exact proposal identity remains visible',doc.getElementById('revisions').textContent.includes('bbbbbbbb'));
+  passed&=check('resolved and ambiguous evidence are labeled separately',doc.querySelectorAll('.evidence-card.observed').length===1&&doc.querySelectorAll('.evidence-card.possible').length===1);
+  doc.querySelector('.evidence-card.observed .evidence-action')?.click();await wait(()=>doc.getElementById('graph-kind').textContent==='symbols');
+  doc.querySelector('#graph button')?.focus();await wait(()=>doc.getElementById('source-meta').textContent.includes('baseline'));
+  passed&=check('evidence drill-down shows baseline and proposal code',doc.getElementById('source-meta').textContent.includes('bbbbbbbb')&&doc.getElementById('source-baseline').textContent.includes('ledger.capture')&&doc.getElementById('source-proposal').textContent.includes('gateway.create'));
+  doc.getElementById('layout-architecture').click();
+  await wait(()=>doc.querySelector('#architecture-diagrams svg'));
+  passed&=check('repository-backed Mermaid structural diff renders',!doc.getElementById('architecture-impact').hidden&&!!doc.querySelector('#architecture-diagrams svg'));
+  passed&=check('HLD and LLD remain honestly unconfirmed',doc.querySelector('.design-boundary').textContent.includes('Not yet confirmed'));
+  doc.getElementById('design-source-fallback').click();
+  passed&=check('source fallback stays available',doc.getElementById('layout-source').getAttribute('aria-pressed')==='true');
+  doc.getElementById('mark-all-reviewed').click();await wait(()=>doc.getElementById('continuity-status').textContent.includes('Merge approval remains separate'));
+  passed&=check('bulk inspection never implies approval',doc.getElementById('continuity-status').textContent.includes('Merge approval remains separate'));
+  result.className=passed?'pass':'fail';result.textContent=passed?'PASS · deterministic journey; human observation still required':'FAIL · inspect the failed step';
+});
+</script></html>

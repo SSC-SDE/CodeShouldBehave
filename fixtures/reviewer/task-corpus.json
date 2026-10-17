@@ -1,0 +1,49 @@
+{
+  "schema": "codeshouldbehave-phase2-usability-corpus-v1",
+  "cases": [
+    {
+      "id": "payment-gateway-partial",
+      "role": "service owner",
+      "state": "partial",
+      "expected": {
+        "observed": ["src/payments.rs adds a resolved call to the gateway"],
+        "unresolved": ["Whether the unchanged event caller observes a new error"],
+        "coverage": "Two paths are partial; no system-wide conclusion is supported",
+        "design": "cannot be determined because HLD and LLD are unavailable"
+      }
+    },
+    {
+      "id": "route-config-stale",
+      "role": "repository maintainer",
+      "state": "stale",
+      "expected": {
+        "observed": ["The displayed result belongs to an older proposal identity"],
+        "unresolved": ["Impact for the newest provider revision"],
+        "coverage": "Old evidence must not be treated as current",
+        "design": "cannot be determined from stale evidence"
+      }
+    },
+    {
+      "id": "contract-outside-scope",
+      "role": "cross-repository reviewer",
+      "state": "incomplete",
+      "expected": {
+        "observed": ["A selected internal contract is inspectable at its pinned commit"],
+        "unresolved": ["Effects in the excluded consumer repository"],
+        "coverage": "Excluded repositories remain unknown, not unchanged",
+        "design": "cannot be determined outside the selected context"
+      }
+    },
+    {
+      "id": "source-only-fallback",
+      "role": "first-time contributor",
+      "state": "unsupported",
+      "expected": {
+        "observed": ["The exact baseline and proposal source remain inspectable"],
+        "unresolved": ["Architecture impact when graph analysis is unavailable"],
+        "coverage": "Unsupported analysis is explicit",
+        "design": "cannot be determined; use the source evidence fallback"
+      }
+    }
+  ]
+}

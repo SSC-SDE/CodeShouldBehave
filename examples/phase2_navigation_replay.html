@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Phase 2 navigation replay</title>
+<style>body{font:14px system-ui;margin:28px;max-width:900px;color:#172033}output{display:block;white-space:pre-wrap;padding:18px;border:1px solid #ccd4e0;border-radius:8px;background:#f7f9f4}</style>
+<h1>Phase 2 navigation identity replay</h1>
+<p>Browser-native checks for route identity, delayed responses, missing targets and access revocation.</p>
+<output id="result">running</output>
+<script src="/assets/workspace.js"></script>
+<script>
+'use strict';
+const deferred=()=>{let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no});return{promise,resolve,reject}};
+const check=(value,message)=>{if(!value)throw new Error(message)};
+async function replay(){
+  const route=encodeWorkspaceRoute({reviewId:'review-new',layout:'source',side:'diff',selection:{kind:'symbol',path:'src/new.rs',symbol:'new::run'}});
+  const decoded=decodeWorkspaceRoute(route);
+  check(decoded.reviewId==='review-new'&&decoded.selection.symbol==='new::run','route round trip failed');
+  check(!route.includes('token')&&!route.includes('source='),'route disclosed sensitive state');
+
+  const pending=[];
+  const delayed=new ReviewWorkspace({request:(path,{signal})=>{const work=deferred();pending.push({path,signal,work});return work.promise}});
+  const oldSelection=delayed.selectReview('review-old');
+  const newSelection=delayed.selectReview('review-new');
+  check(pending.slice(0,4).every(item=>item.signal.aborted),'old requests were not aborted');
+  pending.slice(4).forEach((item,index)=>item.work.resolve(index===0?{review_id:'review-new'}:index===1?{review_id:'review-new'}:index===2?{kind:'children',paths:[]}:{review_id:'review-new',items:[],next_cursor:null}));
+  await newSelection;pending.slice(0,4).forEach(item=>item.work.resolve({review_id:'review-old'}));await oldSelection;
+  check(delayed.snapshot().reviewId==='review-new'&&delayed.snapshot().details.review_id==='review-new','late response replaced current review');
+
+  let revoked=false;
+  const access=new ReviewWorkspace({request:async path=>{if(revoked){const error=new Error('denied');error.status=404;throw error}if(path.endsWith('/progress'))return{review_id:'review-new'};if(path.includes('/files?'))return{review_id:'review-new',items:[{path:'private.rs'}]};if(path.includes('/source?'))return{review_id:'review-new',text:'private'};if(path.includes('/graph?')&&path.includes('path='))return{kind:'symbols',symbols:[]};if(path.includes('/graph?'))return{kind:'children',paths:[]};return{review_id:'review-new'}}});
+  await access.selectReview('review-new');await access.loadSource({path:'private.rs',blob:'blob',side:'proposal',startLine:1,endLine:1});
+  revoked=true;await access.selectPath({path:'private.rs'});
+  const cleared=access.snapshot();check(cleared.source===null&&cleared.graph===null&&cleared.files===null&&cleared.selection===null,'revocation retained evidence');
+
+  const missing=new ReviewWorkspace({request:async path=>path.endsWith('/progress')?{}:path.includes('/files?')?{review_id:'review-new',items:[]}:path.includes('/graph?')&&path.includes('path=')?{kind:'symbols',symbols:[]}:path.includes('/graph?')?{kind:'children',paths:[]}:{review_id:'review-new'}});
+  await missing.selectReview('review-new');await missing.selectPath({path:'renamed-away.rs'});
+  check(missing.snapshot().graph.symbols.length===0&&missing.snapshot().source===null,'missing target reused evidence');
+  return{schema:'codeshouldbehave-phase2-navigation-replay-v1',status:'passed',route,checks:{route_identity:true,delayed_response_fenced:true,revoked_evidence_cleared:true,missing_target_empty:true},browser:navigator.userAgent};
+}
+replay().then(report=>{document.querySelector('#result').textContent=JSON.stringify(report,null,2);document.title='PASS · Phase 2 navigation replay'}).catch(error=>{document.querySelector('#result').textContent=JSON.stringify({status:'failed',reason:error.message},null,2);document.title='FAIL · Phase 2 navigation replay'});
+</script>
+</html>

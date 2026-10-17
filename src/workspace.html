@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'">
+  <title>CodeShouldBehave · Review workspace</title>
+  <link rel="stylesheet" href="/assets/workspace.css">
+</head>
+<body>
+  <a class="skip-link" href="#review-content">Skip to review</a>
+  <header class="topbar">
+    <a class="brand" href="/workspace" aria-label="CodeShouldBehave review workspace"><span>CSB</span> CodeShouldBehave</a>
+    <form id="session-form" class="session" autocomplete="off">
+      <label for="session-token">Session token</label>
+      <input id="session-token" type="password" required minlength="16" placeholder="Kept in memory only">
+      <button type="submit">Connect</button>
+    </form>
+    <span class="beta-badge">Beta</span>
+    <a id="onboarding-link" href="/onboarding" hidden>Repository context</a>
+    <button id="open-feedback" class="quiet" type="button">Send feedback</button>
+    <output id="connection" aria-live="polite">Disconnected</output>
+  </header>
+  <dialog id="feedback-dialog" class="feedback-dialog" aria-labelledby="feedback-title">
+    <form id="feedback-form" method="dialog">
+      <div class="feedback-heading"><div><span class="eyebrow">Feedback</span><h2 id="feedback-title">Report a review issue</h2></div><button id="cancel-feedback" class="quiet" type="button" aria-label="Close feedback">Close</button></div>
+      <p>Automatic metadata excludes code, repository identities and credentials. Check your description and any screenshot for sensitive content before export. Nothing is uploaded.</p>
+      <label>Feedback type<select id="feedback-category" required><option value="confusing">Confusing</option><option value="incorrect_result">Incorrect result</option><option value="missing_capability">Missing capability</option><option value="performance">Performance problem</option><option value="other">Other</option></select></label>
+      <label>Description<textarea id="feedback-description" maxlength="4000" placeholder="What happened, and what did you expect?"></textarea></label>
+      <details><summary>Attach a screenshot</summary>
+        <p>Choose a PNG, JPEG or WebP up to 3 MiB. The image is re-encoded locally to remove embedded metadata. Visible sensitive content is not redacted automatically.</p>
+        <label>Image file<input id="feedback-image" type="file" accept="image/png,image/jpeg,image/webp"></label>
+        <div id="feedback-image-preview" hidden><img id="feedback-image-content" alt="Selected feedback screenshot preview"><label class="feedback-consent"><input id="feedback-image-consent" type="checkbox"> I checked this image and authorize including it in my local export.</label><button id="remove-feedback-image" class="quiet" type="button">Remove screenshot</button></div>
+      </details>
+      <div><span class="eyebrow">Metadata preview</span><pre id="feedback-preview"><code></code></pre></div>
+      <p id="feedback-status" class="status" aria-live="polite">Saved locally only. No external feedback destination is configured.</p>
+      <div class="feedback-actions"><button id="preview-feedback" class="quiet" type="button">Refresh preview</button><button id="copy-feedback" class="quiet" type="button">Copy JSON</button><button id="export-feedback" type="button">Export feedback JSON</button></div>
+      <details><summary>Triage an exported report</summary><p>Import a local report, review its content, update its disposition and export a new copy. No browser storage or external submission is used.</p>
+        <label>Feedback JSON<input id="feedback-import" type="file" accept="application/json,.json"></label>
+        <label>Status<select id="feedback-triage-status"><option value="new">New</option><option value="investigating">Investigating</option><option value="resolved">Resolved</option><option value="duplicate">Duplicate</option><option value="dismissed">Dismissed</option></select></label>
+        <label>Severity<select id="feedback-triage-severity"><option value="untriaged">Untriaged</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
+        <label>Duplicate report ID<input id="feedback-duplicate" maxlength="128"></label>
+        <label>Resolution commit<input id="feedback-resolution" maxlength="40" placeholder="Full commit SHA"></label>
+        <div class="feedback-actions"><button id="apply-feedback-triage" class="quiet" type="button">Apply triage and preview</button><button id="new-feedback" class="quiet" type="button">New report</button></div>
+      </details>
+    </form>
+  </dialog>
+  <main class="shell">
+    <aside class="inbox" aria-label="Pull request inbox">
+      <div class="panel-heading"><div><span class="eyebrow">Review queue</span><h1>Pull requests</h1></div><button id="refresh" class="quiet" type="button">Refresh</button></div>
+      <div id="inbox-status" class="status">Connect to load authorized reviews.</div>
+      <div id="pr-list" class="pr-list" role="listbox" aria-label="Pull requests"></div>
+      <button id="more-prs" class="more" type="button" hidden>Load more</button>
+      <section id="changed-files-panel" class="changed-files-panel" hidden aria-labelledby="changed-files-title">
+        <div class="changed-files-heading"><div><span class="eyebrow">Selected PR</span><h2 id="changed-files-title">Changed files</h2></div><span id="changed-files-count" class="badge">0</span></div>
+        <div id="changed-files-status" class="status" aria-live="polite"></div>
+        <label class="file-search">Find file<input id="file-search" type="search" placeholder="Filter changed paths" autocomplete="off"></label>
+        <output id="file-search-status" class="file-search-status" aria-live="polite"></output>
+        <div id="selected-file-actions" class="selected-file-actions" hidden>
+          <div><span class="eyebrow">Selected file</span><strong id="selected-file-name"></strong><span id="selected-file-delta" class="file-delta"></span></div>
+          <button id="toggle-file-reviewed" class="review-file-button" type="button" aria-pressed="false"><span aria-hidden="true">✓</span> Mark reviewed</button>
+        </div>
+        <div id="changed-files-list" class="changed-files-list" aria-label="Changed files"></div>
+        <button id="more-files" class="more" type="button" hidden>Load more files</button>
+      </section>
+    </aside>
+    <section class="review" aria-label="Selected review">
+      <div id="empty" class="empty" tabindex="-1"><div class="empty-mark">↳</div><h2>Select a pull request</h2><p>The architecture map and source stay unloaded until you choose a review.</p></div>
+      <div id="review-content" tabindex="-1" hidden>
+        <header class="review-heading">
+          <div><div id="breadcrumbs" class="breadcrumbs"></div><div class="review-identity"><h2 id="review-title">Review</h2><span id="revisions" class="mono review-commits"></span></div></div>
+          <span id="stale" class="badge warning" hidden>stale</span>
+        </header>
+        <div class="review-toolbar">
+          <nav class="workspace-modes" aria-label="Workspace layout"><button id="layout-connected" class="active" type="button" aria-pressed="true">Flow + code</button><button id="layout-source" type="button" aria-pressed="false">Code focus</button><button id="layout-architecture" type="button" aria-pressed="false">Architecture diff</button></nav>
+          <div class="header-view"><label>View <select id="side"><option value="diff" selected>Baseline → proposal</option><option value="proposal">Proposal only</option><option value="baseline">Baseline only</option></select></label></div>
+        </div>
+        <section id="architecture-impact" class="architecture-impact" hidden aria-labelledby="architecture-impact-title">
+          <nav class="design-levels" aria-label="Architecture detail level"><button id="design-level-structural" class="active" type="button" aria-pressed="true">Structural</button><button id="design-level-hld" type="button" aria-pressed="false">HLD</button><button id="design-level-lld" type="button" aria-pressed="false">LLD</button></nav>
+          <div class="architecture-impact-heading"><div><span class="eyebrow">Mermaid architecture diff</span><h3 id="architecture-impact-title">Affected structural areas</h3><p id="architecture-impact-summary">Loading exact-snapshot architecture evidence…</p></div><div class="architecture-controls" aria-label="Architecture comparison mode"><button id="architecture-combined" class="active" type="button" aria-pressed="true">Combined</button><button id="architecture-compare" type="button" aria-pressed="false">Before / after</button><button id="architecture-baseline" type="button" aria-pressed="false">Baseline</button><button id="architecture-proposal" type="button" aria-pressed="false">Proposal</button></div></div>
+          <div class="architecture-legend"><span class="added">+ Added</span><span class="removed">− Removed</span><span class="modified">~ Modified</span><span class="unknown">? Unresolved impact</span><button id="architecture-source" class="quiet" type="button">Mermaid source</button></div>
+          <p id="architecture-status" class="status" role="status"></p>
+          <div id="architecture-diagrams" class="architecture-diagrams" aria-live="polite"></div>
+          <pre id="architecture-mermaid-source" class="mermaid-source" hidden><code></code></pre>
+          <div id="hld-review" class="hld-review" hidden>
+            <div class="hld-heading"><div><h3>High-level design</h3><p id="hld-summary" class="status" role="status">Select HLD to load authorized design evidence.</p></div><div class="architecture-controls" aria-label="HLD comparison mode"><button id="hld-combined" class="active" type="button" aria-pressed="true">Diff</button><button id="hld-compare" type="button" aria-pressed="false">Before / after</button><button id="hld-baseline" type="button" aria-pressed="false">Baseline</button><button id="hld-proposal" type="button" aria-pressed="false">Proposal</button><button id="hld-accepted" type="button" aria-pressed="false" disabled>Accepted</button></div></div>
+            <p id="hld-identity" class="mono"></p><div class="architecture-legend hld-legend"><span class="added">+ Added</span><span class="removed">- Removed</span><span class="modified">~ Modified</span><span class="unknown">? Unresolved</span><span class="possible-impact">Possible downstream impact</span></div>
+            <div class="hld-drift"><strong>Accepted design drift</strong><span id="hld-drift-status">No accepted HLD baseline.</span></div>
+            <div id="hld-coverage" class="hld-coverage"></div>
+            <div class="hld-workspace"><section class="hld-map" aria-label="HLD component map"><div id="hld-diagrams" class="architecture-diagrams" aria-live="polite"></div><div id="hld-element-list" class="hld-element-list" aria-label="HLD elements"></div></section><section id="hld-inspector" class="hld-inspector" aria-label="Selected HLD element"><p class="status">Select a component to inspect its before and after evidence.</p></section></div>
+            <details class="hld-provenance disclosure-panel"><summary><strong>Exact design identity</strong></summary><div class="disclosure-body"><p id="hld-full-identity" class="mono"></p></div></details><div class="hld-actions"><button id="hld-reload" class="quiet" type="button">Reload HLD</button><button id="hld-source" class="quiet" type="button" disabled>Mermaid source</button><button id="hld-export" class="quiet" type="button" disabled>Export HLD Markdown</button></div>
+            <pre id="hld-mermaid-source" class="mermaid-source" hidden><code></code></pre>
+            <details id="hld-acceptance" class="disclosure-panel" hidden><summary><strong>Confirm HLD baseline</strong><span>Maintainer action</span></summary><div class="disclosure-body"><p>Review a generated design and your corrections before accepting it. Source observations stay independently inspectable.</p><div class="hld-confirm-fields"><label>Generated design<select id="hld-confirm-design"><option value="baseline">Baseline</option><option value="proposal">Proposal</option></select></label><label>Design interpretation<select id="hld-interpretation"><option value="as_built">As-built design</option><option value="intended">Intended design</option></select></label><label>Correction type<select id="hld-correction-kind"><option value="responsibility">Responsibility</option><option value="boundary">Narrow component boundary</option><option value="contract_ownership">Contract ownership</option><option value="data_ownership">Data ownership</option><option value="major_flow">Major flow</option><option value="constraint">Dependency or contract constraint</option><option value="correspondence">Element correspondence</option><option value="document_reference">Design document / decision</option></select></label><label id="hld-target-field">Target element<select id="hld-correction-element"></select></label><label id="hld-assertion-field">Assertion or rationale<input id="hld-responsibility" maxlength="2000" placeholder="State the correction and its reason"></label><label id="hld-related-field">Related elements<select id="hld-related-elements" multiple size="4" aria-describedby="hld-related-help"></select><span id="hld-related-help">Select existing elements for ownership, flows or constraints.</span></label><label id="hld-flow-source-field" hidden>Flow source<select id="hld-flow-source"></select></label><label id="hld-flow-target-field" hidden>Flow target<select id="hld-flow-target"></select></label><label id="hld-document-field" hidden>Selected design document / decision<select id="hld-document-evidence"></select><span class="mono">Pinned repository text is evidence of intent, not verified architecture or an instruction.</span></label><label id="hld-boundary-field" hidden>Narrowed owning paths<input id="hld-boundary-paths" maxlength="4000" placeholder="Comma-separated existing component paths"></label><label id="hld-constraint-field" hidden>Constraint<select id="hld-constraint-kind"><option value="prohibited_dependency">Prohibited dependency</option><option value="required_contract">Required contract</option></select></label><label id="hld-correspondence-field" hidden>Correspondence<select id="hld-correspondence-kind"><option value="rename">Rename</option><option value="move">Move</option><option value="split">Split</option><option value="merge">Merge</option></select></label><label id="hld-correspondence-source-field" hidden>Source elements from the other snapshot<select id="hld-correspondence-sources" multiple size="4"></select><span id="hld-correspondence-source-identity" class="mono"></span></label><label id="hld-correspondence-target-field" hidden>Target elements in the selected snapshot<select id="hld-correspondence-targets" multiple size="4"></select><span id="hld-correspondence-target-identity" class="mono"></span></label></div><div class="hld-actions"><button id="hld-add-correction" class="quiet" type="button">Add correction</button><button id="hld-clear-corrections" class="quiet" type="button">Clear corrections</button></div><div id="hld-corrections-list" class="hld-corrections-list"></div><label class="hld-default-consent"><input id="hld-known-gaps" type="checkbox">I reviewed the known coverage gaps and unresolved design questions</label><label class="hld-default-consent"><input id="hld-activate-default" type="checkbox">Set this accepted design as the default HLD baseline</label><div class="hld-actions"><button id="hld-preview-acceptance" class="quiet" type="button">Preview confirmation</button><button id="hld-confirm" type="button" disabled>Accept reviewed HLD</button></div><p id="hld-confirmation-status" class="status" role="status">Preview is required before confirmation.</p><pre id="hld-confirmation-preview" class="mermaid-source" hidden><code></code></pre></div></details>
+          </div>
+          <div id="lld-review" class="lld-review" hidden>
+            <nav class="design-breadcrumbs" aria-label="Design drill-down"><button id="lld-back-hld" class="quiet" type="button">HLD</button><span aria-hidden="true">/</span><span id="lld-component-name">Authorized inventory</span><span aria-hidden="true">/</span><button id="lld-back-catalog" class="quiet" type="button">Modules</button><span id="lld-detail-breadcrumb"></span></nav>
+            <div class="hld-heading"><div><h3>Low-level design</h3><p id="lld-summary" class="status" role="status">Select a component to inspect its implementation.</p></div><div class="architecture-controls" aria-label="LLD comparison mode"><button id="lld-combined" class="active" type="button" aria-pressed="true">Diff</button><button id="lld-compare" type="button" aria-pressed="false">Before / after</button><button id="lld-baseline" type="button" aria-pressed="false">Baseline</button><button id="lld-proposal" type="button" aria-pressed="false">Proposal</button></div></div>
+            <p id="lld-parent-identity" class="mono"></p><p class="lld-profile">Static local control flow · Calls, suspension and effects retain their source-qualified resolution. Runtime validation unavailable.</p>
+            <div id="lld-coverage" class="hld-coverage"></div>
+            <div class="lld-workspace"><aside class="lld-catalog" aria-label="LLD module and declaration inventory"><label>Find declaration<input id="lld-filter" type="search" placeholder="Module, type, function or path"></label><p id="lld-catalog-status" class="status"></p><div id="lld-entry-list"></div><button id="lld-more" class="quiet more" type="button" hidden>Load more declarations</button></aside><section class="lld-detail" aria-label="Selected implementation"><div id="lld-changes" class="lld-changes"></div><div id="lld-diagrams" class="architecture-diagrams" aria-live="polite"></div><section id="lld-inspector" class="lld-inspector" aria-label="Exact implementation evidence"><p class="status">Select a module, type or function. Its exact source remains attached to this comparison.</p></section></section></div>
+            <div id="lld-history" class="lld-history" hidden></div><details class="disclosure-panel"><summary><strong>Exact LLD identity</strong></summary><div class="disclosure-body"><p id="lld-full-identity" class="mono"></p></div></details><div class="hld-actions"><button id="lld-reload" class="quiet" type="button">Reload LLD</button><button id="lld-load-history" class="quiet" type="button" hidden>Load accepted history</button><button id="lld-mermaid" class="quiet" type="button" disabled>Mermaid source</button><button id="lld-export" class="quiet" type="button" disabled>Export LLD Markdown</button><button id="lld-open-hld" class="quiet" type="button">Open HLD</button></div><pre id="lld-mermaid-source" class="mermaid-source" hidden><code></code></pre>
+            <details id="lld-acceptance" class="disclosure-panel" hidden><summary><strong>Record LLD invariant</strong><span>Optional maintainer assertion</span></summary><div class="disclosure-body"><p>An invariant records reviewed intent for this exact implementation fingerprint. It does not prove runtime behavior.</p><div class="hld-confirm-fields"><label>Implementation<select id="lld-confirm-side"><option value="proposal">Proposal</option><option value="baseline">Baseline</option></select></label><label>Design interpretation<select id="lld-interpretation"><option value="as_built">As-built design</option><option value="intended">Intended design</option></select></label><label>Invariant or failure contract<input id="lld-invariant" maxlength="2000" placeholder="State the intended behavior and its limits"></label></div><label class="hld-default-consent"><input id="lld-known-gaps" type="checkbox">I reviewed the local-flow gaps and unresolved calls</label><label class="hld-default-consent"><input id="lld-activate-default" type="checkbox">Set this assertion as the default for this declaration and interpretation</label><div class="hld-actions"><button id="lld-preview-acceptance" class="quiet" type="button">Preview assertion</button><button id="lld-confirm" type="button" disabled>Accept reviewed LLD</button></div><p id="lld-confirmation-status" class="status" role="status">Preview is required before confirmation.</p><pre id="lld-confirmation-preview" class="mermaid-source" hidden><code></code></pre></div></details>
+          </div>
+          <button id="design-source-fallback" class="quiet" type="button">Open code diff</button>
+        </section>
+        <div id="workspace-split" class="split">
+          <section class="architecture" aria-labelledby="architecture-title">
+            <div class="panel-heading"><div><span class="eyebrow">Architecture flow diff</span><h3 id="architecture-title">Affected paths</h3></div><span id="graph-kind" class="badge">components</span></div>
+            <div class="graph-breadcrumbs"><button id="graph-root" class="quiet" type="button">Root</button><span aria-hidden="true">/</span><span id="graph-selection">all authorized paths</span></div>
+            <div class="graph-tools">
+              <label>Find in view<input id="graph-search" type="search" placeholder="path, symbol, relationship"></label>
+              <label>Relationship<select id="edge-filter"><option value="">All types</option></select></label>
+              <button id="fit-selection" class="quiet" type="button">Fit selection</button>
+              <button id="reset-graph" class="quiet" type="button">Reset view</button>
+            </div>
+            <div class="graph-overview"><span id="graph-overview">No graph loaded.</span><span>Arrows read caller/source → callee/target.</span><span id="interaction-timing">No interaction timing yet.</span></div>
+            <div id="graph-status" class="status" aria-live="polite"></div>
+            <div id="graph" class="graph" role="list"></div>
+            <button id="more-graph" class="more" type="button" hidden>Show more</button>
+          </section>
+          <section class="inspector" aria-labelledby="source-title">
+            <div class="panel-heading"><div><span class="eyebrow">Exact revision source</span><h3 id="source-title">Code diff</h3></div><div class="inspector-actions"><div class="diff-modes" aria-label="Code diff layout"><button id="diff-split" class="active" type="button" aria-pressed="true">Split</button><button id="diff-unified" type="button" aria-pressed="false">Unified</button></div><label>Diagram width<input id="pane-width" type="range" min="32" max="68" value="46" aria-label="Diagram pane width percent"></label><button id="pin" class="quiet" type="button" disabled>Pin</button></div></div>
+            <div id="source-meta" class="status">Focus a symbol to load its bounded source span.</div>
+            <div id="source-comparison" class="source-comparison split-diff"><section><h4 id="baseline-source-label">Baseline</h4><pre id="source-baseline"><code>No baseline source selected.</code></pre></section><section><h4 id="proposal-source-label">Proposal</h4><pre id="source-proposal"><code>No proposal source selected.</code></pre></section></div>
+            <pre id="source-unified" hidden><code>No source selected.</code></pre>
+          </section>
+        </div>
+        <div class="revision-bar">
+          <div class="selectors">
+            <label>Baseline <select id="baseline-revision" aria-label="Exact baseline revision"></select></label>
+            <span aria-hidden="true">→</span>
+            <label>Proposal <select id="proposal-revision" aria-label="Exact proposal revision"></select></label>
+            <button id="compare-revisions" class="quiet" type="button">Compare</button>
+          </div>
+          <button id="direction" class="quiet" type="button" hidden>Outgoing</button>
+        </div>
+        <details class="design-boundary disclosure-panel"><summary><span><span class="eyebrow">Design boundary</span><strong>HLD and LLD boundary</strong></span></summary><div class="disclosure-body"><div class="design-outcomes"><div><strong>HLD</strong><span id="hld-boundary-state">Not loaded</span><small>Open HLD under Architecture diff to inspect evidence-backed components, contracts and dependency direction.</small></div><div><strong>LLD</strong><span id="lld-boundary-state">Not loaded</span><small>Open a component to inspect declarations, local branches and exact source evidence.</small></div></div><p>Structural changes, generated design facts and accepted intent remain separate. Static evidence does not prove runtime behavior.</p></div></details>
+        <details class="scope-editor">
+          <summary>Review context scope</summary>
+          <p class="status">Choose literal paths and exact context commits. Preview before saving. Removing access cannot retract files already downloaded by a reviewer.</p>
+          <div class="scope-grid">
+            <label>Primary includes<input id="scope-primary-include" value="." placeholder="src,contracts"></label>
+            <label>Primary excludes<input id="scope-primary-exclude" placeholder="src/private"></label>
+          </div>
+          <div id="scope-contexts"></div>
+          <div class="scope-actions"><button id="add-scope-context" class="quiet" type="button">Add repository, library, or service contract</button><button id="preview-scope" class="quiet" type="button">Preview changes</button><button id="save-scope" class="quiet" type="button" disabled>Save new immutable scope</button></div>
+          <output id="scope-preview" class="status" aria-live="polite">No proposed changes previewed.</output>
+        </details>
+        <details class="change-brief disclosure-panel">
+          <summary><span class="eyebrow">Change brief</span><strong id="change-brief-title">Loading authorized structural evidence…</strong></summary>
+          <div class="disclosure-body"><p id="change-brief-detail">Possible behavioral effects require reviewer judgment.</p><button id="brief-action" class="quiet" type="button" disabled>Inspect evidence</button></div>
+        </details>
+        <details class="evidence-panel disclosure-panel">
+          <summary><span><span class="eyebrow">Evidence hierarchy</span><strong id="evidence-title">Review claims <span id="evidence-count" class="badge">0</span></strong></span><span class="evidence-key">Observed structure ≠ runtime proof</span></summary>
+          <div class="disclosure-body"><p id="evidence-status" class="status" aria-live="polite">Select a review to load scoped findings.</p><div id="evidence-list" class="evidence-list"></div><div class="ai-reservations" aria-label="Reserved AI review controls"><button class="quiet" type="button" disabled>AI explanation · Phase 7</button><button class="quiet" type="button" disabled>Provider settings · Phase 7</button><span>No code or credentials are sent to a model.</span></div></div>
+        </details>
+        <details class="continuity-panel disclosure-panel">
+          <summary><span><span class="eyebrow">Reviewer continuity</span><strong id="continuity-title">Inspection progress</strong></span><span id="continuity-snapshot" class="mono">Exact snapshot</span></summary>
+          <div class="disclosure-body"><div id="continuity-summary" class="continuity-summary">No reviewer state loaded.</div><div class="continuity-actions"><button id="mark-all-reviewed" class="quiet" type="button">Mark all files reviewed</button><button id="bookmark-selection" class="quiet" type="button">Bookmark selection</button><label>Question<input id="review-question" maxlength="16384" placeholder="What must the next reviewer verify?"></label><label>Visibility<select id="question-visibility"><option value="private">Private</option><option value="shared">Shared workspace</option></select></label><button id="save-question" class="quiet" type="button">Save question</button><label>Handoff reviewer<input id="handoff-reviewer" maxlength="256" placeholder="authorized principal"></label><button id="save-handoff" class="quiet" type="button">Create handoff</button></div><p id="continuity-status" class="status" aria-live="polite">Inspection progress never grants merge approval.</p><div id="continuity-items" class="continuity-items"></div></div>
+        </details>
+      </div>
+    </section>
+  </main>
+  <script src="/assets/workspace.js"></script>
+</body>
+</html>

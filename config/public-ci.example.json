@@ -1,0 +1,24 @@
+{
+  "schema_version": "csb-public-ci-config-v1",
+  "repository": {"id": 1396405438, "owner": "SSC-SDE", "name": "codeshouldbehave"},
+  "default_branch": "main",
+  "workflow_path": ".github/workflows/csb-public-controller.yml",
+  "workflow_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "policy_path": ".codeshouldbehave/public-policy.json",
+  "policy_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "context_path": ".codeshouldbehave/accepted-context.json",
+  "context_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "engine": {
+    "commit": "0000000000000000000000000000000000000000",
+    "flowdiff_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "exporter_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "site": {"origin": "https://SSC-SDE.github.io", "base_path": "/codeshouldbehave/"},
+  "receipt": {
+    "task": "csb-public-state-v1",
+    "environment": "csb-public-state",
+    "signer_workflow": "SSC-SDE/codeshouldbehave/.github/workflows/csb-public-controller.yml"
+  },
+  "budget": {"proof_mode": "unavailable", "account": "SSC-SDE", "repository_byte_limit": 180355072},
+  "operations": {"analysis": false, "publication": false, "checks": false}
+}

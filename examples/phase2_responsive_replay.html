@@ -1,0 +1,17 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><title>Phase 2 responsive replay</title>
+<style>body{font:14px system-ui;margin:20px;background:#f4f5f8;color:#20242d}#result{font-weight:700;margin-bottom:12px}iframe{width:390px;height:760px;border:2px solid #5b4bce;border-radius:10px;background:white}</style>
+<div id="result" role="status">RUNNING · narrow reviewer replay</div><iframe id="workspace" title="390 pixel reviewer workspace" src="/workspace"></iframe>
+<script>
+const frame=document.getElementById('workspace'),result=document.getElementById('result');
+frame.addEventListener('load',async()=>{const win=frame.contentWindow,doc=frame.contentDocument;
+  doc.getElementById('session-token').value='local-preview-session-token';doc.getElementById('session-form').requestSubmit();
+  for(let i=0;i<100&&doc.getElementById('connection').textContent!=='Connected';i++)await new Promise(r=>setTimeout(r,20));
+  const card=doc.querySelector('.pr-card');if(card)card.click();
+  for(let i=0;i<100&&doc.getElementById('analysis-status').textContent!=='Ready';i++)await new Promise(r=>setTimeout(r,20));
+  const noOverflow=doc.body.scrollWidth<=win.innerWidth+1;
+  const oneColumn=getComputedStyle(doc.getElementById('workspace-split')).gridTemplateColumns.trim().split(/\s+/).length===1;
+  const touchTargets=[...doc.querySelectorAll('#graph button')].every(button=>button.getBoundingClientRect().height>=44);
+  const widest=[...doc.querySelectorAll('body *')].sort((a,b)=>b.scrollWidth-a.scrollWidth)[0];
+  result.textContent=noOverflow&&oneColumn&&touchTargets?'PASS · narrow layout, one column, touch targets':`FAIL · overflow=${noOverflow} (${doc.body.scrollWidth}/${doc.documentElement.clientWidth}, ${widest?.id||widest?.className||widest?.tagName}:${widest?.scrollWidth}) one-column=${oneColumn} touch-targets=${touchTargets}`;
+});
+</script></html>

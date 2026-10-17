@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Phase 2 reviewer pilot</title>
+<style>
+:root{font:14px system-ui;color:#20242d;background:#f4f5f8}*{box-sizing:border-box}body{margin:0}.top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 18px;background:#161929;color:white}.top strong{font-size:16px}.top span{color:#c9cee5}.layout{display:grid;grid-template-columns:minmax(560px,1fr) 370px;height:calc(100vh - 52px)}iframe{width:100%;height:100%;border:0;background:white}.guide{overflow:auto;border-left:1px solid #ccd0dc;padding:16px;background:#fff}.guide h1{font-size:18px;margin:0 0 6px}.guide p{color:#586071;line-height:1.4}.field{display:grid;gap:4px;margin:10px 0}.field span{font-size:11px;font-weight:700;color:#535a69;text-transform:uppercase;letter-spacing:.04em}input,select,textarea,button{font:inherit}input,select,textarea{width:100%;padding:8px;border:1px solid #b8becc;border-radius:7px;background:white}textarea{min-height:62px;resize:vertical}.tasks{display:grid;gap:8px;margin:14px 0}.task{border:1px solid #d7dae3;border-radius:8px;padding:10px}.task label{display:flex;gap:8px;font-weight:650}.task input[type=checkbox]{width:auto}.task small{display:block;color:#626a79;margin:5px 0 0 25px}.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.actions{position:sticky;bottom:0;background:white;border-top:1px solid #ddd;padding:12px 0 2px;display:flex;gap:8px}button{border:0;border-radius:7px;padding:9px 12px;background:#5b4bce;color:white;font-weight:700;cursor:pointer}button.secondary{background:#e9e7f8;color:#372a83}button:disabled{opacity:.45;cursor:not-allowed}#status{font-weight:650;margin:8px 0}.timer{font-variant-numeric:tabular-nums;font-weight:750}@media(max-width:950px){.layout{grid-template-columns:1fr;height:auto}.guide{border-left:0;border-top:1px solid #ccd0dc}.layout iframe{height:70vh}}
+</style></head><body>
+<header class="top"><strong>CodeShouldBehave reviewer pilot</strong><span>Workspace evidence stays in the workspace · observation export contains no token or source</span><span id="timer" class="timer">00:00</span></header>
+<main class="layout"><iframe id="workspace" title="CodeShouldBehave reviewer workspace" src="/workspace"></iframe><aside class="guide">
+<h1>Fixed release tasks</h1><p>Work without interface coaching. Describe unknowns as unknown. Inspection progress never approves a merge.</p>
+<label class="field"><span>Reviewer role</span><select id="role"><option value="">Choose role</option><option>first-time contributor</option><option>service owner</option><option>cross-repository reviewer</option><option>repository maintainer</option></select></label>
+<label class="field"><span>Experience</span><select id="experience"><option value="">Choose experience</option><option>first time using this workspace</option><option>experienced with this workspace</option></select></label>
+<label class="field"><span>Authorized example identifier</span><input id="example" maxlength="256" placeholder="Repository/PR identifier only"></label>
+<div id="tasks" class="tasks"></div>
+<div class="row"><label class="field"><span>Backtracks</span><input id="backtracks" type="number" min="0" max="999" value="0"></label><label class="field"><span>First evidence (seconds)</span><input id="first-evidence" type="number" min="0" max="86400" placeholder="Elapsed"></label></div>
+<label class="field"><span>Wrong interpretation, if any</span><textarea id="wrong" maxlength="4000"></textarea></label>
+<label class="field"><span>Qualitative feedback</span><textarea id="feedback" maxlength="4000"></textarea></label>
+<label class="field"><span>Decision</span><select id="decision"><option value="">Choose decision</option><option value="pass">pass</option><option value="repeat_after_correction">repeat after correction</option><option value="stop">stop</option></select></label>
+<p id="status" role="status">Start when the reviewer is ready.</p>
+<div class="actions"><button id="start">Start observation</button><button id="evidence" class="secondary" disabled>Mark first evidence</button><button id="export" disabled>Export observation</button></div>
+</aside></main>
+<script>
+const definitions=[
+ ['triage','Triage and separate statuses','State analysis, provider and human review independently.'],
+ ['identity','Pin comparison identity','Read repository, baseline, proposal and scope.'],
+ ['evidence','Qualify the main evidence','Separate an observed relationship from a possible effect.'],
+ ['drilldown','Compare code and follow a caller','Inspect Split and Unified code diff, follow a caller where available, then return.'],
+ ['revision','Compare revisions','Explain which progress belongs to the older proposal.'],
+ ['fallback','Interpret architecture impact','Inspect Combined and Before / after Mermaid views, keep HLD/LLD unconfirmed, then open code evidence.'],
+ ['summary','Finish without approving','Summarize evidence, unknowns and coverage; inspection is not approval.']
+];
+const tasks=document.getElementById('tasks');definitions.forEach(([id,title,help])=>{const box=document.createElement('div');box.className='task';box.innerHTML=`<label><input type="checkbox" data-task="${id}">${title}</label><small>${help}</small>`;tasks.append(box)});
+let startedAt=0,firstEvidenceAt=null,tick=null;const status=document.getElementById('status'),timer=document.getElementById('timer');
+const elapsed=()=>startedAt?Math.floor((Date.now()-startedAt)/1000):0;const paint=()=>{const seconds=elapsed();timer.textContent=`${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`};
+function ready(){return startedAt&&document.getElementById('role').value&&document.getElementById('experience').value&&document.getElementById('example').value.trim()&&document.getElementById('decision').value&&[...document.querySelectorAll('[data-task]')].every(item=>item.checked)}
+function refresh(){document.getElementById('export').disabled=!ready()}
+document.getElementById('start').onclick=()=>{if(startedAt)return;startedAt=Date.now();tick=setInterval(paint,1000);document.getElementById('evidence').disabled=false;status.textContent='Observation running. Do not coach the interface.';paint();refresh()};
+document.getElementById('evidence').onclick=()=>{if(firstEvidenceAt!==null)return;firstEvidenceAt=elapsed();document.getElementById('first-evidence').value=firstEvidenceAt;document.getElementById('evidence').disabled=true;status.textContent=`First relevant evidence recorded at ${firstEvidenceAt} seconds.`};
+document.querySelector('.guide').addEventListener('input',refresh);document.querySelector('.guide').addEventListener('change',refresh);
+document.getElementById('export').onclick=()=>{const endedAt=new Date();const record={schema:'codeshouldbehave-phase2-reviewer-observation-v1',recorded_at_utc:endedAt.toISOString(),role:document.getElementById('role').value,experience:document.getElementById('experience').value,authorized_example:document.getElementById('example').value.trim(),tasks:Object.fromEntries([...document.querySelectorAll('[data-task]')].map(item=>[item.dataset.task,item.checked])),elapsed_seconds:elapsed(),first_relevant_evidence_seconds:Number(document.getElementById('first-evidence').value||firstEvidenceAt||0),backtracks:Number(document.getElementById('backtracks').value||0),wrong_interpretation:document.getElementById('wrong').value.trim(),qualitative_feedback:document.getElementById('feedback').value.trim(),decision:document.getElementById('decision').value,claims:{statistical_improvement:false,merge_approval:false},contains_credentials_or_source:false};clearInterval(tick);const blob=new Blob([JSON.stringify(record,null,2)+'\n'],{type:'application/json'}),link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download=`csb-phase2-observation-${endedAt.toISOString().replace(/[:.]/g,'-')}.json`;link.click();setTimeout(()=>URL.revokeObjectURL(link.href),0);status.textContent='Observation exported. Give the JSON file to the Phase 2 maintainer.'};
+</script></body></html>

@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Phase 1 browser replay</title>
+<style>
+  body { font: 14px system-ui; margin: 24px; color: #172033; }
+  #sessions { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+  pre { border: 1px solid #ccd4e0; margin: 0; padding: 4px; overflow: hidden; height: 3em; }
+  output { display: block; white-space: pre-wrap; margin: 16px 0; }
+</style>
+<h1>Phase 1 authorized source-preview replay</h1>
+<p>Twenty-five browser sessions perform four request-to-render interactions each.</p>
+<output id="result">running</output>
+<div id="sessions"></div>
+<script>
+'use strict';
+const SESSION_COUNT = 25;
+const INTERACTIONS_PER_SESSION = 4;
+const sourceUrl = '/v1/reviews/review-preview/source?side=proposal&path=src%2Fpayments.rs&blob=preview-blob&start_line=41&end_line=45';
+const panes = Array.from({length: SESSION_COUNT}, (_, index) => {
+  const pane = document.createElement('pre');
+  pane.setAttribute('aria-label', `session ${index + 1} source`);
+  document.querySelector('#sessions').append(pane);
+  return pane;
+});
+const frame = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+async function session(index) {
+  const samples = [];
+  for (let interaction = 0; interaction < INTERACTIONS_PER_SESSION; interaction += 1) {
+    const started = performance.now();
+    const response = await fetch(sourceUrl, {
+      headers: {Authorization: 'Bearer local-preview-session-token', Accept: 'application/json'},
+      cache: 'no-store',
+    });
+    if (!response.ok) throw new Error(`source request failed: ${response.status}`);
+    const source = await response.json();
+    if (source.review_id !== 'review-preview' || source.path !== 'src/payments.rs' || source.text.split('\n').length !== 5) {
+      throw new Error('source identity or bounded span mismatch');
+    }
+    panes[index].textContent = source.text;
+    await frame();
+    samples.push(performance.now() - started);
+  }
+  return samples;
+}
+function percentile(sorted, value) {
+  return sorted[Math.ceil(sorted.length * value / 100) - 1];
+}
+Promise.all(Array.from({length: SESSION_COUNT}, (_, index) => session(index)))
+  .then(groups => {
+    const samples = groups.flat().sort((left, right) => left - right);
+    const report = {
+      schema: 'codeshouldbehave-phase1-browser-replay-v1',
+      status: 'complete',
+      browser: navigator.userAgent,
+      sessions: SESSION_COUNT,
+      samples: samples.length,
+      measurement: 'authorized request start to source text committed plus two animation frames',
+      p50_ms: percentile(samples, 50),
+      p95_ms: percentile(samples, 95),
+      max_ms: samples.at(-1),
+      rendered_spans: panes.filter(pane => pane.textContent.split('\n').length === 5).length,
+    };
+    document.querySelector('#result').textContent = JSON.stringify(report, null, 2);
+    document.title = report.p95_ms <= 500 ? 'PASS · Phase 1 browser replay' : 'FAIL · Phase 1 browser replay';
+  })
+  .catch(error => {
+    document.querySelector('#result').textContent = JSON.stringify({status: 'failed', reason: error.message});
+    document.title = 'FAIL · Phase 1 browser replay';
+  });
+</script>
+</html>

@@ -1,0 +1,14 @@
+[
+  {
+    "path": "licenses/javascript/DOMPurify-3.4.12-LICENSE.txt",
+    "source": "https://raw.githubusercontent.com/cure53/DOMPurify/3.4.12/LICENSE",
+    "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "bytes": 11358
+  },
+  {
+    "path": "licenses/javascript/lodash-4.18.1-LICENSE.txt",
+    "source": "https://raw.githubusercontent.com/lodash/lodash/4.18.1/LICENSE",
+    "sha256": "f71e8ed126b46346494aad5486874cd8f0aafe95092ed67d2e3cb6110f939abc",
+    "bytes": 1952
+  }
+]
