@@ -199,9 +199,43 @@ activities. The bootstrap uses the fixed Sigstore bundle; trust-root/SDK/platfor
 internal requests are not observable application transports and are not falsely
 included in the proved 100 application REST calls.
 
-The consumer runner must have a usable `/usr/bin/bwrap`. The template tests an
-actual empty `--unshare-all --clearenv` sandbox before invoking the engine. An
-absent executable, blocked user namespace or AppArmor denial is an explicit
-canary/environment stop. Do not disable AppArmor, relax kernel isolation or run
-reviewed code outside the sandbox to make this check pass. Hosted Linux sandbox
-acceptance remains a required live gate.
+The analyzer job uses the explicit `ubuntu-22.04` standard hosted image and
+installs Bubblewrap from its signed distribution repositories with
+`apt-get update -qq` and `apt-get install -y --no-install-recommends bubblewrap`.
+Only this package setup uses `sudo`; the analyzer and exporter run without it.
+Plan and publisher jobs remain on `ubuntu-24.04`.
+
+The trusted Linux engine build job also uses `ubuntu-22.04` so its GNU libc
+requirements match the analyzer image. Its separate attestation job remains on
+`ubuntu-24.04`; that job handles the built archives without executing the native
+binaries. Do not substitute an engine built on a newer distribution merely
+because its archive and signature verify.
+
+The 22.04 builder selects Python 3.12 with the immutable official setup action
+recorded in `action-pins.json`. Its default system Python is not assumed to meet
+the source packager's Python 3.11+ requirement. It runs the public release
+contract suite on the actual builder before packaging. No pip cache is enabled.
+
+In [native compatibility probe run 39018952784](https://github.com/SSC-SDE/codeshouldbehave-beta/actions/runs/39018952784)
+(job 117356721397), release provenance verification and the strict empty sandbox
+passed on 22.04, but the engine built on 24.04 failed to start: its runtime needed
+`GLIBC_2.39`, which the analyzer image did not provide. The corrected build image
+requires a new Linux build, release digest and attestation verification, followed
+by actual native execution inside the unchanged sandbox. That rebuild and worker
+result are not yet accepted. Do not modify the verified archive or install a
+different libc to bypass this failure.
+
+The real hosted [sandbox probe run 39016540661](https://github.com/SSC-SDE/codeshouldbehave-beta/actions/runs/39016540661)
+passed the unchanged strict Bubblewrap command on `ubuntu-22.04`
+(job 117349713231), while `ubuntu-24.04` failed it (job 117349713122) after the
+package installation. This establishes the measured compatible sandbox profile,
+not a completed native worker or public analysis result. The exact cause of the
+24.04 namespace refusal remains unconfirmed; no AppArmor or kernel setting was
+changed to bypass it.
+
+The template still requires a usable `/usr/bin/bwrap` and tests an actual empty
+`--unshare-all --clearenv` sandbox before invoking the engine. Missing packages,
+package-manager failures, blocked user namespaces or AppArmor denial stop the
+job. Do not disable AppArmor, relax kernel isolation or run reviewed code outside
+the sandbox to make this check pass. Native worker, provenance and public canary
+acceptance remain required live gates.

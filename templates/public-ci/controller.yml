@@ -67,7 +67,7 @@ jobs:
       fail-fast: false
       max-parallel: 2
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     timeout-minutes: 15
     permissions:
       contents: read
@@ -84,6 +84,10 @@ jobs:
           name: csb-public-plan-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/plan
           digest-mismatch: error
+      - name: Install distribution Bubblewrap for the isolated analyzer
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends bubblewrap
       - name: Parse exact Git objects as data in a networkless sandbox
         env:
           GH_TOKEN: ${{ github.token }}
