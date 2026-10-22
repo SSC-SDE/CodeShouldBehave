@@ -1,17 +1,30 @@
-# CodeShouldBehave public review workspace
+# CodeShouldBehave
 
 CodeShouldBehave shows how a pull request changes Rust structure and local
 behavior. Open the PR's **CodeShouldBehave / Architecture** check, then follow
 HLD → component → LLD declaration/function → exact baseline/proposal source.
 The same dark workspace provides combined, before/after and split/unified views.
 
-Status: local implementation and verification are underway. The public CI
-installation and hosted URL are not yet claimed live. No reviewer terminal,
-API key or local server is required once an accepted public deployment exists.
+**Open source · MIT · experimental.** Created by Shankhya Subhra Chatterjee,
+with contributor attribution retained in [LICENSE](LICENSE). Development,
+issues and contributions belong in the public
+[CodeShouldBehave repository](https://github.com/SSC-SDE/CodeShouldBehave).
+
+The [Linux x86_64 experimental release](https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-2917f1bb352b)
+is built and signed; checksums and release bootstrap verification passed.
+Native sandbox startup for this release and the live PR-to-dashboard journey
+remain pending. Automatic PR analysis and a hosted dashboard are **not enabled
+by cloning this repository**. See [release status](docs/RELEASE_STATUS.md).
+
+After one-time maintainer setup and activation, opening, reopening or updating a
+PR is intended to trigger analysis automatically. Reviewers follow the check's
+Details link without terminal commands, API keys or a local server.
 
 ## Reviewer journey
 
-1. Open the exact Architecture check on the PR revision you want to review.
+1. After repository activation, open the exact Architecture check on the PR
+   revision you want to review. Details opens **Focus** with the pinned report;
+   direct dashboard entry opens **Standard**.
 2. Verify repository, baseline and proposal commits. The link pins both analysis
    and public export identities; a newer PR head does not change that report.
 3. Open **Architecture diff**, inspect HLD direction/component changes and choose
@@ -23,6 +36,19 @@ API key or local server is required once an accepted public deployment exists.
    Use the file tick or **Mark all files reviewed** for personal inspection state.
 6. Review gaps before drawing a conclusion. Missing/deferred detail cannot be
    requested from a hidden native server; it needs another authorized analysis.
+
+## Workspace appearance
+
+**Profile / Settings** offers independent Standard and Focus layouts, selectable
+sections, panel ordering/sizing, presentation filters and application themes:
+Graphite, Blueprint, Terminal and Contrast. **HLD appearance** offers Studio
+(the Focus default) and Classic (the Standard default). Studio changes HLD
+presentation only; it does not change LLD or analysis evidence.
+
+Static reports save layout preferences in the browser only. The optional Rust
+account service supports authenticated personal preferences with revision
+conflicts; it is not supplied by static Pages hosting. Temporary PR adjustments
+remain separate from saved defaults. No credentials belong in these preferences.
 
 Personal reviewed files, questions and bookmarks live in page memory. Reload
 clears them. They are not shared reviewer state, GitHub approval or a privacy
@@ -53,7 +79,15 @@ Development commands require the source archive or repository checkout. The
 runtime archive contains executables, browser/workflow assets and notices,
 rather than the complete development tree.
 
-From the source repository root:
+Install Rust 1.87.0, Node.js and Python 3.11+ first. From the source repository:
+
+```sh
+git clone https://github.com/SSC-SDE/CodeShouldBehave.git
+cd CodeShouldBehave
+rustup toolchain install 1.87.0 --profile minimal --component clippy --component rustfmt
+```
+
+Then build and test:
 
 ```sh
 cargo +1.87.0 build --locked --all-features --bins
@@ -122,3 +156,14 @@ checksums, a lockfile dependency SBOM and original third-party notices locally.
 It excludes private history, evidence, state and screenshots and never uploads
 anything. A pattern scan is not an exhaustive privacy audit; public source and
 canary activation require a separately reviewed manifest and final approval.
+
+## Contributing and licensing
+
+Use branches and pull requests against this public repository. Read
+[CONTRIBUTING.md](CONTRIBUTING.md) and report vulnerabilities privately using
+[SECURITY.md](SECURITY.md). Earlier private development history is not part of
+this public repository and is not needed to contribute.
+
+Project code is MIT licensed; retain copyright and license notices when
+redistributing. Dependencies and bundled fonts retain their own licenses; see
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and [font notices](src/fonts/README.md).

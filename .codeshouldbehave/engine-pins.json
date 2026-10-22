@@ -1,12 +1,12 @@
 {
   "engine": {
-    "commit": "8c496b1a31c5b522f520475f3ddcff78a6b3e2b1",
-    "flowdiff_sha256": "ba5cc3546b18bfc117ede0628fa01bb64bf6b8f0f9b19f791aefc4984fdb3ba1",
-    "exporter_sha256": "6bbc5ee88af74439233532e6be7e692184f8409ae5f25cdb32e3fd1c70ea91eb",
-    "package_url": "https://github.com/SSC-SDE/codeshouldbehave-beta/releases/download/canary-8c496b1a31c5/codeshouldbehave-x86_64-unknown-linux-gnu-8c496b1a31c5.tar.gz",
-    "package_sha256": "f4016c07fe35b5551e99546c32cee6d43ab16bcd1c3540151676d19849d0eeb4",
-    "package_signer_workflow": "SSC-SDE/codeshouldbehave-beta/.github/workflows/csb-engine-build.yml",
-    "package_attestation_url": "https://github.com/SSC-SDE/codeshouldbehave-beta/releases/download/canary-8c496b1a31c5/native-build.sigstore.json",
-    "package_attestation_sha256": "d8c09347bc804bbd75cceb4e3fab9730e56dcbb0536d3111e58e246889d3a5ec"
+    "commit": "2917f1bb352bd5cee38d5da9be5bf79817434eab",
+    "flowdiff_sha256": "7fab95084c6c5466b908ac9702b31cffd757a45a5a9bdde55c6350e17d6ca13f",
+    "exporter_sha256": "40f4f1d50f7cb6ddfa98b1581302df89be63f593dac5eca0d9244f3bdb4301e1",
+    "package_url": "https://github.com/SSC-SDE/CodeShouldBehave/releases/download/canary-2917f1bb352b/codeshouldbehave-x86_64-unknown-linux-gnu-2917f1bb352b.tar.gz",
+    "package_sha256": "cdeff22cf7e7da235f8e52cdb43b3ac5e35611e712b6c3e6cc6c323ed64dd7f2",
+    "package_signer_workflow": "SSC-SDE/CodeShouldBehave/.github/workflows/csb-engine-build.yml",
+    "package_attestation_url": "https://github.com/SSC-SDE/CodeShouldBehave/releases/download/canary-2917f1bb352b/native-build.sigstore.json",
+    "package_attestation_sha256": "aefb453e3e549b5d2b76b15a3a115dce029c556b99581a23dcc5a6d4a6d2a3c0"
   }
 }

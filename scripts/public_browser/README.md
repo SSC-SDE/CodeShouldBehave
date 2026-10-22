@@ -1,4 +1,4 @@
-# Local public-viewer verification
+# CodeShouldBehave local public-viewer verification
 
 These optional helpers verify the documented `fixture/public` synthetic report in the existing dark workspace. They do not install dependencies, contact GitHub, authorize a deployment, or represent production traffic. The application itself does not require Playwright.
 
@@ -7,7 +7,7 @@ Prepare a public synthetic bundle with the Rust integration test, then assemble 
 Set these environment variables before running the helpers:
 
 ```sh
-export REPO_ROOT=/path/to/codeshouldbehave
+export REPO_ROOT=/path/to/CodeShouldBehave
 export PUBLIC_SITE="$REPO_ROOT/target/phase6-public-site"
 export PUBLIC_BASE_URL=http://127.0.0.1:3220/workspace/
 export PUBLIC_BROWSER_OUTPUT="$REPO_ROOT/target/public-browser-qa"
@@ -35,3 +35,15 @@ The performance profile runs three fixed seeds, each with ten excluded and expli
 The separate memory oracle instantiates 25 independent controllers and transports. Its fake byte transport is not a network or capacity test. Input bundle selection and the exact scope-fault model are recorded in its report.
 
 Every helper records the site-manifest digest, public manifest digest, source and served-asset digests, and all helper digests. Before/after checks reject source, assets, or helper changes during a run. The report's working-tree hashes identify the tested bytes; they are not a claim that an earlier Git commit contained uncommitted code.
+
+## Appearance and entry-mode verification
+
+Use explicit `mode=focus` links for the PR entry journey; direct workspace entry
+uses Standard. Check Studio and Classic HLD appearance, application themes and
+Settings Save/Cancel independently. Studio is Focus's default and must not alter
+LLD evidence or source drill-down. These additional UI checks are not implied
+by a historical passing lifecycle report.
+
+The public source and experimental Linux release are available at
+[CodeShouldBehave](https://github.com/SSC-SDE/CodeShouldBehave). Local browser
+results do not establish automatic PR workflow or hosted dashboard acceptance.

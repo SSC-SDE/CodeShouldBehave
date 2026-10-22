@@ -5,7 +5,7 @@ changes repository visibility, uploads a release, enables Actions, or publishes
 source. `config/public-ci.example.json` is deliberately disabled and contains
 unresolved trust pins. Runtime validation rejects it.
 
-The local implementation prepares the following journey:
+The implementation supports the following intended journey after installation and acceptance:
 
 1. A source-free `pull_request` nudge wakes a default-branch controller. Fork
    workflow edits, checkout contents and artifacts are never consumed. A ten-minute
@@ -45,11 +45,12 @@ workflow source, hosted runner and certificate-bound run/attempt.
 
 Live installation is not accepted yet. The outstanding gates are:
 
-- Explicit owner approval to publish source and create/use the public canary and
-  public Pages project. The current application repository is private.
-- A real hosted Linux runtime release and its fixed `.sigstore.json` bundle,
-  published from the audited engine source. Local source/macOS candidates are
-  review artifacts and do not satisfy this requirement.
+- The project is now public at [SSC-SDE/CodeShouldBehave](https://github.com/SSC-SDE/CodeShouldBehave)
+  under MIT. Publication does not activate consumer workflows or Pages.
+- The [current experimental Linux release](https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-2917f1bb352b)
+  passed build, signing, checksum and bootstrap verification. Its exact pins are
+  in `.codeshouldbehave/engine-pins.json`; native sandbox startup and full worker
+  acceptance remain required. See [release status](../../docs/RELEASE_STATUS.md).
 - Live-provider acceptance of the enforced **aggregate** application REST budget
   of at most 100 calls per logical controller pass. The local broker and complete
   three-worker fake-provider pipeline are tested, but those tests are not hosted
@@ -216,16 +217,16 @@ recorded in `action-pins.json`. Its default system Python is not assumed to meet
 the source packager's Python 3.11+ requirement. It runs the public release
 contract suite on the actual builder before packaging. No pip cache is enabled.
 
-In [native compatibility probe run 39018952784](https://github.com/SSC-SDE/codeshouldbehave-beta/actions/runs/39018952784)
+In [native compatibility probe run 39018952784](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/39018952784)
 (job 117356721397), release provenance verification and the strict empty sandbox
 passed on 22.04, but the engine built on 24.04 failed to start: its runtime needed
 `GLIBC_2.39`, which the analyzer image did not provide. The corrected build image
 requires a new Linux build, release digest and attestation verification, followed
-by actual native execution inside the unchanged sandbox. That rebuild and worker
-result are not yet accepted. Do not modify the verified archive or install a
+by actual native execution inside the unchanged sandbox. The earlier compatible rebuild and startup subsequently passed; the new
+2917f1b release still requires its own native startup and full worker acceptance. Do not modify the verified archive or install a
 different libc to bypass this failure.
 
-The real hosted [sandbox probe run 39016540661](https://github.com/SSC-SDE/codeshouldbehave-beta/actions/runs/39016540661)
+The real hosted [sandbox probe run 39016540661](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/39016540661)
 passed the unchanged strict Bubblewrap command on `ubuntu-22.04`
 (job 117349713231), while `ubuntu-24.04` failed it (job 117349713122) after the
 package installation. This establishes the measured compatible sandbox profile,
@@ -239,3 +240,15 @@ package-manager failures, blocked user namespaces or AppArmor denial stop the
 job. Do not disable AppArmor, relax kernel isolation or run reviewed code outside
 the sandbox to make this check pass. Native worker, provenance and public canary
 acceptance remain required live gates.
+
+## Reviewer entry and current activation state
+
+Published check links explicitly select Focus and pin the exact report/bundle.
+Direct dashboard entry opens Standard. Complete supported no-change analysis is
+green; detected changes or incomplete coverage require review. No-change is not
+a runtime equivalence guarantee. Studio is the default Focus HLD appearance.
+
+Only the manual engine-build and sandbox-preflight workflows are currently
+installed in the upstream project. The consumer nudge/controller templates remain
+inactive; do not advertise a working automatic PR check or hosted dashboard until
+installation, scope confirmation and end-to-end acceptance are complete.
