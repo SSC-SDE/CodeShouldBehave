@@ -125,3 +125,23 @@ test('the browser native fetch receiver is preserved instead of invoking it on t
 test('long immutable LLD breadcrumbs cannot expand the reviewer grid beyond a narrow viewport',()=>{
   const css=fs.readFileSync(require.resolve('../src/workspace.css'),'utf8');assert.match(css,/\.lld-review\{grid-template-columns:minmax\(0,1fr\);min-width:0\}/);assert.match(css,/\.design-breadcrumbs>span\{min-width:0;max-width:100%;overflow-wrap:anywhere\}/);assert.match(css,/\.architecture-svg\{[^}]*overflow:auto/,'graphs keep their own pan surface instead of shrinking text');
 });
+
+test('PR verdict never treats a completed changed comparison or missing coverage as green',()=>{
+  const {publicReviewVerdict}=require('../src/public-workspace.js');
+  const complete={complete:true,gaps:[],deferred_details:0};
+  const unchanged={hld_status:'no_change_detected_within_scope',lld_status:'no_change_detected_within_scope'};
+  assert.equal(publicReviewVerdict(complete,unchanged).kind,'no_change_detected');
+  assert.equal(publicReviewVerdict(complete,{...unchanged,lld_status:'change_detected'}).kind,'change_detected');
+  assert.equal(publicReviewVerdict({...complete,gaps:['unresolved']},unchanged).kind,'incomplete');
+  assert.equal(publicReviewVerdict(complete,{}).kind,'incomplete');
+});
+
+test('repository dashboard filters published reports before pagination',async()=>{
+  const f=fixture();
+  const present=await f.transport.request('/v1/prs?repository_id=1');
+  assert.equal(present.items.length,1);
+  const absent=await f.transport.request('/v1/prs?repository_id=2');
+  assert.equal(absent.items.length,0);
+  const all=await f.transport.request('/v1/prs');
+  assert.equal(all.items.length,1);
+});

@@ -65,7 +65,7 @@ def distribution_files(revision):
         if len(content) > 8 * 1024 * 1024:
             raise ValueError("Distribution source file cap exceeded")
         result[path] = (content, int(mode[-3:], 8))
-    required = {"Cargo.toml", "Cargo.lock", "LICENSE", "THIRD_PARTY_NOTICES.md", "CONTRIBUTING.md", "SECURITY.md", "docs/PUBLIC_MVP_USAGE.md", "src/workspace.html", "src/workspace.js", "src/public-workspace.js", "scripts/public_ci.py", "scripts/public_site.py", "migrations/0001_foundation.sql", "migrations/0013_lld_defaults.sql", "fixtures/demo/checkout.before.rs", "fixtures/demo/checkout.after.rs", "licenses/native/sources.json", "licenses/javascript/sources.json"}
+    required = {"Cargo.toml", "Cargo.lock", "LICENSE", "THIRD_PARTY_NOTICES.md", "CONTRIBUTING.md", "SECURITY.md", "docs/PUBLIC_MVP_USAGE.md", "src/workspace.html", "src/workspace.js", "src/workspace-preferences.js", "src/workspace-registry.json", "src/fonts/inter.ttf", "src/fonts/jetbrains-mono.ttf", "src/fonts/inter-OFL.txt", "src/fonts/jetbrains-mono-OFL.txt", "src/public-workspace.js", "scripts/public_ci.py", "scripts/public_site.py", "migrations/0001_foundation.sql", "migrations/0013_lld_defaults.sql", "migrations/0014_workspace_preferences.sql", "src/workspace_preferences.rs", "fixtures/demo/checkout.before.rs", "fixtures/demo/checkout.after.rs", "licenses/native/sources.json", "licenses/javascript/sources.json"}
     missing = required - result.keys()
     if missing:
         raise ValueError("Release source is incomplete: " + ", ".join(sorted(missing)))
@@ -241,7 +241,7 @@ def build(output, revision, build_runtime=False, target=None, registry=None):
         assets = [{"path": source_archive.name, "sha256": sha(source_archive.read_bytes()), "bytes": source_archive.stat().st_size, "kind": "source"}]
         if build_runtime:
             executables, build_record = build_native(files, revision, temporary, target)
-            runtime_names = {"README.md", "LICENSE", "THIRD_PARTY_NOTICES.md", "SECURITY.md", "CHANGELOG.md", "sbom.cdx.json", "src/workspace.html", "src/workspace.css", "src/workspace.js", "src/public-workspace.js", "scripts/public_ci.py", "scripts/public_ci_budget.py", "scripts/public_site.py", "docs/prototypes/vendor/mermaid.tiny-12.1.0.js", "docs/prototypes/vendor/mermaid-LICENSE.txt"}
+            runtime_names = {"README.md", "LICENSE", "THIRD_PARTY_NOTICES.md", "SECURITY.md", "CHANGELOG.md", "sbom.cdx.json", "src/workspace.html", "src/workspace.css", "src/workspace.js", "src/workspace-preferences.js", "src/workspace-registry.json", "src/fonts/inter.ttf", "src/fonts/jetbrains-mono.ttf", "src/fonts/inter-OFL.txt", "src/fonts/jetbrains-mono-OFL.txt", "src/public-workspace.js", "scripts/public_ci.py", "scripts/public_ci_budget.py", "scripts/public_site.py", "docs/prototypes/vendor/mermaid.tiny-12.1.0.js", "docs/prototypes/vendor/mermaid-LICENSE.txt"}
             runtime = {name: value for name, value in files.items() if name in runtime_names or name.startswith(("licenses/", "templates/public-ci/", "config/"))}
             runtime.update(executables)
             runtime["native-build.json"] = (encode(build_record), 0o644)

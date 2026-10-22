@@ -23,8 +23,11 @@ class PublicSiteTests(unittest.TestCase):
         (self.project / "src").mkdir(parents=True)
         (self.project / "docs/prototypes/vendor").mkdir(parents=True)
         (self.project / "src/workspace.html").write_text('<meta name="color-scheme" content="dark"><link href="/assets/workspace.css"><a href="/workspace">CSB</a><script src="/assets/workspace.js"></script>')
-        for name in ("workspace.js", "workspace.css", "public-workspace.js"):
+        for name in ("workspace.js", "workspace.css", "public-workspace.js", "workspace-preferences.js", "workspace-registry.json"):
             (self.project / "src" / name).write_text("/* trusted UI fixture */")
+        (self.project / "src/fonts").mkdir()
+        for name in ("inter.ttf", "jetbrains-mono.ttf", "inter-OFL.txt", "jetbrains-mono-OFL.txt"):
+            (self.project / "src/fonts" / name).write_text("trusted font fixture")
         for name in ("mermaid.tiny-12.1.0.js", "mermaid-LICENSE.txt"):
             (self.project / "docs/prototypes/vendor" / name).write_text("trusted asset fixture")
         for name in ("LICENSE", "THIRD_PARTY_NOTICES.md"):

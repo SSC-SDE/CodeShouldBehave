@@ -3,8 +3,10 @@
 // State controller for the service-backed review workspace. It owns request
 // generations so a delayed response can never replace a newer review or symbol.
 class ReviewWorkspace {
-  constructor({request, onState}) {
+  constructor({request, onState, optional = () => true}) {
     this.request = request;
+    this.optional = optional;
+    this.optionalAttempted=new Set();
     this.onState = onState || (() => {});
     this.generation = 0;
     this.hldReadGeneration = 0;
@@ -71,6 +73,7 @@ class ReviewWorkspace {
   }
 
   async selectReview(reviewId) {
+    this.optionalAttempted.clear();
     if (!reviewId || reviewId.length > 128) throw new Error('Invalid review identity');
     this.cancelObsolete();
     const generation = ++this.generation;
@@ -112,8 +115,8 @@ class ReviewWorkspace {
       this.fetch(`/v1/reviews/${encodeURIComponent(reviewId)}/progress`, generation),
       this.fetchGraph(reviewId, new URLSearchParams({side:'diff',limit:'100'}), 'diff', generation),
       this.fetch(`/v1/reviews/${encodeURIComponent(reviewId)}/files?limit=100`, generation),
-      this.fetch(`/v1/reviews/${encodeURIComponent(reviewId)}/findings?limit=100`, generation),
-      this.fetch(`/v1/reviews/${encodeURIComponent(reviewId)}/annotations`, generation),
+      this.optional('findings') ? this.fetch(`/v1/reviews/${encodeURIComponent(reviewId)}/findings?limit=100`, generation) : Promise.resolve(null),
+      this.optional('annotations') ? this.fetch(`/v1/reviews/${encodeURIComponent(reviewId)}/annotations`, generation) : Promise.resolve(null),
     ]);
     if (generation !== this.generation) return;
     this.state.loading.clear();
@@ -129,6 +132,14 @@ class ReviewWorkspace {
     }
     this.state.error = failure?.reason?.message || null;
     this.emit();
+  }
+
+  async loadOptional(kind) {
+    if(!['findings','annotations'].includes(kind)||!this.state.reviewId||this.state[kind]||this.state.loading.has(kind)||this.optionalAttempted.has(kind))return;
+    const generation=this.generation;this.optionalAttempted.add(kind);this.state.loading.add(kind);
+    try {const value=await this.fetch(`/v1/reviews/${encodeURIComponent(this.state.reviewId)}/${kind}${kind==='findings'?'?limit=100':''}`,generation);if(generation===this.generation)this.state[kind]=value;}
+    catch(error){if(generation===this.generation){if([401,403,404].includes(error.status)){this.clearReview('Current access does not authorize this review.');return;}this.state.error=error.message;}}
+    finally{if(generation===this.generation){this.state.loading.delete(kind);this.emit();}}
   }
 
   async writeAnnotation(annotation) {
@@ -703,6 +714,47 @@ function lldCatalogRows(payload = {}) {
   return (payload?.entries || []).filter(pair=>pair && (pair.baseline || pair.proposal)).slice(0,1000).map(pair=>({...pair,entry:pair.proposal || pair.baseline,id:(pair.proposal || pair.baseline).id}));
 }
 
+// Presentation-only projections. Never alter stored graphs or evidence identifiers.
+function focusLldCatalog(payload) {
+  if(!payload)return payload;
+  const priority={modified:0,added:1,removed:2};
+  return {...payload,entries:(payload.entries||[]).filter(pair=>{
+    const entry=pair.proposal||pair.baseline;
+    return entry&&['function','method'].includes(entry.kind)&&pair.status!=='unchanged';
+  }).sort((a,b)=>(priority[a.status]??3)-(priority[b.status]??3))};
+}
+
+function focusHldPayload(payload={}) {
+  const changes=payload.delta?.changes||[],elementIds=new Set(changes.map(c=>c.element_id).filter(Boolean)),relationIds=new Set(changes.map(c=>c.relation_id).filter(Boolean));
+  const versions=[payload.baseline,payload.proposal].filter(Boolean);
+  for(const version of versions){
+    for(const relation of version.relations||[])if(relationIds.has(relation.id)){elementIds.add(relation.from);elementIds.add(relation.to);}
+    for(const element of version.elements||[])if(elementIds.has(element.id)&&element.component_id)elementIds.add(element.component_id);
+  }
+  const project=version=>version?{...version,elements:(version.elements||[]).filter(e=>elementIds.has(e.id)),relations:(version.relations||[]).filter(r=>relationIds.has(r.id)&&elementIds.has(r.from)&&elementIds.has(r.to))}:version;
+  return {...payload,baseline:project(payload.baseline),proposal:project(payload.proposal),focus:true};
+}
+
+function focusLldDetail(payload={}) {
+  const project=detail=>{
+    if(!detail?.graph)return detail;
+    const graph=detail.graph,nodes=[...(graph.nodes||[])],byId=new Map(nodes.map(n=>[n.id,n]));let edges=(graph.edges||[]).map(e=>({...e}));const removed=new Set();
+    // Only contract unambiguous, same-region, linear syntactic value steps.
+    // Calls, branches, returns, errors, unsupported syntax and loop topology stay.
+    for(const n of nodes){
+      if(n.operation!=='value'||n.resolution!=='syntactic')continue;
+      const incoming=edges.filter(e=>e.to===n.id),outgoing=edges.filter(e=>e.from===n.id);
+      if(incoming.length!==1||outgoing.length!==1)continue;
+      const left=incoming[0],right=outgoing[0];
+      if(right.kind!=='next'||right.label||left.resolution==='unknown'||right.resolution==='unknown'||left.from===right.to||left.from===n.id||right.to===n.id)continue;
+      if(byId.get(left.from)?.region_id!==n.region_id||byId.get(right.to)?.region_id!==n.region_id)continue;
+      edges=edges.filter(e=>e!==left&&e!==right);edges.push({...left,to:right.to,focus_collapsed:true});removed.add(n.id);
+    }
+    return {...detail,graph:{...graph,nodes:nodes.filter(n=>!removed.has(n.id)),edges}};
+  };
+  return {...payload,baseline:project(payload.baseline),proposal:project(payload.proposal),focus:true};
+}
+
 function lldSafeLabel(value) {
   return String(value ?? '').slice(0,180).replace(/[\r\n\t]+/g,' ').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/["|{}\[\]`\\]/g,' ').replace(/javascript:/gi,'');
 }
@@ -781,25 +833,39 @@ function hldMermaid(payload = {}, mode = 'combined') {
   const comparison = hldComparison(payload, mode);
   const diagramElements=hldDiagramElements(payload,mode);
   const indexes = new Map(diagramElements.map((element,index)=>[element.id,index]));
-  const lines = ['flowchart LR'];
+  const lines = ['%%{init: {"flowchart": {"nodeSpacing": 65, "rankSpacing": 95, "curve": "linear"}}}%%','flowchart TB'];
   const label = value => mermaidLabel(value).replace(/[&|`\\]/g,' ');
-  for (const [index, element] of diagramElements.entries()) {
-    const kind = String(element.kind || 'component').replaceAll('_',' ');
-    const details = [element.name,kind,element.responsibility || (element.roots || []).join(', ')].filter(Boolean).map(label).join('<br/>');
-    const impacted = mode==='combined' && (payload.delta?.possible_impacts||[]).some(impact=>impact.component_id===element.id);
-    const rawStatus = comparison.status.get(element.id) || (impacted?'impacted':'same');
-    const status = ['added','removed','modified','impacted'].includes(rawStatus) ? rawStatus : rawStatus === 'same' ? 'same' : 'unknown';
-    lines.push(`hld${index}["${details}"]:::${status}`);
+  const groups=[['component','Code components'],['dependency','Package dependencies'],['deployment','Deployment'],['schema','Data structures']];
+  for(const [group,title] of groups){
+    const members=diagramElements.map((element,index)=>({element,index})).filter(item=>item.element.kind===group);
+    if(!members.length)continue;
+    // Category is carried by each box so edges can route without cluster crossings.
+    for(const {element,index} of members){
+      const impacted=mode==='combined'&&(payload.delta?.possible_impacts||[]).some(impact=>impact.component_id===element.id);
+      const rawStatus=comparison.status.get(element.id)||(impacted?'impacted':'same');
+      const status=['added','removed','modified','impacted'].includes(rawStatus)?rawStatus:rawStatus==='same'?'same':'unknown';
+      const names={added:'+ Added',removed:'− Removed',modified:'~ Modified',impacted:'Possible impact',unknown:'? Unresolved'};
+      const name=String(element.name||group).replace(/ package$/i,'');
+      const roots=(element.roots||[]).filter(root=>root!=='.'&&root!==name);
+      const description=element.responsibility||roots.join(', ');
+      const details=[name,group==='dependency'?'Package dependency':group==='component'?'Code component':title,description,names[status]].filter(Boolean).map(label).join('<br/>');
+      lines.push(`hld${index}["${details}"]:::${status}`);
+    }
   }
-  for (const relation of comparison.relations) {
-    const from = indexes.get(relation.from), to = indexes.get(relation.to);
-    if (from === undefined || to === undefined) continue;
-    const status=comparison.status.get(relation.id),uncertain = status==='uncertain'||!['observed_structure','resolved_reference'].includes(relation.resolution);
+  const connections=new Map();
+  for(const relation of comparison.relations){
+    const from=indexes.get(relation.from),to=indexes.get(relation.to);if(from===undefined||to===undefined)continue;
+    const status=comparison.status.get(relation.id),uncertain=status==='uncertain'||!['observed_structure','resolved_reference'].includes(relation.resolution);
+    const key=[from,to,status||'',uncertain].join('|');
+    const description=({declares_package_dependency:'declares',local_package_dependency:'local package',imports_declared_package:'imports'}[relation.kind]||String(relation.kind||'interaction').replaceAll('_',' '))+(relation.protocol?' · '+relation.protocol:'');
+    if(!connections.has(key))connections.set(key,{from,to,status,uncertain,labels:[]});
+    const connection=connections.get(key);if(!connection.labels.includes(description))connection.labels.push(description);
+  }
+  for(const {from,to,status,uncertain,labels} of connections.values()){
     const marker=status==='added'?'+ ':status==='removed'?'Removed: ':status==='modified'?'Changed: ':'';
-    const description = `${marker}${uncertain ? '? ' : ''}${String(relation.kind || 'interaction').replaceAll('_',' ')}${relation.protocol ? ' · '+relation.protocol : ''}`;
-    lines.push(`hld${from} ${uncertain||status==='removed' ? '-.->' : '-->'}|${label(description)}| hld${to}`);
+    lines.push(`hld${from} ${uncertain||status==='removed'?'-.->':'-->'}|${label(marker+(uncertain?'? ':'')+labels.join(' + '))}| hld${to}`);
   }
-  if (!diagramElements.length) lines.push('empty["No authorized HLD components available"]:::unknown');
+  if (!diagramElements.length) lines.push(payload.focus?'empty["No directional HLD change identified in available evidence"]:::unknown':'empty["No authorized HLD components available"]:::unknown');
   lines.push('classDef same fill:#20252c,stroke:#718094,color:#edf0f4','classDef impacted fill:#20252c,stroke:#9bbaff,color:#edf0f4,stroke-width:2px','classDef added fill:#163125,stroke:#5ed39a,color:#edf0f4','classDef removed fill:#351e25,stroke:#ef8290,color:#edf0f4,stroke-dasharray:5 4','classDef modified fill:#2b261c,stroke:#f1bd62,color:#edf0f4','classDef unknown fill:#251e31,stroke:#b69be0,color:#edf0f4,stroke-dasharray:5 4');
   return lines.join('\n');
 }
@@ -912,11 +978,13 @@ const WORKSPACE_SIDES = new Set(['baseline', 'proposal', 'diff']);
 const WORKSPACE_SELECTIONS = new Set(['component', 'path', 'symbol']);
 const LLD_INITIAL_SCALE = 1;
 
-function encodeWorkspaceRoute({reviewId, bundleId = null, layout = 'connected', side = 'diff', selection = null, designLevel = 'structural', designMode = 'combined', designElement = null, parentHld = null, component = null, detail = null, lldElement = null, lldNode = null, lldPinned = false, lldBaselineEntry = null, lldCorrespondence = 'rename'} = {}) {
+function encodeWorkspaceRoute({reviewId, reviewMode = 'standard', bundleId = null, layout = 'connected', side = 'diff', selection = null, designLevel = 'structural', designMode = 'combined', designElement = null, parentHld = null, component = null, detail = null, lldElement = null, lldNode = null, lldPinned = false, lldBaselineEntry = null, lldCorrespondence = 'rename'} = {}) {
   if (!reviewId || String(reviewId).length > 128) throw new Error('Invalid review identity');
   if (!WORKSPACE_LAYOUTS.has(layout)) throw new Error('Invalid workspace layout');
   if (!WORKSPACE_SIDES.has(side)) throw new Error('Invalid comparison side');
   const route = new URLSearchParams({review: String(reviewId), layout, side});
+  if(!['standard','focus'].includes(reviewMode))throw new Error('Invalid review mode');
+  if(reviewMode==='focus')route.set('mode','focus');
   if(bundleId){if(!/^[0-9a-f]{64}$/.test(bundleId))throw new Error('Invalid public bundle identity');route.set('bundle',bundleId);}
   if (!['structural','hld','lld'].includes(designLevel)) throw new Error('Invalid design level');
   if (layout === 'architecture' && designLevel !== 'structural') {
@@ -948,6 +1016,8 @@ function encodeWorkspaceRoute({reviewId, bundleId = null, layout = 'connected', 
 function decodeWorkspaceRoute(hash = '') {
   const route = new URLSearchParams(String(hash).replace(/^#/, ''));
   const reviewId = route.get('review');
+  const reviewMode=route.get('mode');
+  if(route.getAll('mode').length>1||(reviewMode&&!['standard','focus'].includes(reviewMode)))return null;
   if (!reviewId) return null;
   const layout = route.get('layout') || 'connected';
   const side = route.get('side') || 'diff';
@@ -969,7 +1039,7 @@ function decodeWorkspaceRoute(hash = '') {
   if (designLevel) {
     const designMode = route.get('design_view') || 'combined', designElement = route.get('element');
     if (!['structural','hld','lld'].includes(designLevel) || !['combined','compare','baseline','proposal','accepted'].includes(designMode) || (designElement && (designElement.length > 256 || designElement.includes('\0')))) return null;
-    const result={reviewId,layout,side,selection,designLevel,designMode,designElement};if(bundleId)result.bundleId=bundleId;
+    const result={reviewId,layout,side,selection,designLevel,designMode,designElement};if(reviewMode==='focus')result.reviewMode='focus';if(bundleId)result.bundleId=bundleId;
     if(designLevel==='lld'&&['parent_hld','component','detail','lld_element'].some(key=>route.has(key))) {
       const parentHld=route.get('parent_hld'),component=route.get('component'),detail=route.get('detail'),lldElement=route.get('lld_element'),lldNode=route.get('lld_node'),lldPinned=route.get('lld_pin'),lldBaselineEntry=route.get('lld_baseline_entry'),lldCorrespondence=route.get('lld_correspondence');
       if([parentHld,component,lldElement,lldNode,lldBaselineEntry].some(value=>value&&(value.length>256||/[\x00-\x1f\x7f]/.test(value)))||(detail&&!['module','type','function','flow'].includes(detail))||(component&&designElement&&component!==designElement)||(lldPinned && (lldPinned!=='1'||!lldNode))||(lldCorrespondence && (!lldBaselineEntry||!['rename','move'].includes(lldCorrespondence))))return null;
@@ -979,7 +1049,7 @@ function decodeWorkspaceRoute(hash = '') {
     }
     return result;
   }
-  return {...{reviewId, layout, side, selection},...(bundleId?{bundleId}:{})};
+  return {...{reviewId, layout, side, selection},...(bundleId?{bundleId}:{}),...(reviewMode==='focus'?{reviewMode}: {})};
 }
 
 function resolvePublicWorkspaceRoute(transport,hash='') {
@@ -1151,7 +1221,7 @@ async function workspaceHttpError(response) {
   return error;
 }
 
-if (typeof module !== 'undefined') module.exports = {ReviewWorkspace, workspaceHttpError, clearHldEvidence, clearLldEvidence, clearReviewEvidence, LldCatalogView, LldSourcePairView, graphItems, filterGraphItems, clusterEdges, mergeGraphs, diffLines, architectureMeaning, architectureAreas, architectureMermaid, hldOutcome, hldExportAllowed, hldComparison, hldDiagramElements, hldMermaid, hldEvidenceFor, hldCorrection, validateLldResponse, lldOutcome, lldCatalogRows, lldMermaid, lldEvidence, LLD_INITIAL_SCALE, observationAge, filterChangedFiles, diagramScale, parseScopePaths, summarizeReviewState, classifyFinding, groupFindings, encodeWorkspaceRoute, decodeWorkspaceRoute, resolvePublicWorkspaceRoute, betaFeedbackRecord, importBetaFeedback, BetaFeedbackDraft};
+if (typeof module !== 'undefined') module.exports = {focusHldPayload, focusLldCatalog, focusLldDetail, ReviewWorkspace, workspaceHttpError, clearHldEvidence, clearLldEvidence, clearReviewEvidence, LldCatalogView, LldSourcePairView, graphItems, filterGraphItems, clusterEdges, mergeGraphs, diffLines, architectureMeaning, architectureAreas, architectureMermaid, hldOutcome, hldExportAllowed, hldComparison, hldDiagramElements, hldMermaid, hldEvidenceFor, hldCorrection, validateLldResponse, lldOutcome, lldCatalogRows, lldMermaid, lldEvidence, LLD_INITIAL_SCALE, observationAge, filterChangedFiles, diagramScale, parseScopePaths, summarizeReviewState, classifyFinding, groupFindings, encodeWorkspaceRoute, decodeWorkspaceRoute, resolvePublicWorkspaceRoute, betaFeedbackRecord, importBetaFeedback, BetaFeedbackDraft};
 if (typeof window !== 'undefined') Object.assign(window, {ReviewWorkspace, encodeWorkspaceRoute, decodeWorkspaceRoute});
 
 if (typeof document !== 'undefined' && document.getElementById('session-form')) {
@@ -1208,12 +1278,141 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
       cache: 'no-store',
     });
     if (!response.ok) {
+      if(response.status===401||response.status===403)preferences?.logout();
       throw await workspaceHttpError(response);
     }
     return response.json();
   };
 
-  const workspace = new ReviewWorkspace({request, onState: renderWorkspace});
+  const workspace = new ReviewWorkspace({request, onState: renderWorkspace, optional:kind=>{const v=preferences?.current().visibility;return !v||(kind==='findings'?(v.findings||v.explanations||v.summary||layout==='architecture'&&designLevel==='structural'):(v.continuity||v.notes||v.bookmarks||v.handoffs||v.reviewed));}});
+  // Local presentation components consume existing authorized workspace DTOs.
+  // Sample reviewer questions are bound to one synthetic fixture commit pair.
+  if(window.innerWidth<1250){document.body.classList.add('context-collapsed');$('context-toggle').setAttribute('aria-expanded','false');}
+  document.body.dataset.view=window.location.hash.includes('review=')?'inspection':'queue';
+  let inspectionQueue=[],inspectionKey='',inspectionDismissed=new Set(),inspectionEvents=[],focusedFinding=null,focusRadius=0;
+  let preferences=null;
+  const presentationFilter=name=>preferences?preferences.filters()[name]:reviewMode==='focus';
+  let reviewMode='standard',standardView=null,focusCatalogSource=null,focusCatalogProjection=null;
+  const legend=$('focus-legend'),legendToggle=$('focus-legend-toggle'),legendPanel=$('focus-legend-panel');
+  let legendPinned=false,legendDismissed=false;
+  function showLegend(open){legendPanel.hidden=!open;legendToggle.setAttribute('aria-expanded',String(open));}
+  function closeLegend(){legendPinned=false;legendDismissed=true;showLegend(false);}
+  legend.addEventListener('pointerenter',()=>{legendDismissed=false;showLegend(true);});
+  legend.addEventListener('pointerleave',()=>{if(!legendPinned&&!legend.contains(document.activeElement))showLegend(false);});
+  legend.addEventListener('focusin',()=>{if(!legendDismissed)showLegend(true);});
+  legend.addEventListener('focusout',event=>{if(!legend.contains(event.relatedTarget)){legendDismissed=false;if(!legendPinned)showLegend(false);}});
+  legendToggle.onclick=()=>{legendPinned=!legendPinned;legendDismissed=!legendPinned;showLegend(legendPinned);};
+  $('focus-legend-close').onclick=()=>{legendToggle.focus();closeLegend();};
+  document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!legendPanel.hidden){if(legend.contains(document.activeElement))legendToggle.focus();closeLegend();}});
+  document.addEventListener('pointerdown',event=>{if(!legend.contains(event.target))closeLegend();});
+  // Move the existing controls, preserving their handlers, IDs and restore positions.
+  const focusHeaderHomes=new Map();
+  function syncFocusHeader(){
+    const bar=document.querySelector('.topbar'),enabled=reviewMode==='focus'&&!$('review-content').hidden;
+    const controls=document.querySelector(`#${designLevel==='lld'?'lld':'hld'}-review .architecture-controls`) || [...focusHeaderHomes.keys()].find(item=>item.getAttribute('aria-label')===`${designLevel==='lld'?'LLD':'HLD'} comparison mode`);
+    const wanted=enabled?[document.querySelector('.review-heading'),$('essential-review-status'),document.querySelector('.design-levels'),controls].filter(Boolean):[];
+    for(const [element,home] of focusHeaderHomes)if(!wanted.includes(element)&&element.parentNode!==home.parentNode)home.after(element);
+    for(const element of wanted){if(!focusHeaderHomes.has(element)){const home=document.createComment('Focus control home');element.before(home);focusHeaderHomes.set(element,home);}if(element.parentNode!==bar)bar.append(element);}
+    bar.classList.toggle('focus-review-header',enabled);if(!enabled)closeLegend();
+    const status=$('essential-review-status');if(status&&status.title!==status.textContent)status.title=status.textContent;
+    if(status)status.dataset.short=/stale/i.test(status.textContent)?'Stale':/denied/i.test(status.textContent)?'Access denied':/error|failed/i.test(status.textContent)?'Error':/incomplete|unverified/i.test(status.textContent)?'Partial · static':'Static evidence';
+  }
+  new MutationObserver(()=>syncFocusHeader()).observe(document.body,{childList:true,subtree:true});
+  function setReviewMode(next,{remember=true,restore=true}={}){
+    const focus=next==='focus';if(remember)preferences?.clearReveal();
+    if(focus&&reviewMode!=='focus')standardView={layout,designLevel,side:$('side').value};
+    reviewMode=focus?'focus':'standard';document.body.dataset.reviewMode=reviewMode;queueMicrotask(syncFocusHeader);
+    for(const mode of ['standard','focus'])$('mode-'+mode).setAttribute('aria-pressed',String(mode===reviewMode));
+    preferences?.setMode(reviewMode);
+    if(restore&&preferences){applyPreferenceDefaults(preferences.defaults());}
+    else if(focus&&!preferences){$('side').value='diff';setLayout('architecture',{remember:false});if(designLevel==='structural'){hldMode='combined';setDesignLevel('hld',{remember:false});}}
+    lastHldKey='';lastLldKey='';
+    if(designLevel==='hld')renderHld(workspace.state);
+    if(designLevel==='lld'){renderLld(workspace.state);if(focus)selectFocusedFunction();}
+    if(remember)rememberRoute();
+  }
+  function selectFocusedFunction(){
+    if(reviewMode==='focus')return;
+    const rows=lldCatalogRows(presentationFilter('changedFunctions')?focusLldCatalog(workspace.state.lld):workspace.state.lld);
+    if(presentationFilter('changedFunctions')&&designLevel==='lld'&&rows.length&&!rows.some(row=>row.id===lldElement))openLldEntry(rows[0].id,rows[0].entry);
+  }
+  $('mode-standard').onclick=()=>setReviewMode('standard');
+  $('mode-focus').onclick=()=>setReviewMode('focus');
+  function fixtureReview(state){return state.details?.proposal==='2cdd5acd7a436c4723a7b7afe52ad41a4730d8b4'&&state.details?.analysis_baseline==='b74222afe4851207df63b41be89de43716e797a1'&&activePr?.repository?.owner==='fixture';}
+  function reviewerQuestions(state){
+    if(fixtureReview(state))return [
+      {id:'duplicate-after-capture',title:'Duplicate check happens after capture',path:'api/src/lib.rs',start:21,end:27,kind:'ORDERING RISK',reason:'The handler calls capture before testing duplicate. In a real payment adapter, a retry could reach the effect before returning the stored receipt. These adapters are stubs; an actual duplicate charge is not demonstrated.',fix:'Check the idempotency key before authorization and capture. Make receipt lookup and reservation atomic; add a repeated-request test.'},
+      {id:'queue-after-payment',title:'Queue failure becomes payment failure',path:'api/src/lib.rs',start:28,end:32,kind:'FAILURE PATH',reason:'record_receipt precedes enqueue_receipt, whose error propagates with ?. A caller may receive an error after processing has completed. A retry strategy and durable delivery policy are not established by these stubs.',fix:'Separate payment outcome from notification delivery. Persist an outbox event atomically with the receipt and test a queue outage after capture.'}
+    ];
+    return (state.findings?.items||[]).filter(item=>item.source_path).slice(0,12).map((item,i)=>({id:String(item.id||i),title:String(item.kind||'Unresolved observation').replaceAll('_',' '),path:item.source_path,start:item.source_start_line||1,end:item.source_end_line||item.source_start_line||1,kind:'INSPECT EVIDENCE',reason:item.resolution==='resolved'?'Observed static relationship. Runtime consequences need separate validation.':'The relationship remains unresolved. Inspect the linked source before drawing a behavioral conclusion.',fix:'Inspect this source-qualified observation and add a test that addresses the expected behavior.'}));
+  }
+  function auditEvent(text){inspectionEvents.push({text,time:new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})});inspectionEvents=inspectionEvents.slice(-30);renderTimeline();}
+  function renderTimeline(){const host=$('review-timeline');host.replaceChildren();for(const event of inspectionEvents){const li=node('li');li.append(node('time','',event.time),node('span','',event.text));host.append(li);}}
+  function validationStatus(name,status,tone='neutral'){const row=node('div','validation-status');row.append(node('span','',name),node('span',`diagnostic ${tone}`,status));return row;}
+  function evidenceChecklist(state){const host=$('validation-checks');host.replaceChildren();const coverage=state.details?.public_coverage;host.append(validationStatus('Static comparison',state.details?(coverage?.complete?'AVAILABLE':'PARTIAL'):'LOADING',state.details?'amber':'neutral'));for(const label of ['Unit tests','Integration tests','Type checks','Lint checks','Runtime observations'])host.append(validationStatus(label,'NOT RUN'));}
+  function findingCard(finding,state){
+    const key=`${state.reviewId}:${finding.id}`,dismissed=inspectionDismissed.has(key),card=node('details','finding-card');card.dataset.finding=finding.id;
+    const summary=node('summary');summary.append(node('span','finding-signal',dismissed?'[–]':'[!]'),node('strong','',finding.title));card.append(summary);
+    const body=node('div','finding-body');body.append(node('span','diagnostic amber',dismissed?'DISMISSED LOCALLY':finding.kind),node('p','',finding.reason),node('p','finding-location',`${finding.path}:${finding.start}-${finding.end} · ${short(state.details?.proposal)}`));
+    const inspect=node('button','finding-inspect','Inspect code');inspect.type='button';inspect.onclick=()=>focusIssue(finding);
+    const copy=node('button','quiet','Copy issue');copy.type='button';copy.onclick=()=>copyIssue(finding);
+    const dismiss=node('button','quiet finding-dismiss',dismissed?'Restore question':'Dismiss locally');dismiss.type='button';dismiss.onclick=()=>{if(dismissed)inspectionDismissed.delete(key);else inspectionDismissed.add(key);auditEvent(`${dismissed?'Restored':'Dismissed locally'}: ${finding.title}`);inspectionKey='';renderInspection(workspace.state);};
+    const requestPatch=node('button','quiet','Request suggested patch');requestPatch.type='button';requestPatch.onclick=()=>{showInspectionDialog('Suggested patch request',[node('p','',finding.fix),node('p','context-note','Draft request only. No model is connected and no patch was generated or sent.')]);};
+    const actions=node('div','finding-actions');actions.append(inspect,copy,dismiss,requestPatch);body.append(actions);card.append(body);return card;
+  }
+  async function focusIssue(finding){
+    const reviewId=workspace.state.reviewId;focusedFinding=finding;focusRadius=0;setLayout('source',{remember:false});$('side').value='diff';
+    await workspace.selectPath({path:finding.path,side:'diff'});if(workspace.state.reviewId!==reviewId||focusedFinding!==finding)return;if(publicStatic)await loadPublishedFile(finding.path);if(workspace.state.reviewId!==reviewId||focusedFinding!==finding)return;
+    applyFocusedDiff();rememberRoute();auditEvent(`Inspected ${finding.path}:${finding.start}-${finding.end}`);$('source-title').scrollIntoView({block:'start',behavior:'auto'});
+  }
+  async function copyIssue(finding){const text=`${finding.title}\n${finding.path}:${finding.start}-${finding.end}\nProposal: ${workspace.state.details?.proposal||'unavailable'}\n\n${finding.reason}\n\n${finding.fix}`;try{await navigator.clipboard.writeText(text);auditEvent('Copied reviewer question');}catch{const area=node('textarea');area.value=text;area.readOnly=true;area.rows=10;showInspectionDialog('Copy reviewer question',[area]);area.select();}}
+  function applyFocusedDiff(){
+    const host=$('source-comparison'),active=Boolean(focusedFinding)&&workspace.state.sourceComparison?.path===focusedFinding.path;
+    host.classList.toggle('focused-evidence',active);$('source-unified').classList.toggle('changed-only',active);
+    for(const line of host.querySelectorAll('.diff-line')){const inProposal=Boolean(line.closest('#source-proposal'));const number=Number(line.dataset.line);line.hidden=active&&(inProposal?(!number||number<focusedFinding.start-focusRadius||number>focusedFinding.end+focusRadius):line.classList.contains('same')||line.classList.contains('empty'));}
+    $('focus-diff-label').textContent=active?`${focusedFinding.path}:${Math.max(1,focusedFinding.start-focusRadius)}-${focusedFinding.end+focusRadius} · proposal focus`:'Full published excerpt · bounded by source permissions';
+  }
+  function renderInspection(state){
+    $('context-toggle').disabled=!state.details;
+    $('review-mode-switch').hidden=document.body.dataset.view!=='inspection';$('mode-focus').disabled=!state.details;
+    $('focus-analysis-state').textContent=state.error?'Evidence unavailable':state.details?.stale?'Stale comparison · refresh required':state.details?.public_coverage?.complete?'Static diff · runtime unverified':'Partial static diff · runtime unverified';
+    if(!state.details){$('inspection-context').hidden=true;$('interrogation-findings').replaceChildren();$('validation-checks').replaceChildren();$('verdict-heading').textContent='INCOMPLETE';$('verdict-reason').textContent='Current evidence is unavailable.';$('claim-title').textContent=state.error?'Evidence unavailable':'Loading exact comparison';$('claim-detail').textContent=state.error||'Resolving the selected commits and authorized scope.';inspectionKey='';return;}
+    const sample=fixtureReview(state),questions=reviewerQuestions(state),files=state.files?.items||[],coverage=state.details.public_coverage;
+    const key=JSON.stringify([state.reviewId,files.length,questions.map(x=>x.id),[...inspectionDismissed],coverage,state.details.stale]);if(key===inspectionKey)return;inspectionKey=key;
+    $('inspection-profile').textContent=sample?'SYNTHETIC DEMO / REVIEWER NOTES':'STATIC ANALYSIS / NO RUNTIME PROOF';
+    $('claim-title').textContent=sample?'Prevent duplicate payments. Add fraud screening.':`${files.length} files changed. Intent requires confirmation.`;
+    $('claim-detail').textContent=sample?'Demo author claim: introduce a safer payment pipeline with receipt storage and asynchronous notifications. The implementation still needs to support that claim.':'No author intent was supplied with this immutable report. Inspect the observed changes and confirm the intended behavior with the author.';
+    $('claim-state').textContent='UNVERIFIED';$('inspection-files').textContent=files.length;$('inspection-additions').textContent='+'+files.reduce((n,f)=>n+(f.additions||0),0);$('inspection-deletions').textContent='−'+files.reduce((n,f)=>n+(f.deletions||0),0);
+    $('inspection-scope').textContent=`${short(state.details.analysis_baseline||state.details.selected_baseline)} → ${short(state.details.proposal)}`;
+    evidenceChecklist(state);$('contradiction-count').textContent=questions.length;$('finding-origin').textContent=sample?'Illustrative reviewer questions tied to this demo source. Not automated findings.':'Source-qualified observations. Severity has not been assigned.';
+    const host=$('interrogation-findings');host.replaceChildren();questions.forEach(question=>host.append(findingCard(question,state)));if(!questions.length)host.append(node('p','context-note','No contradictions supplied. Missing evidence is not evidence of correctness.'));
+    $('verdict-heading').textContent=questions.length?'REVIEW REQUIRED':coverage?.complete?'NO BLOCKING FINDINGS DETECTED':'INCOMPLETE';
+    $('verdict-reason').textContent=questions.length?'Resolve the source-order questions and validate the failure paths. Dismissing a note does not change analysis coverage.':coverage?.complete?'No blocking finding was supplied within the declared static scope. Runtime correctness remains unverified.':'Coverage is partial and runtime checks are not included. A safe-to-merge conclusion is not established.';
+    if(document.body.dataset.view==='inspection'&&!document.body.classList.contains('context-collapsed'))$('inspection-context').hidden=false;
+    const row=inspectionQueue.find(item=>item.pr.review_id===state.reviewId||item.pr.head_commit===state.details.proposal);if(row){row.summary.textContent=`${files.length} files · ${questions.length} ${sample?'sample review questions':'observations'}`;row.status.textContent=questions.length?'REVIEW REQUIRED':'INCOMPLETE';}
+  }
+  function reviewQueueRow(pr,card){const row=node('button','review-queue-row');row.type='button';const name=node('div');name.append(node('strong','',pr.provider_pr_id),node('span','',pr.repository?`${pr.repository.owner}/${pr.repository.name}`:String(pr.repository_id)));const summary=node('span','queue-row-summary','Files and findings available on inspection');const status=node('span','diagnostic amber','UNVERIFIED');const revision=node('span','queue-row-revision',`${short(pr.base_commit)} → ${short(pr.head_commit)}`);row.append(name,summary,status,revision);row.onclick=()=>card.click();return {row,summary,status,pr};}
+  function registerQueueRow(pr,card){const value=reviewQueueRow(pr,card);inspectionQueue.push(value);$('review-queue-rows').append(value.row);$('queue-count').textContent=`${inspectionQueue.length} loaded comparison${inspectionQueue.length===1?'':'s'}`;$('nav-review-count').textContent=inspectionQueue.length;}
+  function showInspectionDialog(title,contents){$('inspection-dialog-title').textContent=title;$('inspection-dialog-content').replaceChildren(...contents);$('inspection-dialog').showModal();}
+  function openReviews(){preferences?.review(null);setReviewMode('standard',{remember:false,restore:false});$('review-mode-switch').hidden=true;document.body.dataset.view='queue';$('empty').hidden=false;$('review-content').hidden=true;$('inspection-context').hidden=true;$('changed-files-panel').hidden=true;history.pushState(null,'',window.location.pathname);$('nav-reviews').focus();}
+  function openRepositoryList(){const repos=new Map(inspectionQueue.map(item=>[item.pr.repository_id,item.pr.repository]));const contents=[];for(const [id,repo] of repos){const button=node('button','repository-row',repo?`${repo.owner}/${repo.name}`:String(id));button.type='button';button.onclick=()=>{$('inspection-dialog').close();openReviews();for(const item of inspectionQueue)item.row.hidden=item.pr.repository_id!==id;};contents.push(button);}showInspectionDialog('Repositories',contents.length?contents:[node('p','','No authorized repositories loaded.')]);}
+  function openHistory(){showInspectionDialog('Session history',inspectionEvents.length?inspectionEvents.map(event=>node('p','',`${event.time} · ${event.text}`)):[node('p','','No inspection activity in this session. Historical server audit records are not published here.')]);}
+  function legacyOpenSettings(){showInspectionDialog('Review settings',[node('h3','','Local, evidence first'),node('p','','Dark theme · Inter interface · JetBrains Mono code'),node('p','','AI provider: disconnected. Runtime checks: unavailable. No source is sent to a model.'),node('p','',publicStatic?'Public reports are immutable. Review notes stay in page memory; reload clears them.':'Private workspace notes follow the existing annotation permissions and storage policy.'),node('p','','Repository scope and evidence permissions remain enforced by the report. Change them through repository onboarding.')]);}
+  function openSettings(){if(preferences)preferences.open();else legacyOpenSettings();}
+  const commands=[['Reviews',openReviews],['Repositories',openRepositoryList],['History',openHistory],['Settings',openSettings],['Behavior diff',()=>{$('layout-connected').click();}],['Architecture diff',()=>{$('layout-architecture').click();}],['Code diff',()=>{$('layout-source').click();}],['Evidence and verdict',()=>{document.body.classList.remove('context-collapsed');$('inspection-context').hidden=!workspace.state.details;$('context-toggle').setAttribute('aria-expanded','true');}]];
+  function renderCommands(){const host=$('command-results');host.replaceChildren();for(const [label,action] of commands.filter(([label])=>label.toLowerCase().includes($('command-search').value.toLowerCase()))){const button=node('button','command-item',label);button.type='button';button.disabled=(label.endsWith('diff')||label==='Evidence and verdict')&&(!workspace.state.details||document.body.dataset.view==='queue');button.onclick=()=>{$('command-palette').close();action();};host.append(button);}}
+  function openCommands(){renderCommands();$('command-palette').showModal();$('command-search').focus();}
+  $('command-open').onclick=openCommands;$('command-search').oninput=renderCommands;$('command-search').onkeydown=event=>{if(event.key==='Enter'){event.preventDefault();$('command-results').querySelector('button:not(:disabled)')?.click();}};
+  document.addEventListener('keydown',event=>{if((event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='k'){event.preventDefault();openCommands();}if(event.altKey&&['j','k'].includes(event.key)){event.preventDefault();const items=[...$('interrogation-findings').querySelectorAll('summary')],index=items.indexOf(document.activeElement);items[(index+(event.key==='j'?1:-1)+items.length)%items.length]?.focus();}});
+  $('nav-reviews').onclick=()=>{inspectionQueue.forEach(item=>item.row.hidden=false);openReviews();};$('nav-repositories').onclick=openRepositoryList;$('nav-history').onclick=openHistory;$('nav-settings').onclick=openSettings;
+  $('inspection-dialog-close').onclick=()=>$('inspection-dialog').close();
+  $('context-toggle').onclick=()=>{if(!workspace.state.details)return;const collapsed=document.body.classList.toggle('context-collapsed');$('inspection-context').hidden=collapsed;$('context-toggle').setAttribute('aria-expanded',String(!collapsed));};
+  $('context-close').onclick=()=>{document.body.classList.add('context-collapsed');$('inspection-context').hidden=true;$('context-toggle').setAttribute('aria-expanded','false');$('context-toggle').focus();};
+  $('decision-review').onclick=()=>{const label=node('label','','Review note'),text=node('textarea');text.rows=5;text.maxLength=2000;label.append(text);const save=node('button','','Save review note');save.type='button';save.onclick=async()=>{if(!text.value.trim())return;text.disabled=true;save.disabled=true;try{await saveAnnotation({kind:'question',targetKey:`review:${workspace.state.reviewId}`,body:text.value.trim()});auditEvent('Saved a review note');$('inspection-dialog').close();}catch(error){text.disabled=false;save.disabled=false;label.append(node('p','warning',error.message));}};showInspectionDialog('Human decision',[label,node('p','context-note','This records a note, not GitHub approval or a merge.'),save]);};
+  $('diff-focus').onclick=()=>{focusedFinding=null;applyFocusedDiff();$('source-comparison').classList.add('changed-only');$('source-unified').classList.add('changed-only');$('focus-diff-label').textContent='Changed lines only';};
+  $('diff-context').onclick=()=>{if(focusedFinding){focusRadius+=3;applyFocusedDiff();}else{$('source-comparison').classList.remove('changed-only');$('source-unified').classList.remove('changed-only');applyFocusedDiff();$('focus-diff-label').textContent='Published context restored';}};
+  $('diff-full').onclick=()=>{focusedFinding=null;$('source-comparison').classList.remove('changed-only');$('source-unified').classList.remove('changed-only');applyFocusedDiff();};
+
   const lldCatalogView=new LldCatalogView({list:$('lld-entry-list'),status:$('lld-catalog-status'),more:$('lld-more'),node,onOpen:openLldEntry});
   const lldSourcePairView=new LldSourcePairView({node});
   const coverageObserver = typeof IntersectionObserver === 'undefined' ? null : new IntersectionObserver(entries => {
@@ -1278,12 +1477,14 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
   }
 
   async function loadInbox({append = false} = {}) {
+    await preferencesReady;
     $('inbox-status').textContent = publicStatic?'Loading published comparisons…':'Loading authorized pull requests…';
     try {
       const query = new URLSearchParams({limit: '100'});
+      if(publicStatic){const repository=new URLSearchParams(window.location.hash.slice(1)).get('repository');if(repository)query.set('repository_id',repository);}
       if (append && inboxCursor) query.set('cursor', inboxCursor);
       const page = await request(`/v1/prs?${query}`);
-      if (!append) $('pr-list').replaceChildren();
+      if (!append) {$('pr-list').replaceChildren();inspectionQueue=[];$('review-queue-rows').replaceChildren();}
       page.items.forEach(addPrCard);
       inboxCursor = page.next_cursor;
       $('more-prs').hidden = !inboxCursor;
@@ -1320,7 +1521,7 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
     const commits = node('div', 'pr-commits', `${short(pr.base_commit)} → ${short(pr.head_commit)}`);
     card.append(name, meta, commits);
     card.addEventListener('click', () => openPr(pr, card));
-    $('pr-list').append(card);
+    $('pr-list').append(card);registerQueueRow(pr,card);
     if (coverageObserver && pr.review_id) coverageObserver.observe(coverage);
     else if (pr.review_id) { coverageQueue.push(coverage); drainCoverageQueue(); }
   }
@@ -1336,7 +1537,9 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
   }
 
   async function openPr(pr, card, {remember = true, route = null} = {}) {
-    activePr = pr; pinned = false;lldCatalogView.clear();lldSourcePairView.clear();
+    setReviewMode('standard',{remember:false,restore:false});standardView=null;
+    preferences?.review(pr.review_id);preferences?.setMode(route?.reviewMode||'standard');
+    activePr = pr; document.body.dataset.view='inspection';$('review-mode-switch').hidden=false;inspectionKey='';focusedFinding=null;auditEvent(`Opened ${pr.provider_pr_id} at ${short(pr.head_commit)}`); pinned = false;lldCatalogView.clear();lldSourcePairView.clear();
     setDesignLevel('structural',{remember:false,load:false});
     hldSelection = null; lastHldKey = ''; renderedHldReview = null; ++hldSourceGeneration;
     lldParentHld=null;lldComponent=null;lldDetail=null;lldElement=null;lldNode=null;lldPinned=false;lldBaselineEntry=null;lldCorrespondenceId=null;lastLldKey='';lastLldInspectorKey='';lldQuery='';$('lld-filter').value='';
@@ -1346,27 +1549,39 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
     $('empty').hidden = true; $('review-content').hidden = false;
     $('review-title').textContent = `${pr.repository ? `${pr.repository.owner}/${pr.repository.name}` : pr.repository_id} · ${pr.provider_pr_id}`;
     $('breadcrumbs').textContent = 'Inbox / architecture';
+    if(publicStatic){
+      $('review-destinations').hidden=false;
+      const repo=pr.repository;
+      $('back-to-pr').href=`https://github.com/${encodeURIComponent(repo.owner)}/${encodeURIComponent(repo.name)}/pull/${pr.provider_pr_id.replace('PR-','')}`;
+      $('repo-dashboard').href=`${window.location.pathname}#repository=${encodeURIComponent(pr.repository_id)}`;
+      $('all-repositories').href=window.location.pathname;
+      $('review-verdict').hidden=true;
+    }
     $('revisions').textContent = `${short(pr.base_commit)} baseline → ${short(pr.head_commit)} proposal`;
     clearSourceInspector();
     $('scope-primary-include').value = '.'; $('scope-primary-exclude').value = '';
     $('scope-contexts').replaceChildren(); invalidateScopePreview();
     setLayout('connected', {remember: false});
     await Promise.all([workspace.selectReview(pr.review_id), loadRevisions(pr)]);
-    if (route) await applyRoute(route);
+    if (route) {preferences?.reveal([({connected:'behavior',source:'code',architecture:'architecture'})[route.layout],route.designLevel||'structural',...(route.selection?['source']:[])]);await applyRoute(route);}
+    else if(preferences){setReviewMode('standard',{remember:false,restore:false});applyPreferenceDefaults(preferences.defaults());if(remember)rememberRoute();}
+    else if(publicStatic){setLayout('architecture',{remember:false});setDesignLevel('lld',{remember:false,load:false});await loadSelectedLldCatalog();if(remember)rememberRoute();}
     else if (remember) rememberRoute();
   }
 
   function rememberRoute({replace = false} = {}) {
     if (applyingRoute || !workspace.state.reviewId) return;
     const identity=publicStatic?publicTransport.routeFor(workspace.state.reviewId):{reviewId:workspace.state.reviewId};
-    const hash = encodeWorkspaceRoute({...identity, layout, side:$('side').value, selection:workspace.state.selection,designLevel,designMode:hldMode,designElement:hldSelection,parentHld:lldParentHld,component:lldComponent,detail:lldDetail,lldElement,lldNode,lldPinned,lldBaselineEntry,lldCorrespondence});
+    const hash = encodeWorkspaceRoute({...identity, reviewMode, layout, side:$('side').value, selection:workspace.state.selection,designLevel,designMode:hldMode,designElement:hldSelection,parentHld:lldParentHld,component:lldComponent,detail:lldDetail,lldElement,lldNode,lldPinned,lldBaselineEntry,lldCorrespondence});
     if (window.location.hash === hash) return;
     window.history[replace ? 'replaceState' : 'pushState'](null, '', hash);
   }
 
   async function applyRoute(route) {
     if (!route || route.reviewId !== workspace.state.reviewId) return;
+    preferences?.reveal([({connected:"behavior",source:"code",architecture:"architecture"})[route.layout],route.designLevel||"structural",...(route.selection?["source"]:[])]);
     applyingRoute = true;
+    setReviewMode(route.reviewMode||'standard',{remember:false,restore:false});
     try {
       $('side').value = route.side;
       setLayout(route.layout, {remember:false});
@@ -1379,6 +1594,7 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
       if (route.selection?.kind === 'component') await workspace.expandComponent({path:route.selection.path, side:route.side});
       if (route.selection?.kind === 'path') await workspace.selectPath({path:route.selection.path, side:route.side});
       if (route.selection?.kind === 'symbol') await workspace.selectSymbol({symbol:route.selection.symbol, path:route.selection.path, side:route.side, direction});
+      setReviewMode(route.reviewMode||'standard',{remember:false,restore:false});
     } finally { applyingRoute = false; }
   }
 
@@ -1504,7 +1720,10 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
   }
 
   function renderWorkspace(state) {
+    preferences?.changed();
+    renderInspection(state);
     if (!state.reviewId) return;
+    if(publicStatic&&state.details?.public_verdict){$('review-verdict').hidden=false;$('review-verdict').textContent=state.details.public_verdict.label;$('review-verdict').dataset.verdict=state.details.public_verdict.kind;}
     if(publicStatic&&$('public-export-report'))$('public-export-report').disabled=!(state.details?.capabilities||[]).includes('export');
     $('hld-boundary-state').textContent=state.hld?.accepted?'Accepted as-built baseline':state.hld?(publicStatic?'Published static evidence':'Generated; explicit acceptance required'):state.hldError?'Unavailable':'Not loaded';
     if(publicStatic&&state.details){const scope=state.details.scope_manifest;$('scope-primary-include').value=(scope?.include||[]).join(', ');$('scope-primary-exclude').value=(scope?.exclude||[]).join(', ');$('scope-preview').textContent=`Published scope ${state.details.scope_version}. ${state.details.public_coverage?.complete?'Declared analysis coverage complete; runtime behavior remains unverified.':(state.details.public_coverage?.gaps||[]).join(' · ')} Request a new analysis to change scope or commits.`;}
@@ -1635,13 +1854,20 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
     $('more-files').hidden = !state.files?.next_cursor;
   }
 
+  function syncReviewTabs(){
+    const selected=layout==='architecture'&&designLevel==='lld'?'connected':layout;
+    for(const name of ['connected','source','architecture']){const control=$(`layout-${name}`);control.classList.toggle('active',selected===name);control.setAttribute('aria-pressed',String(selected===name));}
+  }
+
   function setLayout(next, {remember = true} = {}) {
+    if(remember)preferences?.reveal([({connected:"behavior",source:"code",architecture:"architecture"})[next],...(next==='source'?['source']:[])]);
     layout = ['connected', 'source', 'architecture'].includes(next) ? next : 'connected';
     for (const name of ['connected', 'source', 'architecture']) {
       const control = $(`layout-${name}`);
       control.classList.toggle('active', layout === name);
       control.setAttribute('aria-pressed', String(layout === name));
     }
+    syncReviewTabs();
     $('architecture-impact').hidden = layout !== 'architecture';
     $('workspace-split').hidden = layout === 'architecture';
     $('workspace-split').classList.toggle('source-only', layout === 'source');
@@ -1741,7 +1967,9 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
   }
 
   function appendDiffLine(code, text, kind, number = null) {
-    const line=node('span',`diff-line ${kind}`,text ?? ' '); if (number !== null) line.dataset.line=number; code.append(line);
+    const line=node('span',`diff-line ${kind}`);if(number!==null)line.dataset.line=number;
+    const source=String(text??' '),pattern=/(\/\/.*|"(?:[^"\\]|\\.)*"|\b(?:pub|fn|use|let|if|else|return|match|struct|enum|impl|async|await|true|false)\b|\b[0-9]+\b)/g;let offset=0;
+    for(const match of source.matchAll(pattern)){line.append(document.createTextNode(source.slice(offset,match.index)));line.append(node('span',match[0].startsWith('//')?'syntax-comment':match[0].startsWith('"')?'syntax-string':/^\d/.test(match[0])?'syntax-number':'syntax-keyword',match[0]));offset=match.index+match[0].length;}line.append(document.createTextNode(source.slice(offset)));code.append(line);
   }
 
   function renderSourceComparison(comparison) {
@@ -1757,7 +1985,7 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
       if(row.kind==='added'){appendDiffLine(left,'','empty');appendDiffLine(right,row.after,'added',afterLine++);appendDiffLine(unified,`+ ${row.after}`,'added');}
       if(row.kind==='modified'){appendDiffLine(left,row.before,'removed',beforeLine++);appendDiffLine(right,row.after,'added',afterLine++);appendDiffLine(unified,`- ${row.before}`,'removed');appendDiffLine(unified,`+ ${row.after}`,'added');}
     });
-    setCodeDiffMode(codeDiffMode);
+    setCodeDiffMode(codeDiffMode);applyFocusedDiff();
     $('pin').disabled = false; $('pin').textContent = pinned ? 'Unpin' : 'Pin';
   }
 
@@ -1878,8 +2106,9 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
   }
 
   function setDesignLevel(next, {remember = true, load = true, inferParent = true} = {}) {
+    if(remember)preferences?.reveal([next,"architecture"]);
     if(inferParent&&next==='lld'&&designLevel==='hld'&&workspace.state.hld){const payload=workspace.state.hld;let version=hldMode==='accepted'?payload.accepted:hldMode==='baseline'?payload.baseline:payload.proposal;if(!version?.elements.some(element=>element.id===hldSelection))version=payload.baseline;const selected=version?.elements.find(element=>element.id===hldSelection);const component=selected?.kind==='component'?selected:version?.elements.find(element=>element.id===selected?.component_id&&element.kind==='component');if(component){hldSelection=component.id;lldComponent=component.id;lldParentHld=version.id;lldDetail='module';lldElement=null;lldNode=null;lldPinned=false;}}
-    designLevel = ['structural','hld','lld'].includes(next) ? next : 'structural';
+    designLevel = ['structural','hld','lld'].includes(next) ? next : 'structural';queueMicrotask(syncFocusHeader);
     ++architectureGeneration; ++hldSourceGeneration; lastHldKey = ''; lastArchitectureKey = '';
     ++lldSourceRequest;clearTimeout(lldSourceTimer);lastLldKey='';
     if(designLevel!=='lld')workspace.invalidateLld();
@@ -1888,6 +2117,7 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
     for (const element of [$('architecture-impact').querySelector('.architecture-impact-heading'),$('architecture-impact').querySelector('.architecture-legend'),$('architecture-status'),$('architecture-diagrams')]) element.hidden = designLevel !== 'structural';
     $('architecture-mermaid-source').hidden = true;
     $('hld-review').hidden = designLevel !== 'hld'; $('lld-review').hidden = designLevel !== 'lld';
+    syncReviewTabs();
     if(designLevel==='lld'){renderLld(workspace.state);if(load)loadSelectedLldCatalog().then(()=>{if(lldElement && designLevel==='lld')workspace.loadLldDetail(lldElement,{baselineEntry:lldBaselineEntry,correspondenceKind:lldCorrespondence});});}
     if (designLevel==='hld') { renderHld(workspace.state); if (load && !workspace.state.hld) workspace.loadHld(); }
     else if (designLevel==='structural' && workspace.state.details && workspace.state.files && layout==='architecture') renderArchitectureImpact(workspace.state);
@@ -1903,7 +2133,15 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
   async function loadSelectedLldCatalog({cursor = null} = {}) {
     if(!lldParentHld){if(!workspace.state.hld)await workspace.loadHld();if(designLevel!=='lld')return;lldParentHld=workspace.state.hld?.proposal?.id || workspace.state.hld?.baseline?.id || null;}
     if(!lldParentHld){workspace.state.lldError='An exact HLD parent is required for LLD. Reload after confirming repository context.';workspace.emit();return;}
+    const generation=workspace.generation;
     await workspace.loadLldCatalog({parentHld:lldParentHld,component:lldComponent,cursor});
+    if(publicStatic&&reviewMode!=='focus'&&!cursor&&!lldElement&&designLevel==='lld'&&generation===workspace.generation){
+      const payload=workspace.state.lld;
+      const changed=new Set((payload?.delta?.changes||[]).flatMap(change=>[change.baseline_entry_id,change.proposal_entry_id]));
+      const first=lldCatalogRows(presentationFilter('changedFunctions')?focusLldCatalog(payload):payload).find(row=>['function','method'].includes(row.entry.kind)&&(changed.has(row.id)||changed.has(row.baseline?.id)));
+      if(first)await openLldEntry(first.id,first.entry,{remember:false});
+    }
+    if(presentationFilter('changedFunctions'))selectFocusedFunction();
     rememberRoute({replace:true});
   }
 
@@ -1932,21 +2170,49 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
       if(payload.client_omitted)coverage.append(node('p','warning',`${payload.client_omitted} declarations omitted by the client bound.`));
     }
     renderLldCatalog(payload);
+    if(reviewMode==='focus'&&payload&&!lldElement){
+      const catalogKey=[state.reviewId,payload.baseline?.id,payload.proposal?.id,lldComponent,JSON.stringify(preferences?.filters()),payload.entries?.length].join('|');
+      if(lastLldKey!==catalogKey){lastLldKey=catalogKey;renderFocusInventory(payload);}
+      $('lld-inspector').replaceChildren();$('lld-detail-breadcrumb').textContent='';return;
+    }
     const changes=$('lld-changes');changes.replaceChildren();
+    if(presentationFilter('changedFunctions')&&payload&&!lldCatalogRows(focusLldCatalog(payload)).some(row=>row.id===lldElement)){
+      ++architectureGeneration;lastLldKey='';lastLldInspectorKey='';$('lld-diagrams').replaceChildren(node('p','status',focusLldCatalog(payload).entries.length?'Select a changed function.':'No changed functions in the loaded inventory. Other declarations remain in Standard.'));$('lld-inspector').replaceChildren();return;
+    }
     if(detail) {
       const changed=detail.delta?.changes || [];
       if(changed.length){changes.append(node('h4','','Observed implementation changes'));for(const change of changed.slice(0,20))changes.append(node('p','',`${String(change.kind || change.classification).replaceAll('_',' ')} · ${change.classification || 'changed'} · ${change.resolution || 'static evidence'}`));}
       else changes.append(node('p','status',lldOutcome(detail.delta)));
       if(hldMode==='combined')changes.append(node('p','mono','Diff retains each snapshot’s local graph. Semantic classifications above do not imply runtime equivalence or a matched execution path.'));
     }
-    const key=[state.reviewId,payload?.scope_version,lldParentHld,lldComponent,detail?.baseline?.id,detail?.proposal?.id,detail?.delta?.id,hldMode].join('|');
+    const key=[state.reviewId,payload?.scope_version,lldParentHld,lldComponent,detail?.baseline?.id,detail?.proposal?.id,detail?.delta?.id,hldMode,reviewMode,JSON.stringify(preferences?.filters())].join('|');
     if(!detail){if(lastLldKey!==key){++architectureGeneration;lastLldKey=key;$('lld-diagrams').replaceChildren();}lastLldInspectorKey='';activeLldEvidence=null;lldSourcePairView.clear();$('lld-inspector').replaceChildren(node('p','status',state.loading.has('lld-detail')?'Loading exact implementation evidence…':'Select a module, type or function from the authorized inventory.'));$('lld-acceptance').hidden=true;$('lld-detail-breadcrumb').textContent='';$('lld-confirmation-preview').hidden=true;$('lld-confirmation-preview').firstElementChild.textContent='';return;}
     if(lastLldKey!==key){lastLldKey=key;renderLldDiagrams(detail);}
     renderLldInspector(detail);
   }
 
+  async function renderFocusInventory(payload) {
+    const generation=++architectureGeneration,container=$('lld-diagrams');
+    const rows=lldCatalogRows(presentationFilter('changedFunctions')?focusLldCatalog(payload):payload);
+    container.classList.remove('compare');container.replaceChildren();
+    if(!rows.length){container.append(node('p','status','No changed declarations in the loaded authorized inventory.'));return;}
+    const label=value=>mermaidLabel(value).replace(/[&|`\\]/g,' ');
+    const source=['flowchart LR',...rows.map((row,i)=>`fn${i}["${label(row.entry.name)}<br/>${label(row.entry.path)}"]`)].join('\n');
+    try {
+      const renderer=await ensureMermaid(),rendered=await renderer.render(`csb-functions-${generation}`,source);
+      if(generation!==architectureGeneration||designLevel!=='lld')return;
+      const frame=node('section','architecture-frame');frame.append(node('h4','',`${rows.length} declarations · select to inspect flow`));
+      const host=node('div','architecture-svg');host.innerHTML=rendered.svg;frame.append(host);container.append(frame);
+      mountDiagramViewport(frame,host,host.querySelector('svg'),{initialMode:'fit',hint:'Select a declaration to open its exact flow. No call relationships are inferred here.'});
+      host.querySelectorAll('g.node').forEach(element=>{const match=element.id.match(/flowchart-fn(\d+)-/),row=match&&rows[Number(match[1])];if(!row)return;element.setAttribute('tabindex','0');element.setAttribute('role','button');element.setAttribute('aria-label',`Open flow: ${row.entry.name}`);const open=()=>openLldEntry(row.id,row.entry);element.addEventListener('click',open);element.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();open();}});});
+      if(payload.next_cursor){const more=node('button','','Load more declarations');more.onclick=()=>loadSelectedLldCatalog({cursor:payload.next_cursor});container.append(more);}
+    }catch(error){if(generation===architectureGeneration)container.replaceChildren(node('p','status',`Declaration diagram unavailable: ${error.message}`));}
+  }
+
   function renderLldCatalog(payload) {
+    if(presentationFilter('changedFunctions')&&payload){if(focusCatalogSource!==payload){focusCatalogSource=payload;focusCatalogProjection=focusLldCatalog(payload);}payload=focusCatalogProjection;}
     lldCatalogView.render(payload,{query:lldQuery,selection:lldElement,loading:workspace.state.loading.has('lld')});
+    if(presentationFilter('changedFunctions')&&payload)$('lld-catalog-status').textContent=`${payload.entries.length} changed functions${payload.next_cursor?' · more available':''}`;
   }
 
   function renderLldHistory(history) {
@@ -1956,6 +2222,7 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
   }
 
   async function openLldEntry(id,entry = null,{remember = true} = {}) {
+    $('lld-inspector').classList.remove('source-open');
     lldElement=id;lldDetail=['file','module','import'].includes(entry?.kind)?'module':['type','struct','enum','trait','impl','type_alias','field','variant'].includes(entry?.kind)?'type':'function';lldNode=null;lldPinned=false;lldBaselineEntry=null;lldCorrespondenceId=null;activeLldEvidence=null;++lldSourceRequest;clearTimeout(lldSourceTimer);
     lastLldInspectorKey='';$('lld-invariant').value='';$('lld-known-gaps').checked=false;$('lld-activate-default').checked=false;lldInvariantId=null;
     $('lld-confirmation-status').textContent='Preview is required before confirmation.';
@@ -1965,13 +2232,14 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
   async function renderLldDiagrams(payload) {
     const generation=++architectureGeneration;diagramObservers.splice(0).forEach(observer=>observer.disconnect());
     const modes=hldMode==='compare'?['baseline','proposal']:[hldMode==='accepted'?'combined':hldMode],container=$('lld-diagrams');container.replaceChildren();container.classList.toggle('compare',modes.length===2);
-    const sources=modes.map(mode=>({mode,...lldMermaid(payload,mode)}));
+    const diagramPayload=presentationFilter('collapseValues')?focusLldDetail(payload):payload;
+    const sources=modes.map(mode=>({mode,...lldMermaid(diagramPayload,mode)}));
     $('lld-mermaid-source').firstElementChild.textContent=(payload.can_export || payload.export_allowed)?sources.map(item=>`## ${item.mode}\n\n\`\`\`mermaid\n${item.source}\n\`\`\``).join('\n\n'):'';
     try {
       const renderer=await ensureMermaid();if(generation!==architectureGeneration||designLevel!=='lld')return;
       for(const item of sources) {
         await renderer.parse(item.source);const rendered=await renderer.render(`csb-lld-${generation}-${item.mode}`,item.source);if(generation!==architectureGeneration||designLevel!=='lld')return;
-        const frame=node('section','architecture-frame');frame.append(node('h4','',item.mode==='combined'?'LLD PR comparison':item.mode));const host=node('div','architecture-svg lld-svg');host.innerHTML=rendered.svg;frame.append(host);container.append(frame);const svg=host.querySelector('svg');svg?.setAttribute('aria-label',`${item.mode} static local control flow`);
+        const frame=node('section','architecture-frame');frame.append(node('h4','',item.mode==='combined'?(presentationFilter('collapseValues')?'Control-flow comparison · values collapsed':'LLD PR comparison'):item.mode));const host=node('div','architecture-svg lld-svg');host.innerHTML=rendered.svg;frame.append(host);container.append(frame);const svg=host.querySelector('svg');svg?.setAttribute('aria-label',`${item.mode} static local control flow`);
         let initialIndex=item.nodes.findIndex(record=>record.node.id===lldNode);if(initialIndex<0)initialIndex=item.nodes.findIndex(record=>record.side===(item.mode==='baseline'?'baseline':'proposal') && (record.node.operation==='entry' || record.entry?.id===record.detail.entry.id));if(initialIndex<0)initialIndex=0;
         if(item.nodes[initialIndex])host.dataset.initialDesignNode=item.nodes[initialIndex].node.id;
         mountDiagramViewport(frame,host,svg,{initialMode:LLD_INITIAL_SCALE,initialSelector:`g.node[id*="flowchart-lld${initialIndex}-"]`,hint:'Select a step to inspect code. Scroll the canvas to pan.'});
@@ -1979,7 +2247,7 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
           const match=graphNode.id.match(/-flowchart-lld(\d+)-/),record=match?item.nodes[Number(match[1])]:null;if(!record)return;
           graphNode.dataset.lldNode=record.node.id;graphNode.dataset.lldSide=record.side;graphNode.setAttribute('tabindex','0');graphNode.setAttribute('role','button');graphNode.setAttribute('aria-label',`${record.side}: ${record.node.label}. ${record.node.resolution}. Inspect exact source.`);graphNode.setAttribute('aria-current',String(record.node.id===lldNode));
           const evidence=lldEvidence(record.detail,record.node)[0];
-          const preview=()=>{if(lldPinned&&lldNode!==record.node.id)return;showLldNode(record,evidence,false);};
+          const preview=()=>{if(reviewMode==='focus')return;if(lldPinned&&lldNode!==record.node.id)return;showLldNode(record,evidence,false);};
           graphNode.addEventListener('pointerenter',()=>{clearTimeout(lldSourceTimer);lldSourceTimer=setTimeout(preview,100);});graphNode.addEventListener('focus',preview);
           graphNode.addEventListener('pointerleave',()=>{clearTimeout(lldSourceTimer);if(!lldPinned){++lldSourceRequest;++workspace.lldSourceGeneration;workspace.state.lldSource=null;host.querySelectorAll('.lld-node-source').forEach(item=>item.remove());}});
           const pin=()=>record.entry && record.entry.id!==record.detail.entry.id?openLldEntry(record.entry.id,record.entry):showLldNode(record,evidence,true);graphNode.addEventListener('click',pin);graphNode.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();pin();}else if(event.key==='Escape'){lldPinned=false;lldNode=null;activeLldEvidence=null;++lldSourceRequest;++workspace.lldSourceGeneration;workspace.state.lldSource=null;host.querySelectorAll('.lld-node-source').forEach(item=>item.remove());rememberRoute();renderLldInspector(workspace.state.lldDetail);}});
@@ -1995,13 +2263,14 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
     $('lld-diagrams').querySelectorAll('g.node[data-lld-node]').forEach(item=>item.setAttribute('aria-current',String(item.dataset.lldNode===lldNode)));
     $('lld-diagrams').querySelectorAll('.lld-node-source').forEach(item=>item.remove());
     if(remember&&pin)rememberRoute();
+    if(pin&&reviewMode==='focus'){$('lld-inspector').classList.add('source-open');renderLldInspector(workspace.state.lldDetail);$('lld-source-pair')?.scrollIntoView({block:'nearest'});}
     if(!evidence){$('lld-source-status').textContent='This operation has no retained source evidence. Another revision is never substituted.';return;}
     const token=++lldSourceRequest,key=[workspace.generation,workspace.lldDetailGeneration,evidence.id].join('|');
     let promise=lldActiveSourceKey===key?lldActiveSourcePromise:null;
     if(!promise){promise=workspace.loadLldSource(evidence);lldActiveSourcePromise=promise;lldActiveSourceKey=key;promise.finally(()=>{if(lldActiveSourcePromise===promise){lldActiveSourcePromise=null;lldActiveSourceKey=null;}}).catch(()=>{});}
     const source=await promise;
     if(token!==lldSourceRequest || !source || source.evidence_id!==activeLldEvidence?.id || designLevel!=='lld')return;
-    renderLldInspector(workspace.state.lldDetail);renderLldBoxSource(record.node.id,record.side,source);
+    renderLldInspector(workspace.state.lldDetail);if(reviewMode!=='focus'||!pin)renderLldBoxSource(record.node.id,record.side,source);
   }
 
   function renderLldBoxSource(nodeId,side,source) {
@@ -2013,9 +2282,10 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
 
   function renderLldInspector(payload) {
     if(!payload)return;
-    const selected=payload.proposal || payload.baseline,key=[payload.baseline?.id,payload.proposal?.id,payload.accepted?.accepted_id,payload.accepted_intended?.accepted_id,payload.accepted_status,hldMode].join('|'),container=$('lld-inspector');
+    const selected=payload.proposal || payload.baseline,key=[payload.baseline?.id,payload.proposal?.id,payload.accepted?.accepted_id,payload.accepted_intended?.accepted_id,payload.accepted_status,hldMode,reviewMode,JSON.stringify(preferences?.filters())].join('|'),container=$('lld-inspector');
     if(lastLldInspectorKey!==key){
       lastLldInspectorKey=key;container.replaceChildren();
+      const close=node('button','focus-close-source','Back to diagram');close.onclick=()=>{container.classList.remove('source-open');lldPinned=false;rememberRoute();$('lld-diagrams').querySelector('[aria-current=true]')?.focus();};container.append(close);
       container.append(node('h3','',selected.entry.name),node('p','mono',`${selected.entry.logical_key} · ${selected.entry.path}`));
       $('lld-detail-breadcrumb').textContent=`/ ${selected.entry.module} / ${selected.entry.name}`;
       const facts=node('div','hld-facts');
@@ -2029,10 +2299,12 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
         select.addEventListener('change',async()=>{lldBaselineEntry=select.value || null;lldCorrespondence='rename';lldCorrespondenceId=null;lldNode=null;lldPinned=false;activeLldEvidence=null;++lldSourceRequest;invalidateLldConfirmation();rememberRoute();await workspace.loadLldDetail(lldElement,{baselineEntry:lldBaselineEntry,correspondenceKind:lldCorrespondence});});
         kind.addEventListener('change',async()=>{lldCorrespondence=kind.value;invalidateLldConfirmation();rememberRoute();await workspace.loadLldDetail(lldElement,{baselineEntry:lldBaselineEntry,correspondenceKind:lldCorrespondence});});
       }
+      {
       const children=selected.declarations || [];if(children.length){container.append(node('h4','','Declarations'));for(const entry of children.slice(0,100)){const button=node('button','quiet lld-child',`${entry.kind} · ${entry.name}`);button.type='button';button.addEventListener('click',()=>openLldEntry(entry.id,entry));container.append(button);}}
       appendHldList(container,'Possible callers',(payload.delta?.possible_callers || []).map(item=>`${item.logical_key} · ${item.resolution} · ${item.classification}`));
       for(const [label,accepted] of [['As-built',payload.accepted],['Intended',payload.accepted_intended]])if(accepted){const data=accepted.design?.lld,observed=accepted.observed_design?.lld,changed=observed?.behavior_fingerprint!==selected.behavior_fingerprint;appendHldList(container,`${label} recorded assertions`,[...(data?.invariants || []).map(item=>`${item.statement} · ${item.resolution} · ${item.verification}`),`Original commit ${accepted.observed_design?.snapshot || 'unavailable'} · ${changed?'Implementation changed; prior assertion needs review':'Same implementation fingerprint; runtime claim remains unverified'}`]);}
-      container.append(node('h4','','Exact source evidence'));const evidenceList=node('div','hld-evidence');
+      }
+      const evidenceList=node('details','hld-evidence lld-source-evidence');evidenceList.append(node('summary','','Exact source evidence'));
       for(const [side,detail] of [['Baseline',payload.baseline],['Proposal',payload.proposal]])for(const evidence of lldEvidence(detail).slice(0,12)){const button=node('button','quiet',`${side} · ${evidence.path}:${evidence.start_line}-${evidence.end_line} · ${short(evidence.commit)}`);button.type='button';button.addEventListener('click',async()=>{activeLldEvidence=evidence;lldPinned=true;lldNode=null;const token=++lldSourceRequest;await workspace.loadLldSource(evidence);if(token===lldSourceRequest)renderLldInspector(workspace.state.lldDetail);});evidenceList.append(button);}container.append(evidenceList);
       const actions=node('div','hld-actions');const pin=node('button','quiet');pin.type='button';pin.id='lld-source-pin';pin.addEventListener('click',()=>{lldPinned=!lldPinned;pin.textContent=lldPinned?'Unpin source':'Pin source';rememberRoute();});actions.append(pin);container.append(actions);
       const pair=node('div','lld-source-pair');pair.id='lld-source-pair';container.append(pair);
@@ -2077,7 +2349,7 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
     $('hld-full-identity').textContent=`baseline commit ${payload.baseline?.snapshot || 'unavailable'} · proposal commit ${payload.proposal?.snapshot || 'unavailable'} · scope ${payload.baseline?.scope_version || 'unavailable'} · baseline design ${payload.baseline?.id || 'unavailable'} · proposal design ${payload.proposal?.id || 'unavailable'} · accepted as-built design ${payload.accepted?.id || 'none'} · accepted intended design ${payload.accepted_intended?.id || 'none'}`;
     $('hld-drift-status').textContent = publicStatic?'Read-only public snapshot. Accepted design records are not published.':(payload.accepted_drift ? `${hldOutcome(payload.accepted_drift)} before this PR · accepted ${short(payload.accepted?.snapshot)} → baseline ${short(payload.baseline?.snapshot)}` : payload.accepted ? 'Accepted as-built design drift has not been determined.' : 'No accepted as-built HLD baseline.')+(payload.accepted_intended?' · Accepted intended design is stored separately from observed code.':'');
     renderHldCoverage(payload);
-    const comparison=hldComparison(payload,hldMode==='compare'?'combined':hldMode), elements=comparison.elements;
+    const comparison=hldComparison(presentationFilter('changedHld')?focusHldPayload(payload):payload,hldMode==='compare'?'combined':hldMode), elements=comparison.elements;
     if (!elements.some(element=>element.id===hldSelection)) hldSelection=elements[0]?.id || null;
     const list=$('hld-element-list'); list.replaceChildren();
     for (const element of elements) { const button=node('button','hld-element'); button.type='button'; button.setAttribute('aria-current',String(element.id===hldSelection)); button.append(node('span','',element.name),node('span','badge',comparison.status.get(element.id)||element.kind)); button.addEventListener('click',()=>selectHldElement(element.id)); list.append(button); }
@@ -2085,7 +2357,7 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
     updateHldConfirmationElements(payload);
     const modes=hldMode==='compare'?['baseline','proposal']:[hldMode];
     $('hld-mermaid-source').firstElementChild.textContent=exportAllowed?modes.map(mode=>`## ${mode}\n\n\`\`\`mermaid\n${hldMermaid(payload,mode)}\n\`\`\``).join('\n\n'):'';
-    const key=[state.reviewId,hldMode,payload.baseline?.id,payload.proposal?.id,payload.accepted?.id,payload.delta?.id].join('|');
+    const key=[state.reviewId,hldMode,payload.baseline?.id,payload.proposal?.id,payload.accepted?.id,payload.delta?.id,reviewMode].join('|');
     if (lastHldKey!==key) { lastHldKey=key; renderHldDiagrams(payload); }
   }
 
@@ -2118,23 +2390,25 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
     const generation=++architectureGeneration;
     diagramObservers.splice(0).forEach(observer=>observer.disconnect());
     const modes=hldMode==='compare'?['baseline','proposal']:[hldMode], container=$('hld-diagrams'); container.replaceChildren(); container.classList.toggle('compare',modes.length===2);
-    const sources=modes.map(mode=>({mode,source:hldMermaid(payload,mode)}));
+    const diagramPayload=presentationFilter('changedHld')?focusHldPayload(payload):payload;
+    const sources=modes.map(mode=>({mode,source:hldMermaid(diagramPayload,mode)}));
     $('hld-mermaid-source').firstElementChild.textContent=hldExportAllowed(payload,hldMode)?sources.map(item=>`## ${item.mode}\n\n\`\`\`mermaid\n${item.source}\n\`\`\``).join('\n\n'):'';
     try {
       const renderer=await ensureMermaid(); if (generation!==architectureGeneration || designLevel!=='hld') return;
       for (const item of sources) {
         await renderer.parse(item.source); const rendered=await renderer.render(`csb-hld-${generation}-${item.mode}`,item.source); if (generation!==architectureGeneration || designLevel!=='hld') return;
-        const frame=node('section','architecture-frame'); frame.append(node('h4','',item.mode==='combined'?'HLD PR diff':item.mode));
+        const frame=node('section','architecture-frame'); frame.append(node('h4','',item.mode==='combined'?'Architecture changes · dependencies, not execution order':item.mode+' architecture'));
         const host=node('div','architecture-svg'); host.innerHTML=rendered.svg; frame.append(host); container.append(frame);
         const svg=host.querySelector('svg'); if(svg)svg.setAttribute('aria-label',`${item.mode} high-level design diagram`);
         mountDiagramViewport(frame,host,svg,{initialMode:'overview'});
-        const elements=hldDiagramElements(payload,item.mode);
+        const elements=hldDiagramElements(diagramPayload,item.mode);
         host.querySelectorAll('g.node').forEach(graphNode=>{const match=graphNode.id.match(/-flowchart-hld(\d+)-/); const element=match?elements[Number(match[1])]:null; if(!element)return; graphNode.dataset.designElement=element.id;graphNode.classList.toggle('selected',element.id===hldSelection);graphNode.setAttribute('aria-current',String(element.id===hldSelection));graphNode.setAttribute('tabindex','0'); graphNode.setAttribute('role','button'); graphNode.setAttribute('aria-label',`Inspect ${element.name}, ${element.kind}`); const inspect=()=>selectHldElement(element.id); graphNode.addEventListener('click',inspect); graphNode.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();inspect();}});});
       }
     } catch(error) { if(generation!==architectureGeneration)return; lastHldKey=''; container.replaceChildren(node('p','status',`Diagram unavailable: ${error.message}. Component facts and authorized source evidence remain available below.`)); }
   }
 
   function appendHldList(container, title, values) {
+    const group=node('section',title==='Possible callers'?'preference-callers':title==='Interactions and contracts'?'preference-relationships':'preference-design-details');container.append(group);container=group;
     container.append(node('h4','',title));
     if (!values.length) { container.append(node('p','status','Unknown or not established by current evidence.')); return; }
     const list=node('ul'); for(const value of values.slice(0,50))list.append(node('li','',String(value))); container.append(list);
@@ -2169,7 +2443,7 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
     appendHldList(container,'Architectural constraint findings',(payload.delta?.findings||[]).map(finding=>`${finding.message} · ${finding.resolution} · constraint ${finding.constraint_id}`));
     appendHldList(container,'Selected design intent and decisions',versions.flatMap(version=>(version?.decision_records||[]).filter(decision=>decision.component_id===hldSelection).map(decision=>`${version===payload.baseline?'Baseline':version===payload.proposal?'Proposal':'Accepted'}: ${decision.intent} · ${decision.resolution} · ${decision.verification} · document ${decision.document_candidate_id}`)));
     appendHldList(container,'Unknowns',[...new Set([...(baseline?.unknowns||[]),...(proposal?.unknowns||[])])]);
-    container.append(node('h4','','Exact source evidence')); const evidenceList=node('div','hld-evidence');
+    const evidenceList=node('details','hld-evidence hld-source-evidence');evidenceList.append(node('summary','','Exact source evidence'));
     const evidencePage=hldEvidenceCollection(payload,hldSelection,hldMode==='compare'?'combined':hldMode),evidence=evidencePage.items;
     for(const item of evidence){const button=node('button','quiet',`${item.path}:${item.start_line}-${item.end_line} · ${short(item.commit)} · ${item.relationship_type} · ${item.resolution}`);button.type='button';button.addEventListener('click',()=>inspectHldEvidence(item));evidenceList.append(button);}
     if(!evidence.length)evidenceList.append(node('p','status','No source span supports this element. User assertions are separate from code facts.'));
@@ -2258,7 +2532,24 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
     $('source-baseline').firstElementChild.textContent='No baseline source selected.';$('source-proposal').firstElementChild.textContent='No proposal source selected.';$('source-unified').firstElementChild.textContent='No source selected.';$('pin').disabled=true;$('pin').textContent='Pin';
   }
 
-  $('session-form').addEventListener('submit', event => { event.preventDefault(); token = $('session-token').value; $('session-token').value = ''; loadInbox(); });
+  function applyPreferenceDefaults(preset){
+    setLayout({behavior:'connected',code:'source',architecture:'architecture'}[preset.view],{remember:false});
+    hldMode=preset.comparison;setDesignLevel(preset.level,{remember:false});
+    $('diff-'+(preset.comparison==='compare'?'split':'unified'))?.click();
+  }
+  const preferencesReady=window.WorkspacePreferences?.mount({static:publicStatic,request,
+    permission:key=>key==='hld_accept'?Boolean(workspace.state.hld?.can_accept):key==='lld_accept'?Boolean(workspace.state.lldDetail?.can_accept):(workspace.state.details?.capabilities||[]).includes(key),
+    revealRegion:region=>{if(region==='right'){document.body.classList.remove('context-collapsed');$('inspection-context').hidden=!workspace.state.details;$('context-toggle').setAttribute('aria-expanded','true');}},
+    snapshot:()=>({mode:reviewMode,layout,designLevel,hldMode,hash:window.location.hash}),
+    restore:snapshot=>{setReviewMode(snapshot.mode,{remember:false,restore:false});setLayout(snapshot.layout,{remember:false});hldMode=snapshot.hldMode;setDesignLevel(snapshot.designLevel,{remember:false});history.replaceState(null,'',window.location.pathname+window.location.search+snapshot.hash);},
+    mode:value=>setReviewMode(value,{remember:false,restore:false}),
+    defaults:applyPreferenceDefaults,
+    status:()=>{const state=workspace.state;return [[state.error,state.hldError,state.lldError].filter(Boolean).join(' · '),state.details?.stale?'Stale comparison':'',state.details?.public_coverage?.complete?'Declared coverage complete':'Coverage incomplete or unverified','Static evidence · runtime unverified'].filter(Boolean).join(' · ');},
+    filters:()=>{lastHldKey='';lastLldKey='';lastLldInspectorKey='';focusCatalogSource=null;renderHld(workspace.state);renderLld(workspace.state);selectFocusedFunction();},
+    visibility:preset=>{if(workspace.state.details){if(preset.visibility.findings||preset.visibility.explanations||preset.visibility.summary)void workspace.loadOptional('findings');if(preset.visibility.continuity||preset.visibility.notes||preset.visibility.bookmarks||preset.visibility.handoffs||preset.visibility.reviewed)void workspace.loadOptional('annotations');}const view={connected:'behavior',source:'code',architecture:'architecture'}[layout];if(!preset.visibility[view]&&Object.values(preset.visibility).some(Boolean)){const next=['behavior','code','architecture'].find(v=>preset.visibility[v]);if(next)setLayout({behavior:'connected',code:'source',architecture:'architecture'}[next],{remember:false});}if(!preset.visibility[designLevel]){const next=['structural','hld','lld'].find(v=>preset.visibility[v]);if(next)setDesignLevel(next,{remember:false});}}
+  }).then(value=>{preferences=value;value.setMode(reviewMode);return value;}).catch(error=>{$('connection').textContent='Workspace settings unavailable: '+error.message;});
+
+  $('session-form').addEventListener('submit', async event => { event.preventDefault(); preferences?.logout();token = $('session-token').value; $('session-token').value = ''; await preferences?.login();loadInbox(); });
   document.querySelector('.skip-link').addEventListener('click', event => {
     event.preventDefault();
     const target = $('review-content').hidden ? $('empty') : $('review-content');
@@ -2266,6 +2557,7 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
   });
   $('file-search').addEventListener('input', () => renderChangedFiles(workspace.state));
   if (publicStatic) {
+    $('repo-dashboard').addEventListener('click',event=>{event.preventDefault();window.location.assign($('repo-dashboard').href);window.location.reload();});
     $('session-form').hidden=true;$('session-token').value='';token='';$('onboarding-link').hidden=true;
     for(const id of ['baseline-revision','proposal-revision','compare-revisions','scope-primary-include','scope-primary-exclude','add-scope-context','preview-scope','save-scope','save-handoff','handoff-reviewer']){$(id).disabled=true;$(id).title='Read-only published comparison. Request a new analysis to change this input.';}
     $('question-visibility').value='private';$('question-visibility').disabled=true;$('question-visibility').querySelector('[value="private"]').textContent='Page memory';$('review-question').maxLength=4000;
@@ -2331,9 +2623,9 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
   $('scope-primary-exclude').addEventListener('input', invalidateScopePreview);
   $('direction').addEventListener('click', () => { direction = direction === 'outgoing' ? 'incoming' : 'outgoing'; $('direction').textContent = direction[0].toUpperCase() + direction.slice(1); const selection = workspace.state.selection; if (selection?.kind === 'symbol') workspace.selectSymbol({...selection, side: $('side').value, direction}); });
   $('pin').addEventListener('click', () => { pinned = !pinned; $('pin').textContent = pinned ? 'Unpin' : 'Pin'; });
-  $('layout-connected').addEventListener('click', () => setLayout('connected'));
-  $('layout-source').addEventListener('click', () => setLayout('source'));
-  $('layout-architecture').addEventListener('click', () => setLayout('architecture'));
+  $('layout-connected').addEventListener('click', () => {setLayout('architecture',{remember:false});setDesignLevel('lld');});
+  $('layout-source').addEventListener('click', async () => {setLayout('source');if(publicStatic&&!workspace.state.selection){const file=workspace.state.files?.items?.[0];if(file){await workspace.selectPath({path:file.path,side:'diff'});await loadPublishedFile(file.path);rememberRoute();}}});
+  $('layout-architecture').addEventListener('click', () => {setLayout('architecture',{remember:false});setDesignLevel('hld');});
   $('design-source-fallback').addEventListener('click', async () => {
     if(designLevel==='hld' && workspace.state.hld){const evidence=hldEvidenceFor(workspace.state.hld,hldSelection,hldMode==='compare'?'combined':hldMode);const file=(workspace.state.files?.items||[]).find(item=>evidence.some(source=>source.path===item.path));if(file){$('side').value='diff';await workspace.selectPath({path:file.path,side:'diff'});}else clearSourceInspector('This HLD component has no changed file in this PR. Inspect its exact source evidence in the HLD view.');}
     if(designLevel==='lld' && workspace.state.lldDetail){const detail=workspace.state.lldDetail.proposal || workspace.state.lldDetail.baseline,path=detail.entry.path,file=(workspace.state.files?.items || []).find(item=>item.path===path);if(file){$('side').value='diff';await workspace.selectPath({path,side:'diff'});}else clearSourceInspector('This LLD declaration has no changed file in this PR. Inspect its exact source evidence in the LLD view.');}

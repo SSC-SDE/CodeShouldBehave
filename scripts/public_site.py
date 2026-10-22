@@ -301,7 +301,7 @@ def assemble_site(bundles, output, observed_at, previous=None, previous_sha256=N
         if marker not in html or 'src="../assets/public-workspace.js"' not in html:
             raise SiteError("Approved workspace static hooks unavailable")
         (temporary / "workspace/index.html").write_text(html)
-        for name, source in {"workspace.js": "src/workspace.js", "workspace.css": "src/workspace.css", "public-workspace.js": "src/public-workspace.js", "mermaid.js": "docs/prototypes/vendor/mermaid.tiny-12.1.0.js", "mermaid-LICENSE.txt": "docs/prototypes/vendor/mermaid-LICENSE.txt"}.items():
+        for name, source in {"inter.ttf": "src/fonts/inter.ttf", "jetbrains-mono.ttf": "src/fonts/jetbrains-mono.ttf", "inter-OFL.txt": "src/fonts/inter-OFL.txt", "jetbrains-mono-OFL.txt": "src/fonts/jetbrains-mono-OFL.txt", "workspace-preferences.js": "src/workspace-preferences.js", "workspace-registry.json": "src/workspace-registry.json", "workspace.js": "src/workspace.js", "workspace.css": "src/workspace.css", "public-workspace.js": "src/public-workspace.js", "mermaid.js": "docs/prototypes/vendor/mermaid.tiny-12.1.0.js", "mermaid-LICENSE.txt": "docs/prototypes/vendor/mermaid-LICENSE.txt"}.items():
             (temporary / "assets" / name).write_bytes(read_file(project_root / source, 4 * 1024 * 1024))
         for name in ("LICENSE", "THIRD_PARTY_NOTICES.md"):
             (temporary / name).write_bytes(read_file(project_root / name, 2 * 1024 * 1024))

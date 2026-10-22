@@ -346,7 +346,11 @@ def validate_state(value: Any, config: dict) -> dict:
         raise Refusal("check repair ledger exceeds profile")
     update_ids = set()
     for item in updates:
-        object_fields(item, {"request", "public_report_id", "conclusion", "reason"}, name="check update")
+        object_fields(item, {"request", "public_report_id", "conclusion", "reason"}, {"verdict"}, name="check update")
+        if "verdict" in item and item["verdict"] not in ("change_detected", "no_change_detected", "incomplete"):
+            raise Refusal("invalid check verdict")
+        if "verdict" in item and item["conclusion"] != verdict_conclusion(item):
+            raise Refusal("check conclusion differs from verdict")
         request = validate_ledger_request(item["request"], config)
         if request["request_id"] in update_ids or item["conclusion"] not in ("success", "neutral", "failure", "cancelled") or item["reason"] not in ("", "analysis_unavailable", "superseded"):
             raise Refusal("invalid or duplicate check repair identity")
@@ -806,6 +810,26 @@ def check_outcome(*, complete: bool = False, gaps: list | None = None, deferred:
     if failure:
         return "failure"
     return "success" if complete and not gaps and not deferred else "neutral"
+
+
+def review_verdict(coverage: dict, artifact: dict, changes: list | None = None) -> str:
+    """Classify verified static evidence, never workflow success or runtime safety."""
+    statuses = [artifact.get("hld_status"), artifact.get("lld_status")]
+    observed = any(change.get("resolution") == "observed_structure" and change.get("kind") in ("call_observation_changed", "control_flow_changed", "return_changed", "error_flow_changed") for change in (changes or []))
+    if "change_detected" in statuses or observed:
+        return "change_detected"
+    if (coverage.get("complete") is True and not coverage.get("gaps")
+            and not coverage.get("deferred_details")
+            and all(value == "no_change_detected_within_scope" for value in statuses)):
+        return "no_change_detected"
+    return "incomplete"
+
+
+def verdict_conclusion(update: dict) -> str:
+    if update["conclusion"] in ("failure", "cancelled"):
+        return update["conclusion"]
+    # Older durable records lack a verdict. They must not become a green claim.
+    return "success" if update.get("verdict") == "no_change_detected" else "neutral"
 
 
 def tree_inventory(root: Path, byte_cap: int, file_cap: int, *, entry_cap: int | None = None) -> tuple[list[tuple[str, Path]], int]:
@@ -1354,9 +1378,9 @@ def queue_checks(config: dict, plan_value: dict, provider: GitHub) -> list[dict]
             check_id = integer(matches[0]["id"], 1, 2**63 - 1, "check id")
         else:
             created = provider.api(provider.prefix + "/check-runs", method="POST", body={"name": "CodeShouldBehave / Architecture", "head_sha": request["proposal"], "external_id": external_id, "status": "queued",
-                           "output": {"title": "Architecture review accepted", "summary": "Exact public comparison accepted. Static coverage is not available yet; this advisory check does not approve merging."}})
+                           "output": {"title": "Queued · Architecture review", "summary": "Exact public comparison accepted. Static coverage is not available yet; this advisory check does not approve merging."}})
             check_id = integer(created.get("id"), 1, 2**63 - 1, "check id")
-        provider.api(f"{provider.prefix}/check-runs/{check_id}", method="PATCH", body={"status": "in_progress", "started_at": timestamp(), "output": {"title": "Preparing bounded architecture analysis", "summary": "The trusted controller is preparing the pinned comparison. HLD/LLD coverage will be reported independently of workflow success."}})
+        provider.api(f"{provider.prefix}/check-runs/{check_id}", method="PATCH", body={"status": "in_progress", "started_at": timestamp(), "output": {"title": "Running · Analyzing HLD and LLD", "summary": "The trusted controller is preparing the pinned comparison. HLD/LLD coverage will be reported independently of workflow success."}})
         checks.append({"request_id": request["request_id"], "check_id": check_id, "proposal": request["proposal"]})
     return checks
 
@@ -1370,11 +1394,11 @@ def acknowledge_delivered_checks(config: dict, state: dict, provider: GitHub, *,
         runs = value.get("check_runs")
         if not isinstance(runs, list) or len(runs) >= 100:
             raise Refusal("check delivery readback unavailable or truncated")
-        expected_url = None if update["public_report_id"] is None else config["site"]["origin"] + config["site"]["base_path"] + "workspace/#review=" + update["public_report_id"] + "&bundle=" + update["public_report_id"] + "&layout=architecture&side=diff"
+        expected_url = None if update["public_report_id"] is None else config["site"]["origin"] + config["site"]["base_path"] + "workspace/#review=" + update["public_report_id"] + "&bundle=" + update["public_report_id"] + "&layout=architecture&side=diff&design=lld&mode=focus"
         matches = [item for item in runs if item.get("app", {}).get("slug") == "github-actions" and item.get("external_id") == "csb-public-v1:" + request["request_id"] and item.get("head_sha") == request["proposal"]]
         if len(matches) > 1:
             raise Refusal("ambiguous delivered check")
-        if matches and matches[0].get("status") == "completed" and matches[0].get("conclusion") in (update["conclusion"], "cancelled") and (expected_url is None or matches[0].get("details_url") == expected_url):
+        if matches and matches[0].get("status") == "completed" and matches[0].get("conclusion") in (verdict_conclusion(update), "cancelled") and (expected_url is None or matches[0].get("details_url") == expected_url):
             acknowledged.add(request["request_id"])
     state["check_updates"] = [item for item in state.get("check_updates", []) if item["request"]["request_id"] not in acknowledged]
 
@@ -1395,7 +1419,7 @@ def repair_checks(config: dict, *, provider: GitHub, state: dict | None = None) 
     for update in verified.get("check_updates", [])[:6]:
         request = validate_ledger_request(update["request"], config)
         fresh = provider.pull(request["pr_number"])
-        conclusion = update["conclusion"]
+        conclusion = verdict_conclusion(update)
         try:
             validate_request(request, config)
             current_fence(config, request, fresh)
@@ -1409,11 +1433,19 @@ def repair_checks(config: dict, *, provider: GitHub, state: dict | None = None) 
         matches = [item for item in values if item.get("external_id") == external_id and item.get("head_sha") == request["proposal"] and item.get("app", {}).get("slug") == "github-actions"]
         if len(matches) > 1:
             raise Refusal("ambiguous exact-head check repair")
-        output = {"title": {"success": "Supported static comparison complete", "neutral": "Architecture coverage is partial", "failure": "Architecture analysis unavailable", "cancelled": "Comparison superseded"}[conclusion],
-                  "summary": "Advisory static HLD/LLD evidence only. This check does not approve merging. " + ("A newer PR head, scope or engine requires another comparison." if conclusion == "cancelled" else "Open the immutable dashboard report and inspect coverage and evidence.")}
+        title = {"success": "Ready · No detected change", "neutral": "Incomplete · Review required", "failure": "Failed · Analysis unavailable", "cancelled": "Superseded · New comparison required"}[conclusion]
+        if conclusion == "neutral" and update.get("verdict") == "change_detected":
+            title = "Ready · Changes to review"
+        output = {"title": title, "summary": (
+            "Static evidence within selected scope; runtime effects require review. "
+            "This check does not approve merging.\n\n"
+            + ("A newer PR head, scope or engine requires another comparison. Any linked report is historical, not the current PR result." if conclusion == "cancelled" else
+               "No verified report is available. Check the workflow logs and retry analysis; this is not a no-change result." if conclusion == "failure" or update["public_report_id"] is None else
+               "Open Details for Architecture, HLD, LLD and exact source differences. Coverage gaps remain visible in the report.")
+            + f"\n\nBaseline: `{request['baseline']}` → Proposal: `{request['proposal']}`")}
         body = {"status": "completed", "conclusion": conclusion, "completed_at": timestamp(), "output": output}
         if update["public_report_id"] is not None:
-            body["details_url"] = config["site"]["origin"] + config["site"]["base_path"] + "workspace/#review=" + update["public_report_id"] + "&bundle=" + update["public_report_id"] + "&layout=architecture&side=diff"
+            body["details_url"] = config["site"]["origin"] + config["site"]["base_path"] + "workspace/#review=" + update["public_report_id"] + "&bundle=" + update["public_report_id"] + "&layout=architecture&side=diff&design=lld&mode=focus"
         if matches:
             check_id = integer(matches[0]["id"], 1, 2**63 - 1, "repair check id")
             provider.api(f"{provider.prefix}/check-runs/{check_id}", method="PATCH", body=body)
@@ -1593,7 +1625,10 @@ def stage_publication(config: dict, plan_value: dict, handoffs: Path, output: Pa
                 raise Refusal("public handoff scope differs from current base-owned policy")
             if manifest["public_report_id"] != result["public_report_id"]:
                 raise Refusal("result/bundle immutable identity differs")
-            result = dict(result, conclusion=check_outcome(complete=manifest["coverage"]["complete"], gaps=manifest["coverage"]["gaps"], deferred=bool(manifest["coverage"]["deferred_details"])))
+            artifact = read_json(bundle_root / manifest["routes"]["artifact"], MAX_BUNDLE_BYTES)
+            catalog = read_json(bundle_root / manifest["routes"]["lld_catalog"], MAX_BUNDLE_BYTES) if manifest["routes"]["lld_catalog"] else {}
+            verdict = review_verdict(manifest["coverage"], artifact, catalog.get("delta", {}).get("changes", []))
+            result = dict(result, verdict=verdict, conclusion="success" if verdict == "no_change_detected" else "neutral")
             bundles.append(bundle_root)
         outcome = "published" if result["public_report_id"] is not None else "cancelled" if result["conclusion"] == "cancelled" else "transient"
         state = finish_head(state, request["pr_number"], request["proposal"], outcome, result["reason"])
@@ -1601,6 +1636,8 @@ def stage_publication(config: dict, plan_value: dict, handoffs: Path, output: Pa
         if config["operations"]["checks"]:
             updates = [item for item in state.get("check_updates", []) if item["request"]["request_id"] != request_id]
             updates.append({key: result[key] for key in ("request", "public_report_id", "conclusion", "reason")})
+            if "verdict" in result:
+                updates[-1]["verdict"] = result["verdict"]
             state["check_updates"] = updates
             validate_state(state, config)  # Never truncate repair work on capacity pressure.
     metadata = None

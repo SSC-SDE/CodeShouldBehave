@@ -1,3 +1,6 @@
+
+// Carry only the non-sensitive palette across pages in this browser tab.
+if(typeof document!=='undefined'){try{const theme=sessionStorage.getItem('csb.application-theme');if(['graphite','blueprint','terminal','contrast'].includes(theme))document.documentElement.dataset.theme=theme;}catch(_){} }
 'use strict';
 function boundaryPaths(value) {return [...new Set(value.split(/\r?\n/).map(item=>item.trim()).filter(Boolean))];}
 function inventoryPage(items,query,page,size=100) {

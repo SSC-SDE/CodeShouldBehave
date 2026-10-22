@@ -30,6 +30,8 @@ ROOT = Path(__file__).resolve().parent.parent
 LANDING = (ROOT / "src" / "github_mvp.html").read_bytes()
 LANDING_JS = (ROOT / "src" / "github_mvp.js").read_bytes()
 WORKSPACE = (ROOT / "src" / "workspace.html").read_bytes()
+PREFERENCES_JS = (ROOT / "src" / "workspace-preferences.js").read_bytes()
+PREFERENCES_REGISTRY = (ROOT / "src" / "workspace-registry.json").read_bytes()
 WORKSPACE_JS = (ROOT / "src" / "workspace.js").read_bytes()
 WORKSPACE_CSS = (ROOT / "src" / "workspace.css").read_bytes()
 ONBOARDING = (ROOT / "src" / "onboarding.html").read_bytes()
@@ -367,7 +369,13 @@ class State:
             live=directory / "onboarding.sqlite"
             if not staged_action:
                 private_database(live,missing_allowed=True)
-                status,value=invoke(directory)
+                if action=="preferences-write" and self.app_auth:
+                    current_authority()
+                    with self.app_auth.lock:
+                        if (not self.app_auth._token or self.app_auth.clock()>=self.app_auth._token_deadline or (self.app_auth._identity or {}).get("principal")!=principal):
+                            raise AppError("github_authentication_required")
+                        status,value=invoke(directory)
+                else: status,value=invoke(directory)
                 current_authority()
                 return status,value
             if requires_maintainer and not maintainer: return 404,{"error":"repository_unavailable"}
@@ -1044,9 +1052,27 @@ def handler(state: State):
             if request.get("limit",50)>100: return 400,{"error":"lld_page_limit"}
             return state.lld_request(report,"lld-"+suffix,request)
 
+        def preferences(self, write=False):
+            if not self.api_authorized(): self.send_error(HTTPStatus.FORBIDDEN); return
+            if not state.app_auth: self.json_status(401,{"error":"GitHub App sign-in required"}); return
+            try:
+                identity=state.app_auth.access(state.repository_slug())
+                request={}
+                if write:
+                    length=int(self.headers.get("Content-Length","0"))
+                    if length<2 or length>65536: raise ValueError("Invalid body")
+                    request=json.loads(self.rfile.read(length))
+                status,value=state.native_onboarding_request("preferences-write" if write else "preferences-read", "", request, state.repository_slug(), identity["principal"], False)
+                self.json_status(status,value)
+            except AppError:
+                self.json_status(401,{"error":"GitHub App sign-in required"})
+            except (ValueError,TypeError,KeyError,OSError) as error:
+                self.json_status(409 if "Preference conflict" in str(error) else 400,{"error":"Preference conflict" if "Preference conflict" in str(error) else "Preferences unavailable"})
+
         def do_GET(self) -> None:
             if not self.loopback_origin_allowed(): self.send_error(HTTPStatus.FORBIDDEN); return
             path = urlparse(self.path).path
+            if path == "/v1/me/workspace-preferences": self.preferences(); return
             if path == "/":
                 body = LANDING.replace(b"__CSB_SESSION__", state.session.encode())
                 self.send_body_headers("text/html; charset=utf-8", len(body)); self.wfile.write(body); return
@@ -1058,7 +1084,7 @@ def handler(state: State):
             if path == "/workspace":
                 body = WORKSPACE.replace(b"<title>", f'<meta name="csb-local-session" content="{state.session}"><title>'.encode())
                 self.send_body_headers("text/html; charset=utf-8", len(body)); self.wfile.write(body); return
-            assets = {"/assets/onboarding.css":("text/css; charset=utf-8",ONBOARDING_CSS),"/assets/onboarding.js":("text/javascript; charset=utf-8",ONBOARDING_JS),"/assets/workspace.js":("text/javascript; charset=utf-8",WORKSPACE_JS),
+            assets = {"/assets/workspace-preferences.js":("text/javascript; charset=utf-8",PREFERENCES_JS),"/assets/workspace-registry.json":("application/json",PREFERENCES_REGISTRY),"/assets/onboarding.css":("text/css; charset=utf-8",ONBOARDING_CSS),"/assets/onboarding.js":("text/javascript; charset=utf-8",ONBOARDING_JS),"/assets/workspace.js":("text/javascript; charset=utf-8",WORKSPACE_JS),
                       "/assets/workspace.css":("text/css; charset=utf-8",WORKSPACE_CSS),
                       "/assets/mermaid.js":("text/javascript; charset=utf-8",MERMAID)}
             if path in assets:
@@ -1189,6 +1215,7 @@ def handler(state: State):
 
         def do_PUT(self) -> None:
             if not self.loopback_origin_allowed(): self.send_error(HTTPStatus.FORBIDDEN); return
+            if urlparse(self.path).path == "/v1/me/workspace-preferences": self.preferences(write=True); return
             path=urlparse(self.path).path; match=re.fullmatch(r"/v1/reviews/(pr-[1-9][0-9]*-[0-9a-f]{64})/annotations",path)
             if not match or not self.api_authorized(): self.send_error(HTTPStatus.FORBIDDEN); return
             report=state.report(match.group(1))

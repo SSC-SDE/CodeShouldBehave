@@ -38,6 +38,8 @@ mod scheduler;
 mod service;
 mod snapshot;
 mod storage;
+#[cfg(feature = "server")]
+pub mod workspace_preferences;
 
 pub use ai::{
     AI_CONTRACT_VERSION, DestinationPolicy, DisabledModelAdapter, DisclosureLevel, EvidenceBundle,

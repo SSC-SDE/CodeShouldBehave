@@ -227,3 +227,18 @@ test('design documents are explicit pinned intent selections and cannot become s
   assert.ok(hldEvidenceFor({baseline:design},'a-api','baseline').some(item=>item.path==='docs/design.md'));
   assert.equal(design.elements.find(item=>item.id==='a-api').facts.length,1);
 });
+
+test('HLD parallel package evidence is concise without merging uncertainty or mutating evidence',()=>{
+  const data=payload();data.delta.changes=[];
+  data.proposal.relations=[
+    {id:'a',from:'a-api',to:'z-store',kind:'declares_package_dependency',resolution:'observed_structure'},
+    {id:'b',from:'a-api',to:'z-store',kind:'imports_declared_package',resolution:'observed_structure'},
+    {id:'c',from:'a-api',to:'z-store',kind:'imports_declared_package',resolution:'unknown'}
+  ];
+  const before=JSON.stringify(data),source=hldMermaid(data,'proposal');
+  assert.match(source,/declares \+ imports/);
+  assert.match(source,/\? imports/);
+  assert.match(source,/Code component/);assert.match(source,/Package dependency/);
+  assert.equal((source.match(/\| hld/g)||[]).length,2);
+  assert.equal(JSON.stringify(data),before);
+});

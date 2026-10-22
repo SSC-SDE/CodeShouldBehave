@@ -35,6 +35,9 @@ pub enum HttpOperation {
         action: String,
         request: Value,
     },
+    WorkspacePreferences {
+        request: Option<Value>,
+    },
     AiCapability,
     ListPrs {
         limit: usize,
@@ -256,6 +259,27 @@ where
     fn execute(&self, bearer: &str, operation: HttpOperation) -> Result<Value, HttpFailure> {
         let mut storage = self.storage.lock().map_err(|_| HttpFailure::Unavailable)?;
         match operation {
+            HttpOperation::WorkspacePreferences { request } => {
+                let principal = self
+                    .authenticator
+                    .authenticate(bearer)
+                    .map_err(map_core_error)?;
+                match request {
+                    None => crate::workspace_preferences::read(&storage, &principal),
+                    Some(value) => {
+                        crate::workspace_preferences::write(&mut storage, &principal, &value)
+                    }
+                }
+                .map_err(|error| {
+                    if error == "Preference conflict" {
+                        HttpFailure::Conflict
+                    } else if error.starts_with("Invalid") {
+                        HttpFailure::Malformed
+                    } else {
+                        HttpFailure::Unavailable
+                    }
+                })
+            }
             HttpOperation::AiCapability => {
                 self.authenticator
                     .authenticate(bearer)
@@ -712,7 +736,8 @@ where
                 _ => Err(HttpFailure::Malformed),
             }
         }
-        HttpOperation::AiCapability
+        HttpOperation::WorkspacePreferences { .. }
+        | HttpOperation::AiCapability
         | HttpOperation::CreateOnboarding { .. }
         | HttpOperation::ReadOnboarding { .. }
         | HttpOperation::MutateOnboarding { .. }
@@ -801,8 +826,16 @@ pub fn router(backend: Arc<dyn HttpBackend>) -> Router {
         .route("/workspace", get(workspace))
         .route("/assets/workspace.js", get(workspace_js))
         .route("/assets/workspace.css", get(workspace_css))
+        .route("/assets/inter.ttf", get(inter_font))
+        .route("/assets/jetbrains-mono.ttf", get(jetbrains_font))
         .route("/assets/mermaid.js", get(mermaid_js))
         .route("/v1/ai/capability", get(ai_capability))
+        .route(
+            "/v1/me/workspace-preferences",
+            get(read_workspace_preferences).put(write_workspace_preferences),
+        )
+        .route("/assets/workspace-preferences.js", get(preferences_js))
+        .route("/assets/workspace-registry.json", get(preferences_registry))
         .route("/onboarding", get(onboarding_page))
         .route("/assets/onboarding.js", get(onboarding_js))
         .route("/assets/onboarding.css", get(onboarding_css))
@@ -915,6 +948,19 @@ async fn workspace_css() -> impl IntoResponse {
     (
         [(header::CONTENT_TYPE, "text/css; charset=utf-8")],
         include_str!("workspace.css"),
+    )
+}
+
+async fn inter_font() -> impl IntoResponse {
+    (
+        [(header::CONTENT_TYPE, "font/ttf")],
+        include_bytes!("fonts/inter.ttf").as_slice(),
+    )
+}
+async fn jetbrains_font() -> impl IntoResponse {
+    (
+        [(header::CONTENT_TYPE, "font/ttf")],
+        include_bytes!("fonts/jetbrains-mono.ttf").as_slice(),
     )
 }
 
@@ -1234,6 +1280,44 @@ fn json_response(status: StatusCode, value: Value) -> Response {
         HeaderValue::from_static("nosniff"),
     );
     response
+}
+
+async fn preferences_js() -> impl IntoResponse {
+    (
+        [(header::CONTENT_TYPE, "text/javascript; charset=utf-8")],
+        include_str!("workspace-preferences.js"),
+    )
+}
+async fn preferences_registry() -> impl IntoResponse {
+    (
+        [(header::CONTENT_TYPE, "application/json")],
+        crate::workspace_preferences::REGISTRY,
+    )
+}
+async fn read_workspace_preferences(
+    State(backend): State<Backend>,
+    headers: HeaderMap,
+) -> Response {
+    dispatch(
+        backend,
+        headers,
+        HttpOperation::WorkspacePreferences { request: None },
+    )
+    .await
+}
+async fn write_workspace_preferences(
+    State(backend): State<Backend>,
+    headers: HeaderMap,
+    Json(value): Json<Value>,
+) -> Response {
+    dispatch(
+        backend,
+        headers,
+        HttpOperation::WorkspacePreferences {
+            request: Some(value),
+        },
+    )
+    .await
 }
 
 #[cfg(test)]
@@ -1614,6 +1698,121 @@ mod tests {
             std::process::id(),
             std::thread::current().name().unwrap_or("test")
         ))
+    }
+
+    #[tokio::test]
+    async fn workspace_profiles_are_authenticated_isolated_and_conflict_checked() {
+        let root = host_temp();
+        fs::create_dir_all(&root).unwrap();
+        let storage = Storage::open(&root.join("state.sqlite"), &root.join("artifacts")).unwrap();
+        let sessions = SessionRegistry::default();
+        let principal = PrincipalId::new("github-user:100").unwrap();
+        sessions
+            .register(
+                "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                principal.clone(),
+                u64::MAX,
+            )
+            .unwrap();
+        sessions
+            .register(
+                "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                PrincipalId::new("github-user:101").unwrap(),
+                u64::MAX,
+            )
+            .unwrap();
+        let repository = RepositoryId::new(
+            SecurityDomain::new("local").unwrap(),
+            "github",
+            "owner",
+            "repo",
+        )
+        .unwrap();
+        let scope = ScopeRecord {
+            version: ScopeVersion::new("scope").unwrap(),
+            primary_repository: repository,
+            primary_paths: PathScope::all(),
+            contexts: vec![],
+            contracts: BTreeSet::new(),
+            export_allowed: false,
+            model_destinations: BTreeSet::new(),
+        };
+        let host = Arc::new(ServiceHost::new(
+            storage,
+            sessions,
+            HostAccess {
+                principal,
+                scope,
+                grants: Arc::new(RwLock::new(vec![])),
+            },
+            NoSource,
+        ));
+        let app = router(host);
+        let endpoint = "/v1/me/workspace-preferences";
+        let anonymous = app
+            .clone()
+            .oneshot(Request::get(endpoint).body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(anonymous.status(), StatusCode::UNAUTHORIZED);
+        let mut doc = crate::workspace_preferences::defaults();
+        doc["defaultMode"] = json!("focus");
+        let body = json!({"revision":0,"preferences":doc});
+        for expected in [StatusCode::OK, StatusCode::CONFLICT] {
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::put(endpoint)
+                        .header(
+                            header::AUTHORIZATION,
+                            "Bearer aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+                        )
+                        .header(header::CONTENT_TYPE, "application/json")
+                        .body(Body::from(body.to_string()))
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), expected);
+        }
+        for (token, mode) in [
+            ("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "focus"),
+            ("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "standard"),
+        ] {
+            let response = app
+                .clone()
+                .oneshot(
+                    Request::get(endpoint)
+                        .header(header::AUTHORIZATION, format!("Bearer {token}"))
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            let data = response.into_body().collect().await.unwrap().to_bytes();
+            let value: Value = serde_json::from_slice(&data).unwrap();
+            assert_eq!(value["preferences"]["defaultMode"], mode);
+        }
+        let mut spoof = body;
+        spoof["user_id"] = json!("github-user:100");
+        let response = app
+            .clone()
+            .oneshot(
+                Request::put(endpoint)
+                    .header(
+                        header::AUTHORIZATION,
+                        "Bearer bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+                    )
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from(spoof.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        drop(app);
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[tokio::test]

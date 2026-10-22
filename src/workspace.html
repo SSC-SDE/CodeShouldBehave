@@ -5,22 +5,39 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="color-scheme" content="dark">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'">
-  <title>CodeShouldBehave · Review workspace</title>
+  <title>CodeShouldBehave · Change inspection</title>
   <link rel="stylesheet" href="/assets/workspace.css">
 </head>
 <body>
   <a class="skip-link" href="#review-content">Skip to review</a>
   <header class="topbar">
-    <a class="brand" href="/workspace" aria-label="CodeShouldBehave review workspace"><span>CSB</span> CodeShouldBehave</a>
+    <a class="brand" href="/workspace" aria-label="CodeShouldBehave reviews"><span>[!]</span> CodeShouldBehave</a>
     <form id="session-form" class="session" autocomplete="off">
       <label for="session-token">Session token</label>
       <input id="session-token" type="password" required minlength="16" placeholder="Kept in memory only">
       <button type="submit">Connect</button>
     </form>
-    <span class="beta-badge">Beta</span>
+    <nav id="review-mode-switch" class="review-mode-switch" aria-label="Review mode" hidden><button id="mode-standard" type="button" aria-pressed="true">Standard</button><button id="mode-focus" type="button" aria-pressed="false">Focus</button></nav>
+    <span class="brand-manifesto">AI WROTE IT. PROVE IT WORKS.</span><button id="command-open" class="command-trigger" type="button">Commands <kbd>⌘ K</kbd></button>
     <a id="onboarding-link" href="/onboarding" hidden>Repository context</a>
     <button id="open-feedback" class="quiet" type="button">Send feedback</button>
     <output id="connection" aria-live="polite">Disconnected</output>
+    <div id="focus-legend" class="focus-legend">
+      <button id="focus-legend-toggle" type="button" aria-expanded="false" aria-controls="focus-legend-panel">Legend <span aria-hidden="true">⌄</span></button>
+      <section id="focus-legend-panel" hidden aria-label="Diagram legend">
+        <header><strong>Read the change</strong><button id="focus-legend-close" type="button" aria-label="Close legend">×</button></header>
+        <dl>
+          <dt class="legend-added">+ Green · Added / proposal</dt><dd>HLD: added structure. LLD: proposal-side flow; green alone does not mean every step is new.</dd>
+          <dt class="legend-removed">− Red · Removed / baseline</dt><dd>HLD: removed structure. LLD: baseline-side flow; red alone does not mean every step was deleted.</dd>
+          <dt class="legend-modified">~ Amber · Modified</dt><dd>HLD: existing structure changed. In LLD, amber also marks unknown or unsupported flow; read the node label.</dd>
+          <dt>Gray · Context</dt><dd>Retained structure provides context for the comparison.</dd>
+          <dt class="legend-unknown">? Violet · Unresolved</dt><dd>HLD evidence does not establish the relationship completely. A possible impact needs reviewer verification.</dd>
+        </dl>
+        <p><strong>→ Arrows</strong> HLD: source → dependency or target. LLD: local control-flow direction. Neither proves runtime behavior.</p>
+        <p><strong>┄ Dashed</strong> Removed or unresolved structure. Check the − / ? marker and source evidence.</p>
+        <p class="legend-note">Partial coverage is not a clean bill of health. Exact commits and source evidence remain authoritative.</p>
+      </section>
+    </div>
   </header>
   <dialog id="feedback-dialog" class="feedback-dialog" aria-labelledby="feedback-title">
     <form id="feedback-form" method="dialog">
@@ -48,6 +65,10 @@
   </dialog>
   <main class="shell">
     <aside class="inbox" aria-label="Pull request inbox">
+      <div class="rail-label">WORKSPACE</div><nav class="primary-navigation" aria-label="Primary navigation">
+        <button type="button" id="nav-reviews" aria-current="page"><span>Reviews</span><span id="nav-review-count">0</span></button>
+        <button type="button" id="nav-repositories">Repositories</button><button type="button" id="nav-history">History</button><button type="button" id="nav-settings">Settings</button>
+      </nav><div class="rail-divider"></div>
       <div class="panel-heading"><div><span class="eyebrow">Review queue</span><h1>Pull requests</h1></div><button id="refresh" class="quiet" type="button">Refresh</button></div>
       <div id="inbox-status" class="status">Connect to load authorized reviews.</div>
       <div id="pr-list" class="pr-list" role="listbox" aria-label="Pull requests"></div>
@@ -66,25 +87,35 @@
       </section>
     </aside>
     <section class="review" aria-label="Selected review">
-      <div id="empty" class="empty" tabindex="-1"><div class="empty-mark">↳</div><h2>Select a pull request</h2><p>The architecture map and source stay unloaded until you choose a review.</p></div>
+      <section id="empty" class="queue-view" tabindex="-1"><div class="section-kicker">HUMAN DECISION REQUIRED</div><h1>Review the claim.<br>Follow the evidence.</h1><p>Every change is a claim. Every claim needs evidence.</p><div class="queue-heading"><h2>Review queue</h2><span id="queue-count">Loading comparisons</span></div><div id="review-queue-rows" class="review-queue-rows"></div><p class="status">No scores. No automatic approvals. Open a change to inspect its evidence.</p></section>
       <div id="review-content" tabindex="-1" hidden>
         <header class="review-heading">
           <div><div id="breadcrumbs" class="breadcrumbs"></div><div class="review-identity"><h2 id="review-title">Review</h2><span id="revisions" class="mono review-commits"></span></div></div>
           <span id="stale" class="badge warning" hidden>stale</span>
         </header>
+        <nav id="review-destinations" class="review-destinations" aria-label="Review destinations" hidden><a id="back-to-pr" rel="noopener noreferrer" target="_blank">Back to PR</a><a id="repo-dashboard">Repository dashboard</a><a id="all-repositories">All repositories</a></nav>
+        <p id="review-verdict" class="review-verdict" role="status" hidden></p>
+        <section id="interrogation" class="interrogation" aria-label="Change inspection">
+          <div class="inspection-overline"><span>CodeShouldBehave / CHANGE INSPECTION</span><span id="inspection-profile">STATIC EVIDENCE</span></div>
+          <h1>What did the AI change, and what can we actually verify?</h1>
+          <div class="claim-summary"><div><span class="diagnostic-label">A / THE CLAIM</span><h2 id="claim-title">Inspecting selected change</h2><p id="claim-detail">Author intent has not been supplied.</p></div><span id="claim-state" class="diagnostic neutral">UNVERIFIED</span></div>
+          <div class="inspection-stats"><span><strong id="inspection-files">0</strong> changed files</span><span><strong id="inspection-additions">0</strong> additions</span><span><strong id="inspection-deletions">0</strong> deletions</span><span id="inspection-scope">Exact commit comparison</span></div>
+        </section>
+        <div class="inspection-switch"><span>INSPECT THE CHANGE</span><button id="context-toggle" type="button" aria-expanded="true" aria-controls="inspection-context">Evidence & verdict</button></div>
         <div class="review-toolbar">
-          <nav class="workspace-modes" aria-label="Workspace layout"><button id="layout-connected" class="active" type="button" aria-pressed="true">Flow + code</button><button id="layout-source" type="button" aria-pressed="false">Code focus</button><button id="layout-architecture" type="button" aria-pressed="false">Architecture diff</button></nav>
+          <nav class="workspace-modes" aria-label="Workspace layout"><button id="layout-connected" class="active" type="button" aria-pressed="true">Behavior diff</button><button id="layout-source" type="button" aria-pressed="false">Code diff</button><button id="layout-architecture" type="button" aria-pressed="false">Architecture diff</button></nav>
           <div class="header-view"><label>View <select id="side"><option value="diff" selected>Baseline → proposal</option><option value="proposal">Proposal only</option><option value="baseline">Baseline only</option></select></label></div>
         </div>
         <section id="architecture-impact" class="architecture-impact" hidden aria-labelledby="architecture-impact-title">
+          <div class="focus-heading"><strong>Behavior diff</strong><span id="focus-analysis-state" role="status">Static analysis · runtime unverified</span></div>
           <nav class="design-levels" aria-label="Architecture detail level"><button id="design-level-structural" class="active" type="button" aria-pressed="true">Structural</button><button id="design-level-hld" type="button" aria-pressed="false">HLD</button><button id="design-level-lld" type="button" aria-pressed="false">LLD</button></nav>
-          <div class="architecture-impact-heading"><div><span class="eyebrow">Mermaid architecture diff</span><h3 id="architecture-impact-title">Affected structural areas</h3><p id="architecture-impact-summary">Loading exact-snapshot architecture evidence…</p></div><div class="architecture-controls" aria-label="Architecture comparison mode"><button id="architecture-combined" class="active" type="button" aria-pressed="true">Combined</button><button id="architecture-compare" type="button" aria-pressed="false">Before / after</button><button id="architecture-baseline" type="button" aria-pressed="false">Baseline</button><button id="architecture-proposal" type="button" aria-pressed="false">Proposal</button></div></div>
+          <div class="architecture-impact-heading"><div><span class="eyebrow">Mermaid architecture diff</span><h3 id="architecture-impact-title">Affected structural areas</h3><p id="architecture-impact-summary">Loading exact-snapshot architecture evidence…</p></div><div class="architecture-controls" aria-label="Architecture comparison mode"><button id="architecture-combined" class="active" type="button" aria-pressed="true">Unified</button><button id="architecture-compare" type="button" aria-pressed="false">Split</button><button id="architecture-baseline" type="button" aria-pressed="false">Baseline</button><button id="architecture-proposal" type="button" aria-pressed="false">Proposal</button></div></div>
           <div class="architecture-legend"><span class="added">+ Added</span><span class="removed">− Removed</span><span class="modified">~ Modified</span><span class="unknown">? Unresolved impact</span><button id="architecture-source" class="quiet" type="button">Mermaid source</button></div>
           <p id="architecture-status" class="status" role="status"></p>
           <div id="architecture-diagrams" class="architecture-diagrams" aria-live="polite"></div>
           <pre id="architecture-mermaid-source" class="mermaid-source" hidden><code></code></pre>
           <div id="hld-review" class="hld-review" hidden>
-            <div class="hld-heading"><div><h3>High-level design</h3><p id="hld-summary" class="status" role="status">Select HLD to load authorized design evidence.</p></div><div class="architecture-controls" aria-label="HLD comparison mode"><button id="hld-combined" class="active" type="button" aria-pressed="true">Diff</button><button id="hld-compare" type="button" aria-pressed="false">Before / after</button><button id="hld-baseline" type="button" aria-pressed="false">Baseline</button><button id="hld-proposal" type="button" aria-pressed="false">Proposal</button><button id="hld-accepted" type="button" aria-pressed="false" disabled>Accepted</button></div></div>
+            <div class="hld-heading"><div><h3>High-level design</h3><p id="hld-summary" class="status" role="status">Select HLD to load authorized design evidence.</p></div><div class="architecture-controls" aria-label="HLD comparison mode"><button id="hld-combined" class="active" type="button" aria-pressed="true">Unified</button><button id="hld-compare" type="button" aria-pressed="false">Split</button><button id="hld-baseline" type="button" aria-pressed="false">Baseline</button><button id="hld-proposal" type="button" aria-pressed="false">Proposal</button><button id="hld-accepted" type="button" aria-pressed="false" disabled>Accepted</button></div></div>
             <p id="hld-identity" class="mono"></p><div class="architecture-legend hld-legend"><span class="added">+ Added</span><span class="removed">- Removed</span><span class="modified">~ Modified</span><span class="unknown">? Unresolved</span><span class="possible-impact">Possible downstream impact</span></div>
             <div class="hld-drift"><strong>Accepted design drift</strong><span id="hld-drift-status">No accepted HLD baseline.</span></div>
             <div id="hld-coverage" class="hld-coverage"></div>
@@ -95,7 +126,7 @@
           </div>
           <div id="lld-review" class="lld-review" hidden>
             <nav class="design-breadcrumbs" aria-label="Design drill-down"><button id="lld-back-hld" class="quiet" type="button">HLD</button><span aria-hidden="true">/</span><span id="lld-component-name">Authorized inventory</span><span aria-hidden="true">/</span><button id="lld-back-catalog" class="quiet" type="button">Modules</button><span id="lld-detail-breadcrumb"></span></nav>
-            <div class="hld-heading"><div><h3>Low-level design</h3><p id="lld-summary" class="status" role="status">Select a component to inspect its implementation.</p></div><div class="architecture-controls" aria-label="LLD comparison mode"><button id="lld-combined" class="active" type="button" aria-pressed="true">Diff</button><button id="lld-compare" type="button" aria-pressed="false">Before / after</button><button id="lld-baseline" type="button" aria-pressed="false">Baseline</button><button id="lld-proposal" type="button" aria-pressed="false">Proposal</button></div></div>
+            <div class="hld-heading"><div><h3>Low-level design</h3><p id="lld-summary" class="status" role="status">Select a component to inspect its implementation.</p></div><div class="architecture-controls" aria-label="LLD comparison mode"><button id="lld-combined" class="active" type="button" aria-pressed="true">Unified</button><button id="lld-compare" type="button" aria-pressed="false">Split</button><button id="lld-baseline" type="button" aria-pressed="false">Baseline</button><button id="lld-proposal" type="button" aria-pressed="false">Proposal</button></div></div>
             <p id="lld-parent-identity" class="mono"></p><p class="lld-profile">Static local control flow · Calls, suspension and effects retain their source-qualified resolution. Runtime validation unavailable.</p>
             <div id="lld-coverage" class="hld-coverage"></div>
             <div class="lld-workspace"><aside class="lld-catalog" aria-label="LLD module and declaration inventory"><label>Find declaration<input id="lld-filter" type="search" placeholder="Module, type, function or path"></label><p id="lld-catalog-status" class="status"></p><div id="lld-entry-list"></div><button id="lld-more" class="quiet more" type="button" hidden>Load more declarations</button></aside><section class="lld-detail" aria-label="Selected implementation"><div id="lld-changes" class="lld-changes"></div><div id="lld-diagrams" class="architecture-diagrams" aria-live="polite"></div><section id="lld-inspector" class="lld-inspector" aria-label="Exact implementation evidence"><p class="status">Select a module, type or function. Its exact source remains attached to this comparison.</p></section></section></div>
@@ -122,6 +153,7 @@
           <section class="inspector" aria-labelledby="source-title">
             <div class="panel-heading"><div><span class="eyebrow">Exact revision source</span><h3 id="source-title">Code diff</h3></div><div class="inspector-actions"><div class="diff-modes" aria-label="Code diff layout"><button id="diff-split" class="active" type="button" aria-pressed="true">Split</button><button id="diff-unified" type="button" aria-pressed="false">Unified</button></div><label>Diagram width<input id="pane-width" type="range" min="32" max="68" value="46" aria-label="Diagram pane width percent"></label><button id="pin" class="quiet" type="button" disabled>Pin</button></div></div>
             <div id="source-meta" class="status">Focus a symbol to load its bounded source span.</div>
+            <div class="focus-diff-tools"><span id="focus-diff-label">Full published excerpt</span><button type="button" id="diff-focus">Changed lines</button><button type="button" id="diff-context">Expand context</button><button type="button" id="diff-full">Full published file</button></div>
             <div id="source-comparison" class="source-comparison split-diff"><section><h4 id="baseline-source-label">Baseline</h4><pre id="source-baseline"><code>No baseline source selected.</code></pre></section><section><h4 id="proposal-source-label">Proposal</h4><pre id="source-proposal"><code>No proposal source selected.</code></pre></section></div>
             <pre id="source-unified" hidden><code>No source selected.</code></pre>
           </section>
@@ -161,7 +193,17 @@
         </details>
       </div>
     </section>
+    <aside id="inspection-context" class="inspection-context" aria-label="Review evidence and verdict" hidden>
+      <div class="context-heading"><strong>Review dossier</strong><button type="button" id="context-close" aria-label="Close evidence panel">Close</button></div>
+      <section class="evidence-checklist"><div class="diagnostic-label">B / THE EVIDENCE</div><div id="validation-checks"></div><p class="context-note">A passed check covers only what it measured.</p></section>
+      <section class="contradictions"><div class="context-section-title"><span class="diagnostic-label">C / THE CONTRADICTIONS</span><span id="contradiction-count">0</span></div><p id="finding-origin" class="context-note"></p><div id="interrogation-findings"></div></section>
+      <section class="verdict-panel"><div class="diagnostic-label">D / THE VERDICT</div><h2 id="verdict-heading">INCOMPLETE</h2><p id="verdict-reason">Select a change to inspect evidence.</p><button id="decision-review" type="button">Record review note</button><p class="context-note">Inspection is not merge approval.</p></section>
+      <details class="review-timeline"><summary>Audit trail <span>Session only</span></summary><ol id="review-timeline"></ol></details>
+    </aside>
   </main>
+  <dialog id="inspection-dialog" class="inspection-dialog" aria-labelledby="inspection-dialog-title"><div class="dialog-header"><h2 id="inspection-dialog-title">Workspace</h2><button id="inspection-dialog-close" type="button">Close</button></div><div id="inspection-dialog-content"></div></dialog>
+  <dialog id="command-palette" class="command-palette" aria-label="Command palette"><label for="command-search">Jump to a view or action</label><input id="command-search" type="search" placeholder="Search commands…" autocomplete="off"><div id="command-results"></div><p>Enter to select · Escape to close</p></dialog>
+  <script src="/assets/workspace-preferences.js"></script>
   <script src="/assets/workspace.js"></script>
 </body>
 </html>

@@ -500,3 +500,52 @@ test('review layout starts with modes and design boundary and ends with continui
   assert.doesNotMatch(html, /id="coverage"/);
   assert.match(html, /class="review-toolbar"[^>]*>.*class="workspace-modes".*class="header-view"/s);
 });
+
+test('focus mode survives an exact LLD link without changing legacy routes', () => {
+  const input={reviewId:'r-1',bundleId:'a'.repeat(64),reviewMode:'focus',layout:'architecture',side:'diff',designLevel:'lld',designMode:'compare',parentHld:'hld-1',component:'component-1',lldElement:'function-1',detail:'function'};
+  const route=decodeWorkspaceRoute(encodeWorkspaceRoute(input));
+  assert.equal(route.reviewMode,'focus');
+  assert.equal(route.bundleId,input.bundleId);
+  assert.equal(route.lldElement,'function-1');
+  assert.equal(route.designMode,'compare');
+  assert.equal(route.parentHld,'hld-1');
+  assert.equal(decodeWorkspaceRoute('#review=r&mode=unexpected'),null);
+  assert.equal(decodeWorkspaceRoute('#review=r&mode=focus&mode=standard'),null);
+  assert.throws(()=>encodeWorkspaceRoute({...input,reviewMode:'unexpected'}));
+  assert.equal(encodeWorkspaceRoute({reviewId:'legacy'}),'#review=legacy&layout=connected&side=diff');
+});
+
+test('Focus HLD retains changed relationships, owners and uncertainty without unrelated topology',()=>{
+  const {focusHldPayload,hldMermaid}=require('../src/workspace.js');
+  const elements=[{id:'api',kind:'component',name:'API'},{id:'new',kind:'dependency',name:'Queue'},{id:'host',kind:'deployment',name:'Hosting'},{id:'contract',kind:'contract',component_id:'api'}];
+  const unchanged={id:'hosting',from:'api',to:'host'},changed={id:'queue',from:'api',to:'new',resolution:'unknown'};
+  const input={baseline:{elements,relations:[unchanged]},proposal:{elements,relations:[unchanged,changed]},delta:{changes:[{relation_id:'queue',kind:'uncertain'},{element_id:'contract',kind:'modified'}]}};
+  const before=JSON.stringify(input),result=focusHldPayload(input);
+  assert.deepEqual(result.proposal.elements.map(e=>e.id),['api','new','contract']);
+  assert.deepEqual(result.proposal.relations,[changed]);assert.deepEqual(result.baseline.relations,[]);
+  assert.equal(result.proposal.relations[0].resolution,'unknown');assert.equal(JSON.stringify(input),before);
+  assert.match(hldMermaid(focusHldPayload({...input,delta:{changes:[]}})),/No directional HLD change identified in available evidence/);
+});
+
+test('Focus LLD removes only linear syntactic values and preserves branches, effects and cycles',()=>{
+  const {focusLldDetail}=require('../src/workspace.js');
+  const n=(id,operation,region_id='r',resolution='syntactic')=>({id,operation,region_id,resolution,evidence_id:id});
+  const nodes=[n('entry','entry'),n('v','value'),n('condition','condition'),n('yes','value'),n('call','call','r','target_unresolved'),n('exit','exit'),n('unknown','value','r','unknown'),n('cycle','value'),n('boundary','value','other')];
+  const e=(from,to,kind='next')=>({from,to,kind,label:''});
+  const edges=[e('entry','v'),e('v','condition'),e('condition','yes','true'),e('yes','call'),e('condition','unknown','false'),e('unknown','exit'),e('call','exit'),e('cycle','cycle'),e('exit','boundary'),e('boundary','entry')];
+  const input={proposal:{graph:{nodes,edges,complete:false,limitations:['unresolved']}}},before=JSON.stringify(input);
+  const result=focusLldDetail(input).proposal.graph;
+  assert.deepEqual(result.nodes.map(n=>n.id),['entry','condition','call','exit','unknown','cycle','boundary']);
+  assert.ok(result.edges.some(e=>e.from==='condition'&&e.to==='call'&&e.kind==='true'));
+  assert.ok(result.edges.some(e=>e.from==='condition'&&e.to==='unknown'&&e.kind==='false'));
+  assert.equal(result.complete,false);assert.deepEqual(result.limitations,['unresolved']);
+  assert.equal(result.nodes.find(n=>n.id==='call').evidence_id,'call');assert.equal(JSON.stringify(input),before);
+});
+
+test('Focus catalog excludes unchanged functions and declaration inventory, prioritizing modified functions',()=>{
+  const {focusLldCatalog}=require('../src/workspace.js');
+  const row=(id,kind,status)=>({proposal:{id,kind},status});
+  const payload={entries:[row('import','import','added'),row('param','parameter','added'),row('stable','function','unchanged'),row('new','function','added'),row('changed','method','modified')],next_cursor:'next'};
+  const result=focusLldCatalog(payload);
+  assert.deepEqual(result.entries.map(p=>p.proposal.id),['changed','new']);assert.equal(result.next_cursor,'next');assert.equal(payload.entries.length,5);
+});

@@ -85,6 +85,22 @@ fn run() -> Result<Value, String> {
     let mut storage = Storage::open(&root.join("onboarding.sqlite"), &root.join("artifacts"))?;
     if matches!(
         input.action.as_str(),
+        "preferences-read" | "preferences-write"
+    ) {
+        let result = if input.action == "preferences-read" {
+            flowdiff::workspace_preferences::read(&storage, &principal)
+        } else {
+            flowdiff::workspace_preferences::write(&mut storage, &principal, &input.request)
+        };
+        return Ok(match result {
+            Ok(value) => json!({"status":200,"value":value}),
+            Err(error) => {
+                json!({"status":if error=="Preference conflict"{409}else if error.starts_with("Invalid"){400}else{503},"value":{"error":error}})
+            }
+        });
+    }
+    if matches!(
+        input.action.as_str(),
         "hld-view" | "hld-read" | "hld-preview" | "hld-accept"
     ) {
         let value = hld::invoke(

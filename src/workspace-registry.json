@@ -1,0 +1,864 @@
+[
+  {
+    "id": "commands",
+    "label": "Command launcher",
+    "category": "Navigation",
+    "region": "main",
+    "selector": "#command-open",
+    "standard": true,
+    "focus": false,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ""
+  },
+  {
+    "id": "feedback",
+    "label": "Feedback",
+    "category": "Assistance",
+    "region": "main",
+    "selector": "#open-feedback",
+    "standard": true,
+    "focus": false,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ""
+  },
+  {
+    "id": "repositories",
+    "label": "Repository navigation",
+    "category": "Navigation",
+    "region": "left",
+    "selector": "#nav-repositories",
+    "standard": true,
+    "focus": false,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": "#nav-repositories"
+  },
+  {
+    "id": "history",
+    "label": "History",
+    "category": "Navigation",
+    "region": "left",
+    "selector": "#nav-history",
+    "standard": true,
+    "focus": false,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": "#nav-history"
+  },
+  {
+    "id": "queue",
+    "label": "PR queue",
+    "category": "Navigation",
+    "region": "left",
+    "selector": ".inbox>.panel-heading,#inbox-status,#pr-list,#more-prs",
+    "standard": true,
+    "focus": false,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": "#pr-list"
+  },
+  {
+    "id": "files",
+    "label": "Changed files",
+    "category": "Files",
+    "region": "left",
+    "selector": "#changed-files-panel",
+    "standard": true,
+    "focus": false,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": "#changed-files-panel"
+  },
+  {
+    "id": "fileSearch",
+    "label": "File search",
+    "category": "Files",
+    "region": "left",
+    "selector": ".file-search,#file-search-status",
+    "standard": true,
+    "focus": false,
+    "dependencies": [
+      "files"
+    ],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ""
+  },
+  {
+    "id": "reviewed",
+    "label": "Reviewed markers and actions",
+    "category": "Files",
+    "region": "left",
+    "selector": "#selected-file-actions,.review-file-button,.file-reviewed",
+    "standard": true,
+    "focus": false,
+    "dependencies": [
+      "files"
+    ],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ""
+  },
+  {
+    "id": "lineCounts",
+    "label": "File line counts",
+    "category": "Files",
+    "region": "left",
+    "selector": ".file-delta",
+    "standard": true,
+    "focus": false,
+    "dependencies": [
+      "files"
+    ],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ""
+  },
+  {
+    "id": "destinations",
+    "label": "PR and dashboard links",
+    "category": "Navigation",
+    "region": "main",
+    "selector": "#review-destinations",
+    "standard": true,
+    "focus": false,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": "#review-destinations"
+  },
+  {
+    "id": "claim",
+    "label": "Author claim",
+    "category": "PR overview",
+    "region": "main",
+    "selector": ".claim-summary",
+    "standard": true,
+    "focus": false,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ".claim-summary"
+  },
+  {
+    "id": "counts",
+    "label": "File and line totals",
+    "category": "PR overview",
+    "region": "main",
+    "selector": ".inspection-stats",
+    "standard": true,
+    "focus": false,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ".inspection-stats"
+  },
+  {
+    "id": "code",
+    "label": "Code diff",
+    "category": "Review views",
+    "region": "main",
+    "selector": "#layout-source,#design-source-fallback",
+    "standard": true,
+    "focus": false,
+    "dependencies": [
+      "source"
+    ],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ""
+  },
+  {
+    "id": "architecture",
+    "label": "Architecture diff",
+    "category": "Review views",
+    "region": "main",
+    "selector": "#layout-architecture",
+    "standard": true,
+    "focus": true,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": "#architecture-impact"
+  },
+  {
+    "id": "structural",
+    "label": "Structural",
+    "category": "Architecture levels",
+    "region": "main",
+    "selector": "#design-level-structural",
+    "standard": true,
+    "focus": false,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ""
+  },
+  {
+    "id": "hld",
+    "label": "HLD",
+    "category": "Architecture levels",
+    "region": "main",
+    "selector": "#design-level-hld",
+    "standard": true,
+    "focus": true,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ""
+  },
+  {
+    "id": "lld",
+    "label": "LLD",
+    "category": "Architecture levels",
+    "region": "main",
+    "selector": "#design-level-lld",
+    "standard": true,
+    "focus": true,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ""
+  },
+  {
+    "id": "comparison",
+    "label": "Comparison controls",
+    "category": "Diagram controls",
+    "region": "main",
+    "selector": ".architecture-controls,.diff-modes,.header-view",
+    "standard": true,
+    "focus": true,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ""
+  },
+  {
+    "id": "legend",
+    "label": "Diagram legend",
+    "category": "Diagram controls",
+    "region": "main",
+    "selector": ".architecture-legend",
+    "standard": true,
+    "focus": true,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ""
+  },
+  {
+    "id": "mermaid",
+    "label": "Mermaid source",
+    "category": "Advanced controls",
+    "region": "main",
+    "selector": "#architecture-source,#hld-source,#lld-mermaid",
+    "standard": true,
+    "focus": false,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ""
+  },
+  {
+    "id": "drift",
+    "label": "Accepted design drift",
+    "category": "HLD context",
+    "region": "main",
+    "selector": ".hld-drift",
+    "standard": true,
+    "focus": false,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ""
+  },
+  {
+    "id": "coverage",
+    "label": "Detailed coverage",
+    "category": "Evidence",
+    "region": "main",
+    "selector": "#hld-coverage,#lld-coverage",
+    "standard": true,
+    "focus": false,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ""
+  },
+  {
+    "id": "components",
+    "label": "Component list",
+    "category": "HLD context",
+    "region": "main",
+    "selector": "#hld-element-list",
+    "standard": true,
+    "focus": false,
+    "dependencies": [
+      "hld"
+    ],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": "#hld-element-list"
+  },
+  {
+    "id": "componentDetails",
+    "label": "Selected component",
+    "category": "HLD context",
+    "region": "main",
+    "selector": "#hld-inspector",
+    "standard": true,
+    "focus": true,
+    "dependencies": [
+      "hld"
+    ],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": "#hld-inspector"
+  },
+  {
+    "id": "provenance",
+    "label": "Provenance",
+    "category": "Advanced controls",
+    "region": "main",
+    "selector": ".hld-provenance,#hld-identity,#lld-parent-identity,#lld-review>details:not(#lld-acceptance),#hld-reload,#lld-reload,#lld-open-hld",
+    "standard": true,
+    "focus": false,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": true,
+    "orderSelector": ""
+  },
+  {
+    "id": "exports",
+    "label": "Exports",
+    "category": "Advanced controls",
+    "region": "main",
+    "selector": "#hld-export,#lld-export,#public-export-report",
+    "standard": true,
+    "focus": false,
+    "dependencies": [],
+    "permissions": [
+      "export"
+    ],
+    "disclosure": false,
+    "orderSelector": ""
+  },
+  {
+    "id": "acceptHld",
+    "label": "HLD acceptance",
+    "category": "Advanced controls",
+    "region": "main",
+    "selector": "#hld-acceptance,#hld-accepted",
+    "standard": true,
+    "focus": false,
+    "dependencies": [
+      "hld"
+    ],
+    "permissions": [
+      "hld_accept"
+    ],
+    "disclosure": true,
+    "orderSelector": ""
+  },
+  {
+    "id": "declarations",
+    "label": "Function and declaration navigator",
+    "category": "LLD context",
+    "region": "left",
+    "selector": ".lld-catalog",
+    "standard": true,
+    "focus": false,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ""
+  },
+  {
+    "id": "implementation",
+    "label": "Implementation changes",
+    "category": "LLD context",
+    "region": "main",
+    "selector": "#lld-changes",
+    "standard": true,
+    "focus": false,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ""
+  },
+  {
+    "id": "assertLld",
+    "label": "LLD assertions",
+    "category": "Advanced controls",
+    "region": "main",
+    "selector": "#lld-acceptance",
+    "standard": true,
+    "focus": false,
+    "dependencies": [
+      "lld"
+    ],
+    "permissions": [
+      "lld_accept"
+    ],
+    "disclosure": true,
+    "orderSelector": ""
+  },
+  {
+    "id": "behavior",
+    "label": "Behavior diff",
+    "category": "Review views",
+    "region": "main",
+    "selector": "#layout-connected",
+    "standard": true,
+    "focus": false,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": "#workspace-split"
+  },
+  {
+    "id": "hints",
+    "label": "Navigation hints",
+    "category": "Diagram controls",
+    "region": "main",
+    "selector": ".graph-overview,.design-breadcrumbs",
+    "standard": true,
+    "focus": true,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ""
+  },
+  {
+    "id": "pinning",
+    "label": "Source pin",
+    "category": "Code inspection",
+    "region": "main",
+    "selector": "#pin,#lld-source-pin",
+    "standard": true,
+    "focus": false,
+    "dependencies": [
+      "source"
+    ],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ""
+  },
+  {
+    "id": "expansion",
+    "label": "Context expansion",
+    "category": "Code inspection",
+    "region": "main",
+    "selector": ".focus-diff-tools",
+    "standard": true,
+    "focus": false,
+    "dependencies": [
+      "source"
+    ],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ""
+  },
+  {
+    "id": "revisions",
+    "label": "Revision comparison",
+    "category": "PR overview",
+    "region": "main",
+    "selector": ".revision-bar",
+    "standard": true,
+    "focus": false,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ".revision-bar"
+  },
+  {
+    "id": "support",
+    "label": "Supporting text",
+    "category": "Assistance",
+    "region": "main",
+    "selector": ".brand-manifesto,.inspection-overline,#interrogation>h1,.lld-profile,.design-boundary,.inspection-switch",
+    "standard": true,
+    "focus": false,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ".design-boundary"
+  },
+  {
+    "id": "scope",
+    "label": "Context scope",
+    "category": "Advanced controls",
+    "region": "main",
+    "selector": ".scope-editor",
+    "standard": true,
+    "focus": false,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": true,
+    "orderSelector": ".scope-editor"
+  },
+  {
+    "id": "summary",
+    "label": "Change summary",
+    "category": "PR overview",
+    "region": "main",
+    "selector": ".change-brief",
+    "standard": true,
+    "focus": false,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": true,
+    "orderSelector": ".change-brief"
+  },
+  {
+    "id": "explanations",
+    "label": "Explanations",
+    "category": "Evidence",
+    "region": "main",
+    "selector": ".evidence-panel",
+    "standard": true,
+    "focus": false,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": true,
+    "orderSelector": ".evidence-panel"
+  },
+  {
+    "id": "continuity",
+    "label": "Reviewer continuity",
+    "category": "Review workflow",
+    "region": "main",
+    "selector": ".continuity-panel",
+    "standard": true,
+    "focus": false,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": true,
+    "orderSelector": ".continuity-panel"
+  },
+  {
+    "id": "progress",
+    "label": "Review progress",
+    "category": "Review workflow",
+    "region": "main",
+    "selector": "#continuity-summary,#mark-all-reviewed",
+    "standard": true,
+    "focus": false,
+    "dependencies": [
+      "continuity"
+    ],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ""
+  },
+  {
+    "id": "bookmarks",
+    "label": "Bookmarks",
+    "category": "Review workflow",
+    "region": "main",
+    "selector": "#bookmark-selection",
+    "standard": true,
+    "focus": false,
+    "dependencies": [
+      "continuity"
+    ],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ""
+  },
+  {
+    "id": "checks",
+    "label": "Validation checks",
+    "category": "Evidence",
+    "region": "right",
+    "selector": ".evidence-checklist",
+    "standard": true,
+    "focus": false,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ".evidence-checklist"
+  },
+  {
+    "id": "findings",
+    "label": "Findings",
+    "category": "Evidence",
+    "region": "right",
+    "selector": ".contradictions",
+    "standard": true,
+    "focus": false,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ".contradictions"
+  },
+  {
+    "id": "verdict",
+    "label": "Verdict",
+    "category": "Evidence",
+    "region": "right",
+    "selector": ".verdict-panel",
+    "standard": true,
+    "focus": false,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ".verdict-panel"
+  },
+  {
+    "id": "timeline",
+    "label": "Session history",
+    "category": "Review workflow",
+    "region": "right",
+    "selector": ".review-timeline,#lld-history,#lld-load-history",
+    "standard": true,
+    "focus": false,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": true,
+    "orderSelector": ".review-timeline"
+  },
+  {
+    "id": "zoom",
+    "label": "Zoom and fit",
+    "category": "Diagram controls",
+    "region": "main",
+    "selector": ".diagram-tools,#fit-selection,#reset-graph",
+    "standard": true,
+    "focus": true,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ""
+  },
+  {
+    "id": "facts",
+    "label": "Component facts",
+    "category": "HLD context",
+    "region": "main",
+    "selector": "#hld-inspector .hld-facts",
+    "standard": true,
+    "focus": false,
+    "dependencies": [
+      "componentDetails"
+    ],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ""
+  },
+  {
+    "id": "relationships",
+    "label": "Relationships",
+    "category": "HLD context",
+    "region": "main",
+    "selector": ".preference-relationships",
+    "standard": true,
+    "focus": false,
+    "dependencies": [
+      "componentDetails"
+    ],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ""
+  },
+  {
+    "id": "hldSource",
+    "label": "HLD source evidence",
+    "category": "HLD context",
+    "region": "main",
+    "selector": ".hld-source-evidence",
+    "standard": true,
+    "focus": true,
+    "dependencies": [
+      "componentDetails"
+    ],
+    "permissions": [],
+    "disclosure": true,
+    "orderSelector": "",
+    "expandedDefault": {
+      "standard": true,
+      "focus": false
+    }
+  },
+  {
+    "id": "declarationSearch",
+    "label": "Declaration search",
+    "category": "LLD context",
+    "region": "left",
+    "selector": ".lld-catalog>label",
+    "standard": true,
+    "focus": false,
+    "dependencies": [
+      "declarations"
+    ],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ""
+  },
+  {
+    "id": "callers",
+    "label": "Callers",
+    "category": "LLD context",
+    "region": "main",
+    "selector": ".preference-callers",
+    "standard": true,
+    "focus": false,
+    "dependencies": [
+      "lld"
+    ],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ""
+  },
+  {
+    "id": "signatures",
+    "label": "Signatures",
+    "category": "LLD context",
+    "region": "main",
+    "selector": ".lld-signature",
+    "standard": true,
+    "focus": false,
+    "dependencies": [
+      "lld"
+    ],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ""
+  },
+  {
+    "id": "lldSource",
+    "label": "LLD source evidence",
+    "category": "LLD context",
+    "region": "main",
+    "selector": ".lld-source-evidence",
+    "standard": true,
+    "focus": true,
+    "dependencies": [
+      "lld"
+    ],
+    "permissions": [],
+    "disclosure": true,
+    "orderSelector": "",
+    "expandedDefault": {
+      "standard": true,
+      "focus": false
+    }
+  },
+  {
+    "id": "source",
+    "label": "Source pane",
+    "category": "Code inspection",
+    "region": "main",
+    "selector": "#workspace-split>.inspector",
+    "standard": true,
+    "focus": false,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ""
+  },
+  {
+    "id": "lineNumbers",
+    "label": "Line numbers",
+    "category": "Code inspection",
+    "region": "main",
+    "selector": "",
+    "standard": true,
+    "focus": true,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ""
+  },
+  {
+    "id": "syntax",
+    "label": "Syntax highlighting",
+    "category": "Code inspection",
+    "region": "main",
+    "selector": "",
+    "standard": true,
+    "focus": true,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ""
+  },
+  {
+    "id": "notes",
+    "label": "Review notes",
+    "category": "Review workflow",
+    "region": "main",
+    "selector": "label:has(>#review-question),#save-question,label:has(>#question-visibility)",
+    "standard": true,
+    "focus": false,
+    "dependencies": [
+      "continuity"
+    ],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ""
+  },
+  {
+    "id": "dismiss",
+    "label": "Dismiss and restore",
+    "category": "Review workflow",
+    "region": "right",
+    "selector": ".finding-dismiss",
+    "standard": true,
+    "focus": false,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ""
+  },
+  {
+    "id": "handoffs",
+    "label": "Handoffs",
+    "category": "Review workflow",
+    "region": "main",
+    "selector": "label:has(>#handoff-reviewer),#save-handoff",
+    "standard": true,
+    "focus": false,
+    "dependencies": [
+      "continuity"
+    ],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ""
+  },
+  {
+    "id": "viewTabs",
+    "label": "Review view tabs",
+    "category": "Review views",
+    "region": "main",
+    "selector": ".review-toolbar",
+    "standard": true,
+    "focus": false,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ""
+  },
+  {
+    "id": "designDetails",
+    "label": "Design findings and supporting details",
+    "category": "HLD context",
+    "region": "main",
+    "selector": "#hld-inspector>.preference-design-details,#hld-inspector>p.status,#lld-inspector>p.mono,.lld-entry .mono,.lld-mapping-warning",
+    "standard": true,
+    "focus": false,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ""
+  }
+]

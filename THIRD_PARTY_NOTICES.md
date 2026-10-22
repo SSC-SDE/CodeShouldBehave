@@ -35,3 +35,10 @@ upstream notices. A missing package/license is a packaging failure, never silent
 treated as MIT. Source dependencies remain pinned by Cargo.lock checksums.
 
 Publication audit and release acceptance remain separate from writing this file.
+
+The CodeShouldBehave workspace bundles unmodified Inter and JetBrains Mono variable fonts
+under the SIL Open Font License 1.1. Their original copyright and license texts
+are in [src/fonts/inter-OFL.txt](src/fonts/inter-OFL.txt) and
+[src/fonts/jetbrains-mono-OFL.txt](src/fonts/jetbrains-mono-OFL.txt). Font source
+URLs and content hashes are recorded in [src/fonts/README.md](src/fonts/README.md).
+They are served locally; the browser does not contact a font CDN.

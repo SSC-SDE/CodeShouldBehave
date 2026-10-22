@@ -520,6 +520,44 @@ class PublicationTests(unittest.TestCase):
         self.assertEqual(len(self.previous["check_updates"]), 1)  # only a later signed state removes it
         self.assertIn("/commits/" + "b" * 40 + "/", self.calls[0][0])
 
+    def test_failed_check_does_not_offer_nonexistent_report(self):
+        self.previous["check_updates"] = [{"request": self.request, "public_report_id": None,
+            "conclusion": "failure", "reason": "analysis_unavailable"}]
+        ci.repair_checks(self.config, provider=self.provider)
+        body = [call[1]["body"] for call in self.calls if call[1].get("method") in ("PATCH", "POST")][-1]
+        self.assertEqual(body["output"]["title"], "Failed · Analysis unavailable")
+        self.assertNotIn("details_url", body)
+        self.assertNotIn("Open Details", body["output"]["summary"])
+        self.assertIn("not a no-change result", body["output"]["summary"])
+
+    def test_stale_ready_report_is_cancelled_and_explicitly_historical(self):
+        self.previous["check_updates"] = [{"request": self.request, "public_report_id": "e" * 64,
+            "conclusion": "success", "reason": "", "verdict": "no_change_detected"}]
+        self.provider.pull = lambda number: observation(self.config, number, "c" * 40)
+        ci.repair_checks(self.config, provider=self.provider)
+        body = [call[1]["body"] for call in self.calls if call[1].get("method") in ("PATCH", "POST")][-1]
+        self.assertEqual(body["conclusion"], "cancelled")
+        self.assertEqual(body["output"]["title"], "Superseded · New comparison required")
+        self.assertIn("historical, not the current PR result", body["output"]["summary"])
+
+    def test_repaired_check_carries_verdict_and_exact_behavior_link(self):
+        for verdict, conclusion, title in (
+            ("no_change_detected", "success", "Ready · No detected change"),
+            ("change_detected", "neutral", "Ready · Changes to review"),
+            ("incomplete", "neutral", "Incomplete · Review required"),
+        ):
+            self.previous["check_updates"] = [{"request": self.request, "public_report_id": "e" * 64,
+                "conclusion": conclusion, "reason": "", "verdict": verdict}]
+            ci.validate_state(self.previous, self.config)
+            ci.repair_checks(self.config, provider=self.provider)
+            writes = [call[1]["body"] for call in self.calls if call[1].get("method") in ("PATCH", "POST")]
+            body = writes[-1]
+            self.assertEqual(body["conclusion"], conclusion)
+            self.assertEqual(body["output"]["title"], title)
+            self.assertIn("&design=lld", body["details_url"])
+            self.assertIn("&mode=focus", body["details_url"])
+            self.assertIn(self.request["proposal"], body["output"]["summary"])
+
     def test_repair_limits_six_and_does_not_assume_neutral_is_merge_approval(self):
         for number in range(1, 8):
             result = ci.plan(self.config, ci.empty_state(self.config), [observation(self.config, number, "b" * 40)], "2026-10-17T06:00:00Z")
@@ -891,3 +929,28 @@ class TemplateTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class ReviewerVerdictTests(unittest.TestCase):
+    def test_green_requires_both_designs_unchanged_and_complete(self):
+        coverage = dict(complete=True, gaps=[], deferred_details=0)
+        artifact = dict(hld_status='no_change_detected_within_scope', lld_status='no_change_detected_within_scope')
+        self.assertEqual(ci.review_verdict(coverage, artifact), 'no_change_detected')
+        for missing in ({}, dict(artifact, hld_status='unavailable'), dict(artifact, lld_status='incomplete')):
+            self.assertEqual(ci.review_verdict(coverage, missing), 'incomplete')
+        for gap in (dict(coverage, complete=False), dict(coverage, gaps=['unresolved']), dict(coverage, deferred_details=1)):
+            self.assertEqual(ci.review_verdict(gap, artifact), 'incomplete')
+        for key in ('hld_status', 'lld_status'):
+            changed = dict(artifact, **{key: 'change_detected'})
+            self.assertEqual(ci.review_verdict(coverage, changed), 'change_detected')
+            self.assertEqual(ci.review_verdict(dict(coverage, complete=False), changed), 'change_detected')
+
+    def test_observed_call_change_survives_incomplete_aggregate(self):
+        changes = [{"kind": "call_observation_changed", "resolution": "observed_structure"}]
+        self.assertEqual(ci.review_verdict({}, {}, changes), "change_detected")
+        self.assertEqual(ci.review_verdict({}, {}, [{"kind": "call_observation_changed", "resolution": "uncertain"}]), "incomplete")
+
+    def test_legacy_and_changed_checks_cannot_claim_green(self):
+        self.assertEqual(ci.verdict_conclusion(dict(conclusion='success')), 'neutral')
+        self.assertEqual(ci.verdict_conclusion(dict(conclusion='success', verdict='change_detected')), 'neutral')
+        self.assertEqual(ci.verdict_conclusion(dict(conclusion='success', verdict='no_change_detected')), 'success')
+        self.assertEqual(ci.verdict_conclusion(dict(conclusion='cancelled', verdict='no_change_detected')), 'cancelled')

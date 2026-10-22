@@ -86,7 +86,10 @@ test('browser onboarding keeps credentials server-side and mutations session-bou
   assert.match(js,/'X-CSB-Session':session/);
   assert.match(js,/window\.location\.assign\(value\.review_url\)/);
   assert.match(js,/activeButton\.textContent='Retry review'/);
-  assert.doesNotMatch(js,/token|bearer|localStorage|sessionStorage/i);
+  assert.doesNotMatch(js,/token|bearer|localStorage/i);
+  const withoutThemeStorage=js.replace(/sessionStorage\.(?:getItem|removeItem)\('csb\.application-theme'\)/g,'');
+  assert.doesNotMatch(withoutThemeStorage,/sessionStorage/i);
+  assert.match(js,/\['graphite','blueprint','terminal','contrast'\]\.includes\(theme\)/);
   assert.match(server,/ThreadingHTTPServer\(\("127\.0\.0\.1", args\.port\)/);
   assert.match(server,/compare_digest\(self\.headers\.get\("X-CSB-Session", ""\), state\.session\)/);
   assert.match(server,/re\.fullmatch\(r"pr-\[1-9\]\[0-9\]\*\\\.html", name\)/);

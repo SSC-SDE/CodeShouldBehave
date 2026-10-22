@@ -75,6 +75,11 @@ const MIGRATIONS: &[(i64, &str, &str)] = &[
         "0013_lld_defaults",
         include_str!("../migrations/0013_lld_defaults.sql"),
     ),
+    (
+        14,
+        "0014_workspace_preferences",
+        include_str!("../migrations/0014_workspace_preferences.sql"),
+    ),
 ];
 const MIN_SQLITE: (u32, u32, u32) = (3, 51, 3);
 const MAX_ARTIFACT_BYTES: usize = 64 * 1024 * 1024;
@@ -2230,7 +2235,7 @@ mod tests {
         let storage = Storage::open(&database, &artifacts).unwrap();
         println!("bundled SQLite runtime: {}", storage.sqlite_version());
         assert!(parse_version(storage.sqlite_version()).unwrap() >= MIN_SQLITE);
-        assert_eq!(storage.schema_version().unwrap(), 13);
+        assert_eq!(storage.schema_version().unwrap(), 14);
         drop(storage);
         fs::remove_dir_all(root).unwrap();
     }
@@ -2670,7 +2675,7 @@ mod tests {
         connection.pragma_update(None, "user_version", 1).unwrap();
         drop(connection);
         let storage = Storage::open(&database, &artifacts).unwrap();
-        assert_eq!(storage.schema_version().unwrap(), 13);
+        assert_eq!(storage.schema_version().unwrap(), 14);
         let index_exists: i64 = storage
             .connection
             .query_row(

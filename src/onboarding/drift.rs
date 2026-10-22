@@ -386,11 +386,15 @@ pub(crate) fn assess(
                 "Source or configuration boundary path was added or removed within accepted roots"
                     .into(),
             );
-        } else if item.kind == "source" && path.ends_with(".rs") {
-            let signatures = blob(root, before.unwrap(), &mut budget)
+        } else if let (Some(before), Some(after), true) = (
+            before,
+            after,
+            item.kind == "source" && path.ends_with(".rs"),
+        ) {
+            let signatures = blob(root, before, &mut budget)
                 .and_then(|text| rust_signatures(&text))
                 .and_then(|left| {
-                    blob(root, after.unwrap(), &mut budget)
+                    blob(root, after, &mut budget)
                         .and_then(|text| rust_signatures(&text))
                         .map(|right| (left, right))
                 });

@@ -12,3 +12,11 @@ section{background:var(--panel);border:1px solid var(--line);border-radius:8px;p
 section p,section h3,section h4{overflow-wrap:anywhere}
 
 #drift .evidence-list li{overflow-wrap:anywhere}
+
+/* Shared application palette; selection is made in Workspace settings. */
+:root[data-theme=graphite]{--bg:#111316;--panel:#1b1f24;--panel2:#222830;--line:#353c44;--text:#e5eaf0;--muted:#a5afbc;--amber:#e6a363;--blue:#bac9da;--green:#8bd2ad;--red:#e09ba7}
+:root[data-theme=blueprint]{--bg:#0d1928;--panel:#14263b;--panel2:#1a3048;--line:#31506e;--text:#e0ecfa;--muted:#a0b8d1;--amber:#9ecaff;--blue:#9ecaff;--green:#91dcb7;--red:#efa6b3;--control:2px;--surface:3px}
+:root[data-theme=terminal]{--bg:#101510;--panel:#182019;--panel2:#202c22;--line:#455c49;--text:#d6e4d7;--muted:#a5b8a8;--amber:#d7bf81;--blue:#b3d6b9;--green:#9cdda8;--red:#efa49c;--control:0px;--surface:0px}
+:root[data-theme=contrast]{--bg:#101012;--panel:#202023;--panel2:#2a292f;--line:#68656f;--text:#f7f6f9;--muted:#cbc8d0;--amber:#f1c87a;--blue:#d4d9ff;--green:#94e9b9;--red:#ff9aab}
+html[data-theme] body{background:var(--bg);color:var(--text)}
+html[data-theme=terminal] button,html[data-theme=terminal] section{border-radius:0;border-style:dashed}

@@ -143,6 +143,7 @@ impl ReviewArtifact {
             && self.warnings.is_empty()
             && design_covered;
         let ready = complete(hld) && complete(lld) && covered;
+        let changed = hld == "change_detected" || lld == "change_detected";
         Ok(ArchitectureCheckDraft {
             name: ARCHITECTURE_CHECK_NAME,
             head_sha: self.proposal.clone(),
@@ -161,12 +162,18 @@ impl ReviewArtifact {
                 }
             ),
             status: "completed",
-            conclusion: if ready { "success" } else { "neutral" },
+            conclusion: if ready && !changed {
+                "success"
+            } else {
+                "neutral"
+            },
             output: CheckOutput {
-                title: if ready {
-                    "Architecture analysis completed"
+                title: if changed {
+                    "Behavior change · Review required"
+                } else if ready {
+                    "No behavior change detected"
                 } else {
-                    "Architecture analysis is incomplete or unavailable"
+                    "Analysis incomplete · Review required"
                 },
                 // Fixed vocabulary only: no repo labels, source paths, excerpts,
                 // counts, warning text, related repos or model explanations.

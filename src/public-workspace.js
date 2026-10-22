@@ -3,6 +3,13 @@
 // Public, immutable data transport. It never sends credentials or calls a native
 // service. The existing workspace controller remains responsible for selection
 // generations and renders the same HLD/LLD/source surfaces.
+function publicReviewVerdict(coverage,artifact,changes=[]){
+  const states=[artifact.hld_status,artifact.lld_status];
+  const observed=changes.some(change=>change.resolution==='observed_structure'&&['call_observation_changed','control_flow_changed','return_changed','error_flow_changed'].includes(change.kind));
+  if(states.includes('change_detected')||observed)return {kind:'change_detected',label:'Behavior change · Review required'};
+  if(coverage.complete===true&&!coverage.gaps?.length&&!coverage.deferred_details&&states.every(value=>value==='no_change_detected_within_scope'))return {kind:'no_change_detected',label:'No behavior change detected'};
+  return {kind:'incomplete',label:'Analysis incomplete · Review required'};
+}
 class PublicWorkspaceError extends Error {
   constructor(code,{invalidateReview=false,status=400}={}) {super(code);this.name='PublicWorkspaceError';Object.assign(this,{code,invalidateReview,status});}
 }
@@ -109,14 +116,14 @@ class PublicStaticTransport {
   async request(path,options={}){
     publicAbort(options.signal);if(typeof path!=='string'||!path.startsWith('/v1/')||path.includes('#'))throw new PublicWorkspaceError('Unsupported public request');const url=new URL(path,'https://public.invalid'),query=url.searchParams;for(const key of new Set(query.keys()))if(query.getAll(key).length!==1)throw new PublicWorkspaceError('Duplicate public query');
     if(!this.index||(url.pathname==='/v1/prs'&&!query.has('cursor')))await this.bootstrap({signal:options.signal});
-    if(url.pathname==='/v1/prs'){publicQuery(query,['limit','cursor']);if(options.method&&options.method!=='GET')throw new PublicWorkspaceError('Read-only published index');return {api_version:'v1',...publicPage(this.index.reports.map(item=>this.revision(item)),query,'published-index')};}
+    if(url.pathname==='/v1/prs'){publicQuery(query,['limit','cursor','repository_id']);if(options.method&&options.method!=='GET')throw new PublicWorkspaceError('Read-only published index');return {api_version:'v1',...publicPage(this.index.reports.filter(item=>!query.has('repository_id')||String(item.repository.id)===query.get('repository_id')).map(item=>this.revision(item)),query,`published-index:${query.get('repository_id')||'all'}`)};}
     if(/^\/v1\/prs\/PR-[0-9]+\/revisions$/.test(url.pathname)){publicQuery(query,['repository_id','limit','cursor']);if(options.method&&options.method!=='GET')throw new PublicWorkspaceError('Read-only published revisions');const number=Number(url.pathname.split('/')[3].slice(3));return {api_version:'v1',...publicPage(this.index.reports.filter(item=>item.pr_number===number&&String(item.repository.id)===query.get('repository_id')).map(item=>this.revision(item)),query,`revisions:${query.get('repository_id')}:${number}`)};}
     const match=url.pathname.match(/^\/v1\/reviews\/([^/]+)(.*)$/);if(!match)throw new PublicWorkspaceError('This action needs a new published analysis');const review=await this.review(decodeURIComponent(match[1]),options.signal),suffix=match[2],artifact=review.artifact,m=review.manifest;
     const tupleKeys=['entry','parent_hld','component','baseline_entry','correspondence_kind'];
     const queries={'':[], '/progress':[], '/files':['limit','cursor'],'/findings':['limit','cursor'],'/annotations':[], '/graph':['side','path','symbol','direction','limit','cursor'],'/source':['side','path','blob','start_line','end_line'], '/hld':[], '/hld/source':['design_id','evidence_id'], '/lld/catalog':['parent_hld','component','limit','cursor'], '/lld/detail':[...tupleKeys,'side'], '/lld/source':[...tupleKeys,'evidence','start_line','end_line'], '/lld/history':tupleKeys, '/export':['view']};
     if(!Object.hasOwn(queries,suffix))throw new PublicWorkspaceError('This action needs a new published analysis');publicQuery(query,queries[suffix]);
     if((options.method||'GET')!=='GET'){if(suffix==='/annotations'&&options.method==='PUT')return this.annotate(review,options);throw new PublicWorkspaceError('Published design is read-only; request a new analysis run');}
-    if(suffix==='')return this.envelope(review,{api_version:'v1',selected_baseline:m.selected_baseline,analysis_baseline:m.baseline,proposal:m.proposal,comparison_mode:m.selected_baseline===m.baseline?'exact':'merge_base',stale:false,capabilities:['graph',...(m.capabilities.source?['source']:[]),...(m.capabilities.export?['export']:[])],revision:this.revision(review.record),profile:this.profile,scope_manifest:publicClone(artifact.scope_manifest),public_coverage:publicClone(m.coverage)});
+    if(suffix==='')return this.envelope(review,{api_version:'v1',selected_baseline:m.selected_baseline,analysis_baseline:m.baseline,proposal:m.proposal,comparison_mode:m.selected_baseline===m.baseline?'exact':'merge_base',stale:false,capabilities:['graph',...(m.capabilities.source?['source']:[]),...(m.capabilities.export?['export']:[])],revision:this.revision(review.record),profile:this.profile,scope_manifest:publicClone(artifact.scope_manifest),public_coverage:publicClone(m.coverage),public_verdict:publicReviewVerdict(m.coverage,artifact,m.capabilities.lld?(await this.catalogValue(review,options.signal)).delta?.changes||[]:[])});
     if(suffix==='/progress')return this.envelope(review,{api_version:'v1',job_state:'published',coverage:Object.entries(artifact.coverage).filter(([,value])=>typeof value==='number'),stale:false});
     if(suffix==='/files')return this.envelope(review,{api_version:'v1',...publicPage(artifact.files,query,`${m.public_report_id}:files`)});
     if(suffix==='/findings')return this.envelope(review,{api_version:'v1',items:[],next_cursor:null});
@@ -144,5 +151,5 @@ class PublicStaticTransport {
   close(){this.reviews.clear();this.personal.clear();this.index=null;}
 }
 function createPublicStaticTransport(options){return new PublicStaticTransport(options);}
-if(typeof module!=='undefined')module.exports={PublicStaticTransport,PublicWorkspaceError,createPublicStaticTransport,PUBLIC_LIMITS};
-if(typeof window!=='undefined')window.CodeShouldBehavePublic={PublicStaticTransport,PublicWorkspaceError,createPublicStaticTransport,PUBLIC_LIMITS};
+if(typeof module!=='undefined')module.exports={PublicStaticTransport,PublicWorkspaceError,createPublicStaticTransport,PUBLIC_LIMITS,publicReviewVerdict};
+if(typeof window!=='undefined')window.CodeShouldBehavePublic={PublicStaticTransport,PublicWorkspaceError,createPublicStaticTransport,PUBLIC_LIMITS,publicReviewVerdict};
