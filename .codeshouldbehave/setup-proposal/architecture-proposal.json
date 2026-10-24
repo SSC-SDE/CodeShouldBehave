@@ -99,7 +99,13 @@
         ]
       }
     ],
-    "confirmation": null,
+    "confirmation": {
+      "actor": "setup-preparer",
+      "confirmed_at_ms": 1792824203678,
+      "input_fingerprint": "a062a4ea42f6f71cbc68544d735befdac8e6e23ffd0cf6fb6c2ca82def509f12",
+      "known_gaps_accepted": true,
+      "proposal_fingerprint": "41d43d9dd296e28a263a9e922772c62f356100c9dd9a3a25d9fb48fdade19a4d"
+    },
     "contexts": [],
     "contracts": [],
     "exclude": [
@@ -126,7 +132,7 @@
     "scope_version": "public-setup-proposal-v1",
     "sensitive_paths_excluded": true,
     "session_id": "public-setup-20261024",
-    "session_revision": 18,
+    "session_revision": 19,
     "usable": true,
     "version": "csb-accepted-context-v1"
   },
@@ -375,13 +381,19 @@
       ]
     }
   ],
-  "confirmation": null,
+  "confirmation": {
+    "actor": "setup-preparer",
+    "confirmed_at_ms": 1792824203678,
+    "input_fingerprint": "a062a4ea42f6f71cbc68544d735befdac8e6e23ffd0cf6fb6c2ca82def509f12",
+    "known_gaps_accepted": true,
+    "proposal_fingerprint": "41d43d9dd296e28a263a9e922772c62f356100c9dd9a3a25d9fb48fdade19a4d"
+  },
   "confirmation_readiness": {
     "components_pending": 0,
     "integrations_pending": 0,
     "known_gaps_required": true,
     "providers_pending": 0,
-    "ready": true
+    "ready": false
   },
   "contexts": [],
   "exclude": [
@@ -1478,8 +1490,8 @@
     "security_domain": "local"
   },
   "review_defaults_active": false,
-  "revision": 18,
+  "revision": 19,
   "scan_version": "csb-inventory-v2",
   "scope_version": "public-setup-proposal-v1",
-  "state": "awaiting_confirmation"
+  "state": "confirmed"
 }

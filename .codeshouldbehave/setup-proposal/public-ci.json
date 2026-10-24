@@ -11,7 +11,7 @@
   "policy_path": ".codeshouldbehave/public-policy.json",
   "policy_sha256": "036ab740206c6fe9aea4be31df2f1806abdd0eef16b0500695422e4139f5255a",
   "context_path": ".codeshouldbehave/accepted-context.json",
-  "context_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "context_sha256": "4f5b26a23de40b0971dca2bf6ac42e61dd318a102217dd816a44bcdd8233d7be",
   "engine": {
     "commit": "2917f1bb352bd5cee38d5da9be5bf79817434eab",
     "flowdiff_sha256": "7fab95084c6c5466b908ac9702b31cffd757a45a5a9bdde55c6350e17d6ca13f",
