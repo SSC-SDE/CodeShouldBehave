@@ -118,5 +118,27 @@ activation preparation must explicitly review export/publication consent, verify
 context drift against the intended baseline, refresh engine pins and budget proof,
 and present the final installation diff before owner activation approval.
 
-At verification time GitHub reported PR #3 OPEN, with no merge commit. These
-confirmation records are added to that existing PR; no merge is inferred.
+PR #3 merged at `14eb601f117de04f7719ffc81143dec343e5c217`. Final confirmation
+was delivered separately in PR #4, merged at
+`c9a6f78dce6df5bb681a41eced9833df69710a2a`.
+
+## Post-merge context verification — 2026-10-24
+
+`context-drift.json` records native read-only verification from the original
+confirmed source to PR #4's exact merge commit. Result: unchanged architecture
+context, reuse allowed, no reconfirmation required, no scope expansion and no
+defaults changed. This does not assert unchanged PR behavior or complete coverage.
+The previously accepted unsupported-path and hosting gaps remain applicable.
+
+Verification exposed a second exact-manifest-root mismatch in drift validation:
+Cargo.toml was accepted during confirmation but treated as absent during drift.
+The correction recognizes an indexed manifest at its exact authorized path,
+while preserving directory roots and rejecting missing manifests. Three drift
+tests (including deletion and revoked-access checks) and Rust 1.87 all-target,
+all-feature Clippy with warnings denied pass.
+
+Next checkpoint: merge this correction, then prepare a Linux release containing
+both manifest-root corrections. Before any hosted build, refresh the expired
+USD 0 budget observation. Verify release signatures and native startup before
+updating engine pins. Runtime context/export consent, workflow installation,
+Pages and check publication remain pending separate activation approval.
