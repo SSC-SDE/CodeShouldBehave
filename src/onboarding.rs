@@ -493,8 +493,9 @@ impl OnboardingSession {
                     && !crate::onboarding_scan::sensitive_path(&item.path)
                     && ((item.kind == "source" && source_under_root(&item.path))
                         || (item.kind == "manifest"
-                            && item.path.rsplit_once('/').map_or(".", |(parent, _)| parent)
-                                == root))
+                            && (item.path == *root
+                                || item.path.rsplit_once('/').map_or(".", |(parent, _)| parent)
+                                    == root)))
             }) {
                 return Err("Unknown component root; choose an indexed source path or explicit manifest root from the pinned inventory".into());
             }
@@ -1846,6 +1847,21 @@ mod tests {
             .unwrap();
         assert_eq!(session.proposals()[0].evidence, original.evidence);
         assert_eq!(session.proposals()[0].confidence, original.confidence);
+        // The detector can propose an explicitly scoped manifest file itself.
+        // It must be confirmable without widening to its parent directory.
+        let mut exact_manifest = correction.clone();
+        exact_manifest.roots = vec!["src/manifest-only/Cargo.toml".into()];
+        assert!(
+            session
+                .validate_component_roots(&exact_manifest, true)
+                .is_ok()
+        );
+        exact_manifest.roots = vec!["src/manifest-only/unknown.toml".into()];
+        assert!(
+            session
+                .validate_component_roots(&exact_manifest, true)
+                .is_err()
+        );
         correction.roots = vec!["src/manifest-only".into()];
         session
             .decide_component(4, correction, &principal, &grants)

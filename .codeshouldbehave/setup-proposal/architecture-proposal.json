@@ -1,20 +1,121 @@
 {
   "accepted_context": {
-    "accepted_scope_fingerprint": "",
+    "accepted_scope_fingerprint": "efc68c3b77b1a4e0157295dd253e5497fc0004c76fbdbcff47a2bf3ab4e763e3",
     "commit": "ad26461d57b58da1b3782c3854e57672ee9e82b2",
-    "components": [],
+    "components": [
+      {
+        "confidence": "corroborated",
+        "contradictions": [
+          "Source sampling is limited to eight files per manifest root; roles and integrations outside the sample remain unknown",
+          "Static signals do not prove runtime use; conditional compilation, dependency aliases, grouped imports and generated code require confirmation"
+        ],
+        "decision": "confirmed",
+        "evidence": [
+          {
+            "blob": "1293ee1e4f45cb921b22ce858e4b972210fcb599",
+            "end_line": 47,
+            "path": "Cargo.toml",
+            "producer_version": "csb-component-detectors-v2",
+            "repository_index": 0,
+            "start_line": 1
+          },
+          {
+            "blob": "c35ad14d98417f68a5ab94002662ff524def0c99",
+            "end_line": 575,
+            "path": "src/ai.rs",
+            "producer_version": "csb-component-detectors-v2",
+            "repository_index": 0,
+            "start_line": 1
+          },
+          {
+            "blob": "c31252d741d55d73de08c665573cef425a7cc95a",
+            "end_line": 463,
+            "path": "src/analysis.rs",
+            "producer_version": "csb-component-detectors-v2",
+            "repository_index": 0,
+            "start_line": 1
+          },
+          {
+            "blob": "e34f25f519d39872248677480b4528de1c270547",
+            "end_line": 1011,
+            "path": "src/architecture.rs",
+            "producer_version": "csb-component-detectors-v2",
+            "repository_index": 0,
+            "start_line": 1
+          },
+          {
+            "blob": "08e91a8859fb6ae28b47dcee6c8709c37a71aee4",
+            "end_line": 201,
+            "path": "src/bin/csb_onboarding.rs",
+            "producer_version": "csb-component-detectors-v2",
+            "repository_index": 0,
+            "start_line": 1
+          },
+          {
+            "blob": "2fa2407f1851f4cfc74a0c15dcec271b3246d620",
+            "end_line": 460,
+            "path": "src/bin/csb_onboarding/database_copy.rs",
+            "producer_version": "csb-component-detectors-v2",
+            "repository_index": 0,
+            "start_line": 1
+          },
+          {
+            "blob": "313779a28bd43379ccaa891c84c1b5800ad05940",
+            "end_line": 301,
+            "path": "src/bin/csb_onboarding/hld.rs",
+            "producer_version": "csb-component-detectors-v2",
+            "repository_index": 0,
+            "start_line": 1
+          },
+          {
+            "blob": "142d54e807d4d250870298823c69083113f94785",
+            "end_line": 771,
+            "path": "src/bin/csb_onboarding/lld.rs",
+            "producer_version": "csb-component-detectors-v2",
+            "repository_index": 0,
+            "start_line": 1
+          },
+          {
+            "blob": "b95ee27fc2c89edf6d6618f90f56ab47728a5470",
+            "end_line": 85,
+            "path": "src/bin/csb_public_report.rs",
+            "producer_version": "csb-component-detectors-v2",
+            "repository_index": 0,
+            "start_line": 1
+          }
+        ],
+        "id": "component-388998447a91011cea02fe4b40dcfe7fc7046aa70abe0465adc75b57bef56834",
+        "name": "Repository 1 \u00b7 .",
+        "repository_index": 0,
+        "role": "unclassified",
+        "roots": [
+          "Cargo.toml",
+          "src"
+        ],
+        "signals": [],
+        "stack_candidates": [
+          "Rust \u00b7 manifest candidate",
+          "Rust \u00b7 parsed source"
+        ]
+      }
+    ],
     "confirmation": null,
     "contexts": [],
     "contracts": [],
-    "exclude": [],
+    "exclude": [
+      "src/fonts"
+    ],
     "export_allowed": false,
     "gaps": [
       "2 scan limitations were explicitly accepted; inspect the protected onboarding session for source-qualified details"
     ],
-    "include": [],
+    "include": [
+      "Cargo.toml",
+      "src"
+    ],
     "input_fingerprint": "a062a4ea42f6f71cbc68544d735befdac8e6e23ffd0cf6fb6c2ca82def509f12",
     "integrations": [],
-    "proposal_fingerprint": "9d0a5d5a1d2e00aebf2c74df670310e85bf0b31e90b379b2dfa5e9b0d018f14a",
+    "proposal_fingerprint": "41d43d9dd296e28a263a9e922772c62f356100c9dd9a3a25d9fb48fdade19a4d",
     "providers": [],
     "repository": {
       "name": "CodeShouldBehave",
@@ -25,8 +126,8 @@
     "scope_version": "public-setup-proposal-v1",
     "sensitive_paths_excluded": true,
     "session_id": "public-setup-20261024",
-    "session_revision": 8,
-    "usable": false,
+    "session_revision": 18,
+    "usable": true,
     "version": "csb-accepted-context-v1"
   },
   "ai_dispatch_available": false,
@@ -45,7 +146,7 @@
         "Source sampling is limited to eight files per manifest root; roles and integrations outside the sample remain unknown",
         "Static signals do not prove runtime use; conditional compilation, dependency aliases, grouped imports and generated code require confirmation"
       ],
-      "decision": "pending",
+      "decision": "confirmed",
       "evidence": [
         {
           "blob": "1293ee1e4f45cb921b22ce858e4b972210fcb599",
@@ -276,11 +377,11 @@
   ],
   "confirmation": null,
   "confirmation_readiness": {
-    "components_pending": 1,
+    "components_pending": 0,
     "integrations_pending": 0,
     "known_gaps_required": true,
     "providers_pending": 0,
-    "ready": false
+    "ready": true
   },
   "contexts": [],
   "exclude": [
@@ -300,7 +401,7 @@
     {
       "answer": null,
       "component_id": "component-388998447a91011cea02fe4b40dcfe7fc7046aa70abe0465adc75b57bef56834",
-      "decision": "pending",
+      "decision": "defer",
       "evidence": [
         {
           "blob": "2fa2407f1851f4cfc74a0c15dcec271b3246d620",
@@ -320,7 +421,7 @@
     {
       "answer": null,
       "component_id": "component-388998447a91011cea02fe4b40dcfe7fc7046aa70abe0465adc75b57bef56834",
-      "decision": "pending",
+      "decision": "defer",
       "evidence": [
         {
           "blob": "c35ad14d98417f68a5ab94002662ff524def0c99",
@@ -340,7 +441,7 @@
     {
       "answer": null,
       "component_id": "component-388998447a91011cea02fe4b40dcfe7fc7046aa70abe0465adc75b57bef56834",
-      "decision": "pending",
+      "decision": "defer",
       "evidence": [
         {
           "blob": "c35ad14d98417f68a5ab94002662ff524def0c99",
@@ -368,7 +469,7 @@
     {
       "answer": null,
       "component_id": "component-388998447a91011cea02fe4b40dcfe7fc7046aa70abe0465adc75b57bef56834",
-      "decision": "pending",
+      "decision": "defer",
       "evidence": [
         {
           "blob": "c35ad14d98417f68a5ab94002662ff524def0c99",
@@ -1011,13 +1112,13 @@
     "version": "csb-inventory-v2"
   },
   "onboarding_version": "csb-onboarding-v1",
-  "proposal_fingerprint": "9d0a5d5a1d2e00aebf2c74df670310e85bf0b31e90b379b2dfa5e9b0d018f14a",
+  "proposal_fingerprint": "41d43d9dd296e28a263a9e922772c62f356100c9dd9a3a25d9fb48fdade19a4d",
   "providers": [],
   "questions": [
     {
       "category": "component",
       "component_id": "component-388998447a91011cea02fe4b40dcfe7fc7046aa70abe0465adc75b57bef56834",
-      "decision": "pending",
+      "decision": "confirmed",
       "evidence": [
         {
           "blob": "1293ee1e4f45cb921b22ce858e4b972210fcb599",
@@ -1192,7 +1293,7 @@
     {
       "category": "integration",
       "component_id": "component-388998447a91011cea02fe4b40dcfe7fc7046aa70abe0465adc75b57bef56834",
-      "decision": "pending",
+      "decision": "defer",
       "evidence": [
         {
           "blob": "2fa2407f1851f4cfc74a0c15dcec271b3246d620",
@@ -1227,7 +1328,7 @@
     {
       "category": "integration",
       "component_id": "component-388998447a91011cea02fe4b40dcfe7fc7046aa70abe0465adc75b57bef56834",
-      "decision": "pending",
+      "decision": "defer",
       "evidence": [
         {
           "blob": "c35ad14d98417f68a5ab94002662ff524def0c99",
@@ -1262,7 +1363,7 @@
     {
       "category": "integration",
       "component_id": "component-388998447a91011cea02fe4b40dcfe7fc7046aa70abe0465adc75b57bef56834",
-      "decision": "pending",
+      "decision": "defer",
       "evidence": [
         {
           "blob": "c35ad14d98417f68a5ab94002662ff524def0c99",
@@ -1305,7 +1406,7 @@
     {
       "category": "integration",
       "component_id": "component-388998447a91011cea02fe4b40dcfe7fc7046aa70abe0465adc75b57bef56834",
-      "decision": "pending",
+      "decision": "defer",
       "evidence": [
         {
           "blob": "c35ad14d98417f68a5ab94002662ff524def0c99",
@@ -1377,7 +1478,7 @@
     "security_domain": "local"
   },
   "review_defaults_active": false,
-  "revision": 8,
+  "revision": 18,
   "scan_version": "csb-inventory-v2",
   "scope_version": "public-setup-proposal-v1",
   "state": "awaiting_confirmation"
