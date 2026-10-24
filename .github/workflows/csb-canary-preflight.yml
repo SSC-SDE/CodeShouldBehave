@@ -53,7 +53,7 @@ jobs:
           from pathlib import Path
           from datetime import datetime,timezone
           engine=Path(os.environ['RUNNER_TEMP'])/'csb-engine'
-          sys.path.insert(0,str(engine/'scripts'))
+          sys.path.insert(0,str(Path.cwd()/'scripts'))
           import public_ci as ci
           cfg=json.loads(Path('.codeshouldbehave/public-ci.json').read_text())
           base='ad25c3feff864efb14c3187a08891e72bd588292'
