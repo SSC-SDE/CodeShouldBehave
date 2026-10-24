@@ -34,3 +34,13 @@ copied into this repository. Branch: `phase-6`; PR base: `main`.
   consent diff for explicit owner approval. Do not activate on merge.
 - Activation remains OFF; publication consent, export permission, defaults and
   runtime operations unchanged. No consumer workflows installed.
+
+## 2026-10-24 — installation/consent review prepared
+
+- PR #6 provider-confirmed merge: `bd5c06f6566c9523e48dddcefc10f85caf4c6236`.
+- Prepared unapplied six-file installation patch, byte manifest and separate
+  consent preview under `.codeshouldbehave/setup-proposal/installation-review/`.
+- Pages read-only check: workflow source, expected project URL, status null.
+- Export context regeneration, reviewed public budget proof, final hashes and
+  complete activation diff remain pending explicit owner consent.
+- Activation remains OFF. No installer execution or runtime workflow placement.
