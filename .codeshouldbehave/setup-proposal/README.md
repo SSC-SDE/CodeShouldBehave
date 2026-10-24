@@ -67,3 +67,27 @@ session is awaiting_confirmation. Do not install this placeholder as runtime
 context. Validation checks these fields explicitly.
 
 Review PR: https://github.com/SSC-SDE/CodeShouldBehave/pull/2
+
+## Owner boundary approval recorded — 2026-10-24
+
+PR #2 merged at d88752c9f8f8f6c50459e9bd32dfc1194e214e39. The owner approved
+the scope and single component boundary. Native component decision is confirmed;
+all four integrations are deferred, not authorized for added context. Earlier
+statements above about pending component decisions describe the original proposal.
+
+A validator mismatch prevented confirming the detector's explicit Cargo.toml
+root. The correction accepts only an indexed manifest's exact authorized path
+or its already supported manifest directory; unknown paths remain rejected.
+22 onboarding tests and full-feature strict Clippy pass. The native decision
+round trip now succeeds with the same paths and source commit.
+
+Final confirmation has NOT run: state=awaiting_confirmation, confirmation=null,
+review_defaults_active=false. The API now reports a usable projected component
+map; that is not a confirmation or authorization to install it. No runtime
+accepted-context.json exists, publication_consent=false and all operations=false.
+
+Remaining owner decision: accept incomplete coverage for eight unsupported paths
+and unknown hosting, with the four integrations deferred. Then generate the
+confirmed context with activate_defaults=false. Workflow installation and live
+activation remain separate. The engine correction needs merge and release refresh
+before relying on it in the hosted onboarding path.
