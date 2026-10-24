@@ -1,5 +1,10 @@
 # Repository setup proposal — activation OFF
 
+**Latest status (2026-10-24):** Scope, component boundary and known gaps are
+confirmed. `accepted-context.json` is staged in this proposal directory only.
+Export permission, review defaults, publication consent and all runtime operations
+remain off. Earlier sections below retain the preparation history.
+
 Repository: SSC-SDE/CodeShouldBehave, numeric ID 1423092555.
 Scanned public commit: `ad26461d57b58da1b3782c3854e57672ee9e82b2`.
 
@@ -91,3 +96,27 @@ and unknown hosting, with the four integrations deferred. Then generate the
 confirmed context with activate_defaults=false. Workflow installation and live
 activation remain separate. The engine correction needs merge and release refresh
 before relying on it in the hosted onboarding path.
+
+## Final context confirmation — 2026-10-24
+
+The owner accepted eight unsupported paths and unknown hosting as known gaps,
+with all four integrations deferred. Native `confirm` completed with
+`known_gaps_accepted=true` and `activate_defaults=false`. The confirmation was
+recorded by the local setup-preparer on the owner's explicit instruction; it
+is not a GitHub authentication or runtime deployment claim.
+
+Confirmed context remains tied to scanned public commit
+`ad26461d57b58da1b3782c3854e57672ee9e82b2`, not silently advanced to branch HEAD.
+It contains one component, no included integrations or providers, and no model
+destinations. SHA-256:
+`4f5b26a23de40b0971dca2bf6ac42e61dd318a102217dd816a44bcdd8233d7be`.
+
+`public-ci.json` pins those exact staged bytes, but runtime paths are not installed.
+No export permission was granted, no default context activated, no publication
+consent enabled and no workflow moved into .github/workflows. Subsequent
+activation preparation must explicitly review export/publication consent, verify
+context drift against the intended baseline, refresh engine pins and budget proof,
+and present the final installation diff before owner activation approval.
+
+At verification time GitHub reported PR #3 OPEN, with no merge commit. These
+confirmation records are added to that existing PR; no merge is inferred.
