@@ -19,3 +19,15 @@ copied into this repository. Branch: `phase-6`; PR base: `main`.
   signature/native startup verification. Current engine pins remain unchanged.
 - Activation OFF: export permission, review defaults, publication consent and
   analysis/publication/check operations remain false; consumer workflows staged only.
+
+## 2026-10-24 — refreshed Linux release
+
+- PR #5 merged: `39b89ac088beb8823da738e9587c6ab07c315676`.
+- Current GitHub Free / USD 0 Actions and Packages hard stops verified by UI;
+  fresh twelve-hour observation passed the hosted guard on build attempt 2.
+- Release build and hosted attestation passed: run `40087980741`, attempt 2.
+- Package hashes and exact-source hosted signatures verified. Canary tag:
+  `canary-39b89ac088be`. Engine pins updated on `phase-6`, not main.
+- Native sandbox startup with the refreshed pins is pending.
+- Activation remains OFF; publication consent, export permission, defaults and
+  runtime operations unchanged. No consumer workflows installed.
