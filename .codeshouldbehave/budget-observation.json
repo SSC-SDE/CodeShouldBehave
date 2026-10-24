@@ -1,0 +1,22 @@
+{
+  "schema_version": "csb-public-operator-budget-v1",
+  "account": "SSC-SDE",
+  "source": "https://github.com/settings/billing/budgets",
+  "observed_at": "2026-10-24T19:52:56.593182Z",
+  "expires_at": "2026-10-25T07:52:56.593182Z",
+  "plan": "free",
+  "products": [
+    {
+      "product": "actions",
+      "budget_amount_usd": 0,
+      "prevent_further_usage": true,
+      "status": "usage_blocked"
+    },
+    {
+      "product": "packages",
+      "budget_amount_usd": 0,
+      "prevent_further_usage": true,
+      "status": "usage_blocked"
+    }
+  ]
+}

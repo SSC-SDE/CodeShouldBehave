@@ -44,3 +44,13 @@ copied into this repository. Branch: `phase-6`; PR base: `main`.
 - Export context regeneration, reviewed public budget proof, final hashes and
   complete activation diff remain pending explicit owner consent.
 - Activation remains OFF. No installer execution or runtime workflow placement.
+
+## 2026-10-25 — final activation prepared
+
+PR #7 merge verified: `0e5403557bf36bb01aede19eb0d28062dbf93716`. Owner
+requested activation. Fresh native export context retains the approved boundary,
+gaps and deferred integrations. Verified-runtime installer prepared seven runtime
+files including the public budget observation, policy and context. 82 public
+tests passed, four skipped; config/hashes/budget and main-only Pages access pass.
+See docs/ACTIVATION_STATUS.md. Pending final activation PR merge and actual live
+PR-to-dashboard verification; no live completion claim.
