@@ -55,6 +55,11 @@ jobs:
           engine=Path(os.environ['RUNNER_TEMP'])/'csb-engine'
           sys.path.insert(0,str(Path.cwd()/'scripts'))
           import public_ci as ci
+          # Report only fixed categories, never native output bytes.
+          source=Path('scripts/public_ci.py').read_text()
+          replacement='stderr.seek(0); diagnostic=stderr.read(4096).lower(); print("native_exit", process.returncode, "category", "memory" if b"memory" in diagnostic else "missing_file" if b"no such file" in diagnostic else "permission" if b"permission" in diagnostic else "context" if b"context" in diagnostic else "arguments" if b"argument" in diagnostic else "unknown"); raise Refusal("bounded subprocess failed (details withheld)")'
+          source=source.replace('raise Refusal("bounded subprocess failed (details withheld)")', replacement)
+          exec(compile(source, str(Path('scripts/public_ci.py').resolve()), 'exec'), ci.__dict__)
           cfg=json.loads(Path('.codeshouldbehave/public-ci.json').read_text())
           base='ad25c3feff864efb14c3187a08891e72bd588292'
           req=ci.request_for(cfg,{'pr_number':9,'selected_baseline':base,'proposal':os.environ['CANARY_HEAD']},{'head_sha':os.environ['GITHUB_SHA'],'id':int(os.environ['GITHUB_RUN_ID']),'run_attempt':int(os.environ['GITHUB_RUN_ATTEMPT'])},base,datetime.now(timezone.utc).isoformat().replace('+00:00','Z'))
