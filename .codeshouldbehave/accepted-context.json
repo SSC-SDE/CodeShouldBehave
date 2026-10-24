@@ -1,0 +1,137 @@
+{
+  "accepted_scope_fingerprint": "9a6f10d21315032c4e590cc3ae4498fda497308f71674417d9c44d30ba1b84e6",
+  "commit": "0e5403557bf36bb01aede19eb0d28062dbf93716",
+  "components": [
+    {
+      "confidence": "corroborated",
+      "contradictions": [
+        "Source sampling is limited to eight files per manifest root; roles and integrations outside the sample remain unknown",
+        "Static signals do not prove runtime use; conditional compilation, dependency aliases, grouped imports and generated code require confirmation"
+      ],
+      "decision": "confirmed",
+      "evidence": [
+        {
+          "blob": "1293ee1e4f45cb921b22ce858e4b972210fcb599",
+          "end_line": 47,
+          "path": "Cargo.toml",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 1
+        },
+        {
+          "blob": "c35ad14d98417f68a5ab94002662ff524def0c99",
+          "end_line": 575,
+          "path": "src/ai.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 1
+        },
+        {
+          "blob": "c31252d741d55d73de08c665573cef425a7cc95a",
+          "end_line": 463,
+          "path": "src/analysis.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 1
+        },
+        {
+          "blob": "e34f25f519d39872248677480b4528de1c270547",
+          "end_line": 1011,
+          "path": "src/architecture.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 1
+        },
+        {
+          "blob": "08e91a8859fb6ae28b47dcee6c8709c37a71aee4",
+          "end_line": 201,
+          "path": "src/bin/csb_onboarding.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 1
+        },
+        {
+          "blob": "2fa2407f1851f4cfc74a0c15dcec271b3246d620",
+          "end_line": 460,
+          "path": "src/bin/csb_onboarding/database_copy.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 1
+        },
+        {
+          "blob": "313779a28bd43379ccaa891c84c1b5800ad05940",
+          "end_line": 301,
+          "path": "src/bin/csb_onboarding/hld.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 1
+        },
+        {
+          "blob": "142d54e807d4d250870298823c69083113f94785",
+          "end_line": 771,
+          "path": "src/bin/csb_onboarding/lld.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 1
+        },
+        {
+          "blob": "b95ee27fc2c89edf6d6618f90f56ab47728a5470",
+          "end_line": 85,
+          "path": "src/bin/csb_public_report.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 1
+        }
+      ],
+      "id": "component-388998447a91011cea02fe4b40dcfe7fc7046aa70abe0465adc75b57bef56834",
+      "name": "Repository 1 \u00b7 .",
+      "repository_index": 0,
+      "role": "unclassified",
+      "roots": [
+        "Cargo.toml",
+        "src"
+      ],
+      "signals": [],
+      "stack_candidates": [
+        "Rust \u00b7 manifest candidate",
+        "Rust \u00b7 parsed source"
+      ]
+    }
+  ],
+  "confirmation": {
+    "actor": "setup-preparer",
+    "confirmed_at_ms": 1792871576587,
+    "input_fingerprint": "65b83b03d6edcb40145a104ce88ac1c1cdbe707dd9a578c0fbfe1d7308c89f94",
+    "known_gaps_accepted": true,
+    "proposal_fingerprint": "701588ac1043712e98b2653a5b633ef6393599aa54a1c7bb4912debf7c238af9"
+  },
+  "contexts": [],
+  "contracts": [],
+  "exclude": [
+    "src/fonts"
+  ],
+  "export_allowed": true,
+  "gaps": [
+    "2 scan limitations were explicitly accepted; inspect the protected onboarding session for source-qualified details"
+  ],
+  "include": [
+    "Cargo.toml",
+    "src"
+  ],
+  "input_fingerprint": "65b83b03d6edcb40145a104ce88ac1c1cdbe707dd9a578c0fbfe1d7308c89f94",
+  "integrations": [],
+  "proposal_fingerprint": "701588ac1043712e98b2653a5b633ef6393599aa54a1c7bb4912debf7c238af9",
+  "providers": [],
+  "repository": {
+    "name": "CodeShouldBehave",
+    "owner": "SSC-SDE",
+    "provider": "github",
+    "security_domain": "local"
+  },
+  "scope_version": "public-activation-v1",
+  "sensitive_paths_excluded": true,
+  "session_id": "public-activation-20261025",
+  "session_revision": 14,
+  "usable": true,
+  "version": "csb-accepted-context-v1"
+}

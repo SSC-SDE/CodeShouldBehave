@@ -1,0 +1,15 @@
+name: CodeShouldBehave nudge
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review, converted_to_draft, closed]
+permissions: {}
+concurrency:
+  group: csb-public-nudge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  wake:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 1
+    steps:
+      - name: Wake the trusted default-branch controller
+        run: ':'
