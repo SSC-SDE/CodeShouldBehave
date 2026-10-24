@@ -1,0 +1,25 @@
+--- a/.codeshouldbehave/public-policy.json
++++ b/.codeshouldbehave/public-policy.json
+@@ -6,7 +6,7 @@
+     "name": "CodeShouldBehave"
+   },
+   "public": true,
+-  "publication_consent": false,
++  "publication_consent": true,
+   "include": [
+     "Cargo.toml",
+     "src"
+--- a/.codeshouldbehave/public-ci.json
++++ b/.codeshouldbehave/public-ci.json
+@@ -37,8 +37,8 @@
+     "repository_byte_limit": 180355072
+   },
+   "operations": {
+-    "analysis": false,
+-    "publication": false,
+-    "checks": false
++    "analysis": true,
++    "publication": true,
++    "checks": true
+   }
+ }

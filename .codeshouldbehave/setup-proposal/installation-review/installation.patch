@@ -1,0 +1,574 @@
+--- /dev/null
++++ b/.github/workflows/csb-public-controller.yml
+@@ -0,0 +1,196 @@
++# Inactive template. Install only after explicit public-source/Pages consent and
++# attested Linux release pins. Never consume artifacts from the nudge run.
++name: CodeShouldBehave public controller
++on:
++  workflow_run:
++    workflows: [CodeShouldBehave nudge]
++    types: [completed]
++  schedule:
++    - cron: '*/10 * * * *'
++  workflow_dispatch:
++permissions: {}
++concurrency:
++  group: csb-public-controller-${{ github.repository_id }}
++  cancel-in-progress: false
++jobs:
++  plan:
++    runs-on: ubuntu-24.04
++    timeout-minutes: 15
++    permissions:
++      contents: read
++      actions: read
++      deployments: read
++      attestations: read
++    outputs:
++      matrix: ${{ steps.matrix.outputs.matrix }}
++      count: ${{ steps.matrix.outputs.count }}
++    steps:
++      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
++        with:
++          ref: ${{ github.workflow_sha }}
++          persist-credentials: false
++      - name: Load the attested fixed engine
++        env:
++          GH_TOKEN: ${{ github.token }}
++        run: python3 .codeshouldbehave/bootstrap.py --config .codeshouldbehave/public-ci.json --output "$RUNNER_TEMP/csb-engine"
++      - name: Resolve current provider identities and bounded queue
++        env:
++          GH_TOKEN: ${{ github.token }}
++        run: |
++          python3 "$RUNNER_TEMP/csb-engine/scripts/public_ci.py" github-plan --config .codeshouldbehave/public-ci.json --trusted-root "$GITHUB_WORKSPACE" --output "$RUNNER_TEMP/plan.json" --budget-dir "$RUNNER_TEMP/csb-rest-budget" --budget-output "$RUNNER_TEMP/budget.json" --budget-snapshot "$RUNNER_TEMP/plan-budget.json"
++          python3 "$RUNNER_TEMP/csb-engine/scripts/public_ci.py" prepare-matrix --plan "$RUNNER_TEMP/plan.json" --output "$RUNNER_TEMP/requests"
++      - id: matrix
++        name: Publish source-free matrix metadata
++        run: |
++          python3 - <<'PY'
++          import json,os
++          from pathlib import Path
++          value=json.loads((Path(os.environ['RUNNER_TEMP'])/'requests/matrix.json').read_text())
++          with open(os.environ['GITHUB_OUTPUT'],'a') as output:
++              output.write('matrix='+json.dumps(value,separators=(',',':'))+'\ncount='+str(len(value['include']))+'\n')
++          PY
++      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
++        with:
++          name: csb-public-plan-${{ github.run_id }}-${{ github.run_attempt }}
++          path: |
++            ${{ runner.temp }}/plan.json
++            ${{ runner.temp }}/requests
++            ${{ runner.temp }}/budget.json
++            ${{ runner.temp }}/plan-budget.json
++          retention-days: 1
++          compression-level: 0
++          if-no-files-found: error
++  analyze:
++    needs: plan
++    if: needs.plan.outputs.count != '0'
++    strategy:
++      fail-fast: false
++      max-parallel: 2
++      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
++    runs-on: ubuntu-22.04
++    timeout-minutes: 15
++    permissions:
++      contents: read
++      actions: read
++      deployments: read
++      attestations: read
++    steps:
++      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
++        with: {ref: '${{ github.workflow_sha }}', persist-credentials: false}
++      - env: {GH_TOKEN: '${{ github.token }}'}
++        run: python3 .codeshouldbehave/bootstrap.py --config .codeshouldbehave/public-ci.json --output "$RUNNER_TEMP/csb-engine"
++      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
++        with:
++          name: csb-public-plan-${{ github.run_id }}-${{ github.run_attempt }}
++          path: ${{ runner.temp }}/plan
++          digest-mismatch: error
++      - name: Install distribution Bubblewrap for the isolated analyzer
++        run: |
++          sudo apt-get update -qq
++          sudo apt-get install -y --no-install-recommends bubblewrap
++      - name: Parse exact Git objects as data in a networkless sandbox
++        env:
++          GH_TOKEN: ${{ github.token }}
++          REQUEST_ID: ${{ matrix.request_id }}
++        run: |
++          test -x /usr/bin/bwrap
++          /usr/bin/bwrap --unshare-all --clearenv --ro-bind /usr /usr --ro-bind-try /lib /lib --ro-bind-try /lib64 /lib64 --proc /proc --dev /dev -- /usr/bin/true
++          python3 "$RUNNER_TEMP/csb-engine/scripts/public_ci.py" analyze-request --config .codeshouldbehave/public-ci.json --trusted-root "$GITHUB_WORKSPACE" --request "$RUNNER_TEMP/plan/requests/$REQUEST_ID.json" --bin-dir "$RUNNER_TEMP/csb-engine/bin" --output "$RUNNER_TEMP/handoff" --budget-manifest "$RUNNER_TEMP/plan/budget.json" --budget-dir "$RUNNER_TEMP/csb-rest-budget"
++      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
++        with:
++          name: csb-public-handoff-${{ matrix.request_id }}
++          path: ${{ runner.temp }}/handoff
++          retention-days: 1
++          compression-level: 0
++          if-no-files-found: error
++  publish:
++    needs: [plan, analyze]
++    if: always() && needs.plan.result == 'success'
++    runs-on: ubuntu-24.04
++    timeout-minutes: 15
++    environment: github-pages
++    permissions:
++      contents: read
++      actions: write
++      deployments: write
++      attestations: write
++      id-token: write
++      pages: write
++      checks: write
++    steps:
++      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
++        with: {ref: '${{ github.workflow_sha }}', persist-credentials: false}
++      - env: {GH_TOKEN: '${{ github.token }}'}
++        run: python3 .codeshouldbehave/bootstrap.py --config .codeshouldbehave/public-ci.json --output "$RUNNER_TEMP/csb-engine"
++      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
++        with:
++          name: csb-public-plan-${{ github.run_id }}-${{ github.run_attempt }}
++          path: ${{ runner.temp }}/plan
++          digest-mismatch: error
++      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
++        with:
++          pattern: csb-public-handoff-*
++          path: ${{ runner.temp }}/handoffs
++          merge-multiple: false
++          digest-mismatch: error
++      - name: Start one trusted publisher with its durable REST ticket
++        env: {GH_TOKEN: '${{ github.token }}'}
++        run: |
++          mkdir -p "$RUNNER_TEMP/handoffs"
++          nohup python3 "$RUNNER_TEMP/csb-engine/scripts/public_ci.py" publisher-server --config .codeshouldbehave/public-ci.json --trusted-root "$GITHUB_WORKSPACE" --plan "$RUNNER_TEMP/plan/plan.json" --budget-manifest "$RUNNER_TEMP/plan/budget.json" --budget-dir "$RUNNER_TEMP/csb-rest-budget" --handoffs "$RUNNER_TEMP/handoffs" --project-root "$RUNNER_TEMP/csb-engine" --verifier "$RUNNER_TEMP/csb-engine/bin/csb-public-report" --work "$RUNNER_TEMP/csb-publisher" --allow-remote-writes >"$RUNNER_TEMP/csb-publisher.log" 2>&1 &
++      - id: stage
++        name: Verify exact public evidence and reserve the whole new snapshot
++        run: |
++          python3 "$RUNNER_TEMP/csb-engine/scripts/public_ci.py" publisher-call --socket "$RUNNER_TEMP/csb-publisher/control.sock" --phase stage --output "$RUNNER_TEMP/stage.json"
++          python3 - <<'PY'
++          import json,os
++          from pathlib import Path
++          value=json.loads((Path(os.environ['RUNNER_TEMP'])/'stage.json').read_text())
++          with open(os.environ['GITHUB_OUTPUT'],'a') as out: out.write('site='+str(value['site']).lower()+'\n')
++          PY
++      - if: steps.stage.outputs.site == 'true'
++        id: pages
++        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
++        with:
++          name: csb-public-pages-${{ github.run_id }}-${{ github.run_attempt }}
++          path: ${{ runner.temp }}/csb-publisher/publication/site
++          retention-days: 1
++      - if: steps.stage.outputs.site == 'true'
++        name: Prepare the pre-deployment intent
++        env:
++          ARTIFACT_ID: ${{ steps.pages.outputs.artifact_id }}
++        run: python3 "$RUNNER_TEMP/csb-engine/scripts/public_ci.py" publisher-call --socket "$RUNNER_TEMP/csb-publisher/control.sock" --phase intent --artifact-id "$ARTIFACT_ID" --output "$RUNNER_TEMP/intent-prepared.json"
++      - if: steps.stage.outputs.site == 'true'
++        id: intent-proof
++        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
++        with:
++          subject-path: ${{ runner.temp }}/csb-publisher/intent.json
++          predicate-type: https://codeshouldbehave.dev/attestations/public-state/v1
++          predicate-path: ${{ runner.temp }}/csb-publisher/intent.json
++          create-storage-record: false
++      - if: steps.stage.outputs.site == 'true'
++        name: Commit intent before creating the exact Pages deployment
++        env:
++          PROOF: ${{ steps.intent-proof.outputs.bundle-path }}
++        run: python3 "$RUNNER_TEMP/csb-engine/scripts/public_ci.py" publisher-call --socket "$RUNNER_TEMP/csb-publisher/control.sock" --phase deploy --proof "$PROOF" --output "$RUNNER_TEMP/deployed.json"
++      - name: Verify live readback or prepare cursor-only progress
++        run: python3 "$RUNNER_TEMP/csb-engine/scripts/public_ci.py" publisher-call --socket "$RUNNER_TEMP/csb-publisher/control.sock" --phase finalize --output "$RUNNER_TEMP/final-prepared.json"
++      - id: final-proof
++        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
++        with:
++          subject-path: ${{ runner.temp }}/csb-publisher/final.json
++          predicate-type: https://codeshouldbehave.dev/attestations/public-state/v1
++          predicate-path: ${{ runner.temp }}/csb-publisher/final.json
++          create-storage-record: false
++      - name: Commit durable evidence before creating Architecture checks
++        env:
++          PROOF: ${{ steps.final-proof.outputs.bundle-path }}
++        run: python3 "$RUNNER_TEMP/csb-engine/scripts/public_ci.py" publisher-call --socket "$RUNNER_TEMP/csb-publisher/control.sock" --phase commit --proof "$PROOF" --output "$RUNNER_TEMP/final-committed.json"
++      - if: always()
++        name: Stop only this job's publisher and retain its REST counter
++        run: |
++          if test -S "$RUNNER_TEMP/csb-publisher/control.sock"; then
++            python3 "$RUNNER_TEMP/csb-engine/scripts/public_ci.py" publisher-call --socket "$RUNNER_TEMP/csb-publisher/control.sock" --phase stop --output "$RUNNER_TEMP/publisher-stopped.json"
++          fi
++      - name: Verify all assigned REST stage evidence
++        run: python3 "$RUNNER_TEMP/csb-engine/scripts/public_ci.py" audit-budget --manifest "$RUNNER_TEMP/plan/budget.json" --plan-snapshot "$RUNNER_TEMP/plan/plan-budget.json" --handoffs "$RUNNER_TEMP/handoffs" --publish-snapshot "$RUNNER_TEMP/csb-publisher/budget.json" --output "$RUNNER_TEMP/pass-budget.json"
+--- /dev/null
++++ b/.github/workflows/csb-public-nudge.yml
+@@ -0,0 +1,15 @@
++name: CodeShouldBehave nudge
++on:
++  pull_request:
++    types: [opened, reopened, synchronize, ready_for_review, converted_to_draft, closed]
++permissions: {}
++concurrency:
++  group: csb-public-nudge-${{ github.event.pull_request.number }}
++  cancel-in-progress: true
++jobs:
++  wake:
++    runs-on: ubuntu-24.04
++    timeout-minutes: 1
++    steps:
++      - name: Wake the trusted default-branch controller
++        run: ':'
+--- /dev/null
++++ b/.codeshouldbehave/bootstrap.py
+@@ -0,0 +1,145 @@
++#!/usr/bin/env python3
++"""Fetch one pinned, attested Linux engine package. Never load reviewed code."""
++import argparse
++import gzip
++import hashlib
++import io
++import json
++import os
++from pathlib import Path, PurePosixPath
++import re
++import shutil
++import subprocess
++import tarfile
++import tempfile
++import urllib.parse
++import urllib.request
++
++CAP = 128 * 1024 * 1024
++NATIVE_PREDICATE = "https://github.com/SSC-SDE/codeshouldbehave/attestations/native-build/v1"
++HEX = re.compile(r"[0-9a-f]{64}\Z")
++URL = re.compile(r"https://github\.com/([A-Za-z0-9_.-]+)/([A-Za-z0-9_.-]+)/releases/download/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\.tar\.gz\Z")
++
++
++class Refusal(ValueError):
++    pass
++
++
++class ReleaseRedirect(urllib.request.HTTPRedirectHandler):
++    def redirect_request(self, request, fp, code, message, headers, new_url):
++        target = urllib.parse.urlsplit(new_url)
++        if target.scheme != "https" or target.username or target.password or target.hostname not in ("release-assets.githubusercontent.com", "objects.githubusercontent.com", "github.com"):
++            raise Refusal("Release asset redirect escaped the approved hosts")
++        return super().redirect_request(request, fp, code, message, headers, new_url)
++
++
++def fetch(config, output, *, opener=None, verifier=subprocess.run):
++    engine = config.get("engine", {})
++    match = URL.fullmatch(engine.get("package_url", ""))
++    sha = engine.get("package_sha256", "")
++    commit = engine.get("commit", "")
++    signer = engine.get("package_signer_workflow", "")
++    if not match or not HEX.fullmatch(sha) or sha == "0" * 64 or not re.fullmatch(r"[0-9a-f]{40}", commit) or commit == "0" * 40:
++        raise Refusal("A real fixed release URL, source commit and digest are required")
++    upstream = match[1] + "/" + match[2]
++    if not re.fullmatch(re.escape(upstream) + r"/\.github/workflows/[A-Za-z0-9_.-]+\.ya?ml", signer):
++        raise Refusal("The exact hosted release signer workflow must be pinned")
++    attestation_url = engine.get("package_attestation_url", "")
++    attestation_sha = engine.get("package_attestation_sha256", "")
++    expected_prefix = "https://github.com/" + upstream + "/releases/download/"
++    if not attestation_url.startswith(expected_prefix) or not re.fullmatch(r"https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/releases/download/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\.sigstore\.json", attestation_url) or not HEX.fullmatch(attestation_sha) or attestation_sha == "0" * 64:
++        raise Refusal("A digest-pinned release attestation bundle is required")
++    output = Path(output)
++    if output.exists() or output.is_symlink():
++        raise Refusal("Package output must be new")
++    output.parent.mkdir(parents=True, exist_ok=True)
++    with tempfile.TemporaryDirectory(prefix="csb-release-", dir=output.parent) as directory:
++        temporary = Path(directory)
++        archive = temporary / "engine.tar.gz"
++        client = opener or urllib.request.build_opener(ReleaseRedirect)
++        with client.open(engine["package_url"], timeout=30) as response, archive.open("xb") as target:
++            count, digest = 0, hashlib.sha256()
++            while True:
++                chunk = response.read(65536)
++                if not chunk:
++                    break
++                count += len(chunk)
++                if count > CAP:
++                    raise Refusal("Package download exceeds its byte budget")
++                digest.update(chunk); target.write(chunk)
++        if digest.hexdigest() != sha:
++            raise Refusal("Release archive digest mismatch")
++        proof = temporary / "release.sigstore.json"
++        with client.open(attestation_url, timeout=15) as response:
++            proof_bytes = response.read(256 * 1024 + 1)
++        if len(proof_bytes) > 256 * 1024 or hashlib.sha256(proof_bytes).hexdigest() != attestation_sha:
++            raise Refusal("Release attestation digest mismatch")
++        proof.write_bytes(proof_bytes)
++        verified = verifier(["gh", "attestation", "verify", str(archive), "--repo", upstream, "--bundle", str(proof),
++                             "--signer-workflow", signer, "--signer-digest", commit,
++                             "--source-digest", commit, "--deny-self-hosted-runners", "--predicate-type", NATIVE_PREDICATE, "--format", "json"],
++                            check=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60)
++        if verified.returncode or len(verified.stdout) > 2 * 1024 * 1024:
++            raise Refusal("Hosted release provenance verification failed")
++        # gh performs cryptographic verification; additionally reject a valid but
++        # private-source/self-hosted release that cannot be this public profile.
++        try:
++            results = json.loads(verified.stdout)
++            certificates = [value["verificationResult"]["signature"]["certificate"] for value in results]
++        except (KeyError, TypeError, ValueError) as exc:
++            raise Refusal("Release verifier returned no certificate") from exc
++        if not any(cert.get("sourceRepositoryVisibilityAtSigning") == "public" and cert.get("runnerEnvironment") == "github-hosted" and cert.get("sourceRepositoryDigest") == commit and cert.get("buildSignerDigest") == commit for cert in certificates):
++            raise Refusal("Release source visibility or hosted builder differs")
++        # Bound decompression before tar header parsing, including PAX headers.
++        with gzip.GzipFile(fileobj=io.BytesIO(archive.read_bytes())) as compressed:
++            expanded = compressed.read(CAP + 1)
++        if len(expanded) > CAP:
++            raise Refusal("Release expansion exceeds its byte budget")
++        staging = temporary / "package"; staging.mkdir()
++        seen, total = set(), 0
++        with tarfile.open(fileobj=io.BytesIO(expanded), mode="r:") as source:
++            for item in source:
++                path = PurePosixPath(item.name)
++                if path.is_absolute() or any(part in ("", ".", "..", ".git") for part in item.name.split("/")) or "\\" in item.name or item.name in seen or not item.isfile() or item.pax_headers or item.size < 0:
++                    raise Refusal("Unsafe release archive entry")
++                seen.add(item.name); total += item.size
++                if len(seen) > 20_000 or total > CAP:
++                    raise Refusal("Release file inventory exceeds its budget")
++                destination = staging / item.name; destination.parent.mkdir(parents=True, exist_ok=True)
++                data = source.extractfile(item)
++                if data is None:
++                    raise Refusal("Release entry missing")
++                with destination.open("xb") as target:
++                    shutil.copyfileobj(data, target, 65536)
++                destination.chmod(0o755 if item.name.startswith("bin/") else 0o644)
++        for name, key in (("flowdiff", "flowdiff_sha256"), ("csb-public-report", "exporter_sha256")):
++            path = staging / "bin" / name
++            if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != engine.get(key) or path.read_bytes()[:4] != b"\x7fELF":
++                raise Refusal("Pinned Linux native executable mismatch")
++        build = json.loads((staging / "native-build.json").read_bytes())
++        if build.get("source_commit") != commit or not re.fullmatch(r"x86_64-unknown-linux-(?:gnu|musl)", build.get("target", "")):
++            raise Refusal("Linux build source or target differs")
++        for relative in ("scripts/public_ci.py", "scripts/public_ci_budget.py", "scripts/public_site.py", "src/workspace.html", "src/workspace.js", "src/public-workspace.js"):
++            if relative not in seen:
++                raise Refusal("Release helper or dashboard asset missing")
++        staging.rename(output)
++    return output
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--config", required=True, type=Path)
++    parser.add_argument("--output", required=True, type=Path)
++    args = parser.parse_args()
++    try:
++        if args.config.is_symlink() or args.config.stat().st_size > 128 * 1024:
++            raise Refusal("Unsafe base-owned configuration")
++        fetch(json.loads(args.config.read_bytes()), args.output)
++    except (Refusal, OSError, ValueError, subprocess.SubprocessError, tarfile.TarError) as exc:
++        # Exception classes only: asset redirects can contain signed query URLs.
++        parser.exit(2, "Release bootstrap unavailable: " + type(exc).__name__ + "\n")
++    print("Attested pinned Linux engine ready")
++
++
++if __name__ == "__main__":
++    main()
+--- /dev/null
++++ b/.codeshouldbehave/public-policy.json
+@@ -0,0 +1,19 @@
++{
++  "schema_version": "csb-public-policy-v1",
++  "repository": {
++    "id": 1423092555,
++    "owner": "SSC-SDE",
++    "name": "CodeShouldBehave"
++  },
++  "public": true,
++  "publication_consent": false,
++  "include": [
++    "Cargo.toml",
++    "src"
++  ],
++  "exclude": [
++    "src/fonts"
++  ],
++  "baseline_mode": "merge_base",
++  "max_details": 100
++}
+--- /dev/null
++++ b/.codeshouldbehave/accepted-context.json
+@@ -0,0 +1,137 @@
++{
++  "accepted_scope_fingerprint": "efc68c3b77b1a4e0157295dd253e5497fc0004c76fbdbcff47a2bf3ab4e763e3",
++  "commit": "ad26461d57b58da1b3782c3854e57672ee9e82b2",
++  "components": [
++    {
++      "confidence": "corroborated",
++      "contradictions": [
++        "Source sampling is limited to eight files per manifest root; roles and integrations outside the sample remain unknown",
++        "Static signals do not prove runtime use; conditional compilation, dependency aliases, grouped imports and generated code require confirmation"
++      ],
++      "decision": "confirmed",
++      "evidence": [
++        {
++          "blob": "1293ee1e4f45cb921b22ce858e4b972210fcb599",
++          "end_line": 47,
++          "path": "Cargo.toml",
++          "producer_version": "csb-component-detectors-v2",
++          "repository_index": 0,
++          "start_line": 1
++        },
++        {
++          "blob": "c35ad14d98417f68a5ab94002662ff524def0c99",
++          "end_line": 575,
++          "path": "src/ai.rs",
++          "producer_version": "csb-component-detectors-v2",
++          "repository_index": 0,
++          "start_line": 1
++        },
++        {
++          "blob": "c31252d741d55d73de08c665573cef425a7cc95a",
++          "end_line": 463,
++          "path": "src/analysis.rs",
++          "producer_version": "csb-component-detectors-v2",
++          "repository_index": 0,
++          "start_line": 1
++        },
++        {
++          "blob": "e34f25f519d39872248677480b4528de1c270547",
++          "end_line": 1011,
++          "path": "src/architecture.rs",
++          "producer_version": "csb-component-detectors-v2",
++          "repository_index": 0,
++          "start_line": 1
++        },
++        {
++          "blob": "08e91a8859fb6ae28b47dcee6c8709c37a71aee4",
++          "end_line": 201,
++          "path": "src/bin/csb_onboarding.rs",
++          "producer_version": "csb-component-detectors-v2",
++          "repository_index": 0,
++          "start_line": 1
++        },
++        {
++          "blob": "2fa2407f1851f4cfc74a0c15dcec271b3246d620",
++          "end_line": 460,
++          "path": "src/bin/csb_onboarding/database_copy.rs",
++          "producer_version": "csb-component-detectors-v2",
++          "repository_index": 0,
++          "start_line": 1
++        },
++        {
++          "blob": "313779a28bd43379ccaa891c84c1b5800ad05940",
++          "end_line": 301,
++          "path": "src/bin/csb_onboarding/hld.rs",
++          "producer_version": "csb-component-detectors-v2",
++          "repository_index": 0,
++          "start_line": 1
++        },
++        {
++          "blob": "142d54e807d4d250870298823c69083113f94785",
++          "end_line": 771,
++          "path": "src/bin/csb_onboarding/lld.rs",
++          "producer_version": "csb-component-detectors-v2",
++          "repository_index": 0,
++          "start_line": 1
++        },
++        {
++          "blob": "b95ee27fc2c89edf6d6618f90f56ab47728a5470",
++          "end_line": 85,
++          "path": "src/bin/csb_public_report.rs",
++          "producer_version": "csb-component-detectors-v2",
++          "repository_index": 0,
++          "start_line": 1
++        }
++      ],
++      "id": "component-388998447a91011cea02fe4b40dcfe7fc7046aa70abe0465adc75b57bef56834",
++      "name": "Repository 1 \u00b7 .",
++      "repository_index": 0,
++      "role": "unclassified",
++      "roots": [
++        "Cargo.toml",
++        "src"
++      ],
++      "signals": [],
++      "stack_candidates": [
++        "Rust \u00b7 manifest candidate",
++        "Rust \u00b7 parsed source"
++      ]
++    }
++  ],
++  "confirmation": {
++    "actor": "setup-preparer",
++    "confirmed_at_ms": 1792824203678,
++    "input_fingerprint": "a062a4ea42f6f71cbc68544d735befdac8e6e23ffd0cf6fb6c2ca82def509f12",
++    "known_gaps_accepted": true,
++    "proposal_fingerprint": "41d43d9dd296e28a263a9e922772c62f356100c9dd9a3a25d9fb48fdade19a4d"
++  },
++  "contexts": [],
++  "contracts": [],
++  "exclude": [
++    "src/fonts"
++  ],
++  "export_allowed": false,
++  "gaps": [
++    "2 scan limitations were explicitly accepted; inspect the protected onboarding session for source-qualified details"
++  ],
++  "include": [
++    "Cargo.toml",
++    "src"
++  ],
++  "input_fingerprint": "a062a4ea42f6f71cbc68544d735befdac8e6e23ffd0cf6fb6c2ca82def509f12",
++  "integrations": [],
++  "proposal_fingerprint": "41d43d9dd296e28a263a9e922772c62f356100c9dd9a3a25d9fb48fdade19a4d",
++  "providers": [],
++  "repository": {
++    "name": "CodeShouldBehave",
++    "owner": "SSC-SDE",
++    "provider": "github",
++    "security_domain": "local"
++  },
++  "scope_version": "public-setup-proposal-v1",
++  "sensitive_paths_excluded": true,
++  "session_id": "public-setup-20261024",
++  "session_revision": 19,
++  "usable": true,
++  "version": "csb-accepted-context-v1"
++}
+--- /dev/null
++++ b/.codeshouldbehave/public-ci.json
+@@ -0,0 +1,44 @@
++{
++  "schema_version": "csb-public-ci-config-v1",
++  "repository": {
++    "id": 1423092555,
++    "owner": "SSC-SDE",
++    "name": "CodeShouldBehave"
++  },
++  "default_branch": "main",
++  "workflow_path": ".github/workflows/csb-public-controller.yml",
++  "workflow_sha256": "a93f79d5b6d440988c302c173ce8d5cf5ae812b84843597a39b625638e2aa02d",
++  "policy_path": ".codeshouldbehave/public-policy.json",
++  "policy_sha256": "036ab740206c6fe9aea4be31df2f1806abdd0eef16b0500695422e4139f5255a",
++  "context_path": ".codeshouldbehave/accepted-context.json",
++  "context_sha256": "4f5b26a23de40b0971dca2bf6ac42e61dd318a102217dd816a44bcdd8233d7be",
++  "engine": {
++    "commit": "39b89ac088beb8823da738e9587c6ab07c315676",
++    "flowdiff_sha256": "7fab95084c6c5466b908ac9702b31cffd757a45a5a9bdde55c6350e17d6ca13f",
++    "exporter_sha256": "40f4f1d50f7cb6ddfa98b1581302df89be63f593dac5eca0d9244f3bdb4301e1",
++    "package_url": "https://github.com/SSC-SDE/CodeShouldBehave/releases/download/canary-39b89ac088be/codeshouldbehave-x86_64-unknown-linux-gnu-39b89ac088be.tar.gz",
++    "package_sha256": "371bc977134dce04168492f2aa9d8528201e17cbacafa999ef33b3bb41c36d3f",
++    "package_signer_workflow": "SSC-SDE/CodeShouldBehave/.github/workflows/csb-engine-build.yml",
++    "package_attestation_url": "https://github.com/SSC-SDE/CodeShouldBehave/releases/download/canary-39b89ac088be/native-build.sigstore.json",
++    "package_attestation_sha256": "12ddf0fc11abc871008781780aa0a08d42ccdb9797b3337ad611893cafc56ce0"
++  },
++  "site": {
++    "origin": "https://ssc-sde.github.io",
++    "base_path": "/CodeShouldBehave/"
++  },
++  "receipt": {
++    "task": "csb-public-state-v1",
++    "environment": "csb-public-state",
++    "signer_workflow": "SSC-SDE/CodeShouldBehave/.github/workflows/csb-public-controller.yml"
++  },
++  "budget": {
++    "proof_mode": "unavailable",
++    "account": "SSC-SDE",
++    "repository_byte_limit": 180355072
++  },
++  "operations": {
++    "analysis": false,
++    "publication": false,
++    "checks": false
++  }
++}
