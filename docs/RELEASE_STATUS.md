@@ -45,3 +45,27 @@ credential-free empty sandbox, release download/signature verification and actua
 This proves startup compatibility, not complete PR analysis. Repository policy,
 accepted component context, controller installation, Pages/check publication and
 end-to-end acceptance are still pending. No automatic PR trigger is installed.
+
+## Refresh after PR #5 — 2026-10-24
+
+PR #5 merged at `39b89ac088beb8823da738e9587c6ab07c315676` (provider verified).
+Fresh account UI observation confirmed GitHub Free and account-wide Actions and
+Packages budgets at USD 0, Usage blocked. Existing controls were not changed.
+The observation remains private and expires after twelve hours.
+
+[Build 40087980741](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/40087980741)
+at that exact source passed on attempt 2. Attempt 1 stopped before compilation
+on a budget proof digest mismatch from trailing-newline transport; exact-byte
+normalization corrected the proof without relaxing its guard. Public contract
+tests, Ubuntu 22.04/Rust 1.87 build and hosted attestation passed.
+
+[Canary release](https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-39b89ac088be)
+contains both exact manifest-root corrections. Downloaded asset checksums and
+hosted public provenance passed verification with exact signer/source digests.
+Engine pins and the disabled setup proposal now reference this package.
+The unchanged bootstrap passed against the published URLs. Native startup passed
+in [preflight 40088281103](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/40088281103)
+on pin commit `e90ef4b6317451a4f6a0bd55155dc561109d6bcc`: signed Ubuntu
+Bubblewrap installation, credential-free/networkless sandbox and actual
+`flowdiff --version` execution all passed. This proves package startup, not a
+complete live PR-to-dashboard journey. Activation remains off.
