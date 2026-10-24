@@ -1,0 +1,32 @@
+[
+  {
+    "staged_source": ".codeshouldbehave/setup-proposal/workflows/csb-public-controller.yml",
+    "destination": ".github/workflows/csb-public-controller.yml",
+    "sha256": "a93f79d5b6d440988c302c173ce8d5cf5ae812b84843597a39b625638e2aa02d"
+  },
+  {
+    "staged_source": ".codeshouldbehave/setup-proposal/workflows/csb-public-nudge.yml",
+    "destination": ".github/workflows/csb-public-nudge.yml",
+    "sha256": "db82562db85ce02dd2f54769c971815d2135cec36ae21aa4173bb72f797ec53e"
+  },
+  {
+    "staged_source": ".codeshouldbehave/setup-proposal/bootstrap.py",
+    "destination": ".codeshouldbehave/bootstrap.py",
+    "sha256": "06b4306f00ff0f26dce4b3c0735d141aed063a59c51c83828a2b2eda6fa8348c"
+  },
+  {
+    "staged_source": ".codeshouldbehave/setup-proposal/public-policy.json",
+    "destination": ".codeshouldbehave/public-policy.json",
+    "sha256": "036ab740206c6fe9aea4be31df2f1806abdd0eef16b0500695422e4139f5255a"
+  },
+  {
+    "staged_source": ".codeshouldbehave/setup-proposal/accepted-context.json",
+    "destination": ".codeshouldbehave/accepted-context.json",
+    "sha256": "4f5b26a23de40b0971dca2bf6ac42e61dd318a102217dd816a44bcdd8233d7be"
+  },
+  {
+    "staged_source": ".codeshouldbehave/setup-proposal/public-ci.json",
+    "destination": ".codeshouldbehave/public-ci.json",
+    "sha256": "80e98c1da6d1359e4b2c0897eb70c12690925c4a19aa36393c032f6f37504974"
+  }
+]
