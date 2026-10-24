@@ -33,3 +33,15 @@ Pages deployment is enabled by this change.
 The unchanged bootstrap also passed against the actual published download URLs,
 verified the offline signature and ELF identities, and extracted the pinned
 binaries locally. Native Linux execution remains the next manual preflight.
+
+## Native startup verified
+
+Public PR #1 merged at `ad26461d57b58da1b3782c3854e57672ee9e82b2`.
+[Manual preflight 39756007309](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/39756007309)
+passed on that exact commit: signed Ubuntu Bubblewrap provisioning, the unchanged
+credential-free empty sandbox, release download/signature verification and actual
+`flowdiff --version` execution inside the networkless sandbox.
+
+This proves startup compatibility, not complete PR analysis. Repository policy,
+accepted component context, controller installation, Pages/check publication and
+end-to-end acceptance are still pending. No automatic PR trigger is installed.

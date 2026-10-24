@@ -1,0 +1,44 @@
+{
+  "schema_version": "csb-public-ci-config-v1",
+  "repository": {
+    "id": 1423092555,
+    "owner": "SSC-SDE",
+    "name": "CodeShouldBehave"
+  },
+  "default_branch": "main",
+  "workflow_path": ".github/workflows/csb-public-controller.yml",
+  "workflow_sha256": "a93f79d5b6d440988c302c173ce8d5cf5ae812b84843597a39b625638e2aa02d",
+  "policy_path": ".codeshouldbehave/public-policy.json",
+  "policy_sha256": "036ab740206c6fe9aea4be31df2f1806abdd0eef16b0500695422e4139f5255a",
+  "context_path": ".codeshouldbehave/accepted-context.json",
+  "context_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "engine": {
+    "commit": "2917f1bb352bd5cee38d5da9be5bf79817434eab",
+    "flowdiff_sha256": "7fab95084c6c5466b908ac9702b31cffd757a45a5a9bdde55c6350e17d6ca13f",
+    "exporter_sha256": "40f4f1d50f7cb6ddfa98b1581302df89be63f593dac5eca0d9244f3bdb4301e1",
+    "package_url": "https://github.com/SSC-SDE/CodeShouldBehave/releases/download/canary-2917f1bb352b/codeshouldbehave-x86_64-unknown-linux-gnu-2917f1bb352b.tar.gz",
+    "package_sha256": "cdeff22cf7e7da235f8e52cdb43b3ac5e35611e712b6c3e6cc6c323ed64dd7f2",
+    "package_signer_workflow": "SSC-SDE/CodeShouldBehave/.github/workflows/csb-engine-build.yml",
+    "package_attestation_url": "https://github.com/SSC-SDE/CodeShouldBehave/releases/download/canary-2917f1bb352b/native-build.sigstore.json",
+    "package_attestation_sha256": "aefb453e3e549b5d2b76b15a3a115dce029c556b99581a23dcc5a6d4a6d2a3c0"
+  },
+  "site": {
+    "origin": "https://ssc-sde.github.io",
+    "base_path": "/CodeShouldBehave/"
+  },
+  "receipt": {
+    "task": "csb-public-state-v1",
+    "environment": "csb-public-state",
+    "signer_workflow": "SSC-SDE/CodeShouldBehave/.github/workflows/csb-public-controller.yml"
+  },
+  "budget": {
+    "proof_mode": "unavailable",
+    "account": "SSC-SDE",
+    "repository_byte_limit": 180355072
+  },
+  "operations": {
+    "analysis": false,
+    "publication": false,
+    "checks": false
+  }
+}

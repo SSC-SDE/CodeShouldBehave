@@ -1,0 +1,1384 @@
+{
+  "accepted_context": {
+    "accepted_scope_fingerprint": "",
+    "commit": "ad26461d57b58da1b3782c3854e57672ee9e82b2",
+    "components": [],
+    "confirmation": null,
+    "contexts": [],
+    "contracts": [],
+    "exclude": [],
+    "export_allowed": false,
+    "gaps": [
+      "2 scan limitations were explicitly accepted; inspect the protected onboarding session for source-qualified details"
+    ],
+    "include": [],
+    "input_fingerprint": "a062a4ea42f6f71cbc68544d735befdac8e6e23ffd0cf6fb6c2ca82def509f12",
+    "integrations": [],
+    "proposal_fingerprint": "9d0a5d5a1d2e00aebf2c74df670310e85bf0b31e90b379b2dfa5e9b0d018f14a",
+    "providers": [],
+    "repository": {
+      "name": "CodeShouldBehave",
+      "owner": "SSC-SDE",
+      "provider": "github",
+      "security_domain": "local"
+    },
+    "scope_version": "public-setup-proposal-v1",
+    "sensitive_paths_excluded": true,
+    "session_id": "public-setup-20261024",
+    "session_revision": 8,
+    "usable": false,
+    "version": "csb-accepted-context-v1"
+  },
+  "ai_dispatch_available": false,
+  "api_version": "v1",
+  "candidate_roots": [
+    [
+      0,
+      "."
+    ]
+  ],
+  "commit": "ad26461d57b58da1b3782c3854e57672ee9e82b2",
+  "components": [
+    {
+      "confidence": "corroborated",
+      "contradictions": [
+        "Source sampling is limited to eight files per manifest root; roles and integrations outside the sample remain unknown",
+        "Static signals do not prove runtime use; conditional compilation, dependency aliases, grouped imports and generated code require confirmation"
+      ],
+      "decision": "pending",
+      "evidence": [
+        {
+          "blob": "1293ee1e4f45cb921b22ce858e4b972210fcb599",
+          "end_line": 47,
+          "path": "Cargo.toml",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 1
+        },
+        {
+          "blob": "c35ad14d98417f68a5ab94002662ff524def0c99",
+          "end_line": 1,
+          "path": "src/ai.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 1
+        },
+        {
+          "blob": "c35ad14d98417f68a5ab94002662ff524def0c99",
+          "end_line": 329,
+          "path": "src/ai.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 329
+        },
+        {
+          "blob": "c35ad14d98417f68a5ab94002662ff524def0c99",
+          "end_line": 330,
+          "path": "src/ai.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 330
+        },
+        {
+          "blob": "c35ad14d98417f68a5ab94002662ff524def0c99",
+          "end_line": 75,
+          "path": "src/ai.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 72
+        },
+        {
+          "blob": "c35ad14d98417f68a5ab94002662ff524def0c99",
+          "end_line": 575,
+          "path": "src/ai.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 1
+        },
+        {
+          "blob": "c31252d741d55d73de08c665573cef425a7cc95a",
+          "end_line": 396,
+          "path": "src/analysis.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 396
+        },
+        {
+          "blob": "c31252d741d55d73de08c665573cef425a7cc95a",
+          "end_line": 463,
+          "path": "src/analysis.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 1
+        },
+        {
+          "blob": "e34f25f519d39872248677480b4528de1c270547",
+          "end_line": 8,
+          "path": "src/architecture.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 1
+        },
+        {
+          "blob": "e34f25f519d39872248677480b4528de1c270547",
+          "end_line": 768,
+          "path": "src/architecture.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 768
+        },
+        {
+          "blob": "e34f25f519d39872248677480b4528de1c270547",
+          "end_line": 1011,
+          "path": "src/architecture.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 1
+        },
+        {
+          "blob": "08e91a8859fb6ae28b47dcee6c8709c37a71aee4",
+          "end_line": 201,
+          "path": "src/bin/csb_onboarding.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 1
+        },
+        {
+          "blob": "2fa2407f1851f4cfc74a0c15dcec271b3246d620",
+          "end_line": 5,
+          "path": "src/bin/csb_onboarding/database_copy.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 2
+        },
+        {
+          "blob": "2fa2407f1851f4cfc74a0c15dcec271b3246d620",
+          "end_line": 233,
+          "path": "src/bin/csb_onboarding/database_copy.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 233
+        },
+        {
+          "blob": "2fa2407f1851f4cfc74a0c15dcec271b3246d620",
+          "end_line": 460,
+          "path": "src/bin/csb_onboarding/database_copy.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 1
+        },
+        {
+          "blob": "313779a28bd43379ccaa891c84c1b5800ad05940",
+          "end_line": 301,
+          "path": "src/bin/csb_onboarding/hld.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 1
+        },
+        {
+          "blob": "142d54e807d4d250870298823c69083113f94785",
+          "end_line": 771,
+          "path": "src/bin/csb_onboarding/lld.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 1
+        },
+        {
+          "blob": "b95ee27fc2c89edf6d6618f90f56ab47728a5470",
+          "end_line": 85,
+          "path": "src/bin/csb_public_report.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 1
+        }
+      ],
+      "id": "component-388998447a91011cea02fe4b40dcfe7fc7046aa70abe0465adc75b57bef56834",
+      "name": "Repository 1 \u00b7 .",
+      "repository_index": 0,
+      "role": "unclassified",
+      "roots": [
+        "Cargo.toml",
+        "src"
+      ],
+      "signals": [
+        {
+          "evidence_index": 1,
+          "kind": "internal contract",
+          "name": "Internal module import",
+          "reason": "An internal module import is observed; component ownership and target resolution remain unresolved; scope is not expanded",
+          "test_only": false
+        },
+        {
+          "evidence_index": 2,
+          "kind": "internal contract",
+          "name": "Internal module import",
+          "reason": "An internal module import is observed; component ownership and target resolution remain unresolved; scope is not expanded",
+          "test_only": true
+        },
+        {
+          "evidence_index": 3,
+          "kind": "internal contract",
+          "name": "Internal module import",
+          "reason": "An internal module import is observed; component ownership and target resolution remain unresolved; scope is not expanded",
+          "test_only": true
+        },
+        {
+          "evidence_index": 4,
+          "kind": "interface contract",
+          "name": "ModelAdapter",
+          "reason": "A Rust trait is declared; public exposure, implementation correspondence and cross-component ownership remain unresolved",
+          "test_only": false
+        },
+        {
+          "evidence_index": 6,
+          "kind": "internal contract",
+          "name": "Internal module import",
+          "reason": "An internal module import is observed; component ownership and target resolution remain unresolved; scope is not expanded",
+          "test_only": true
+        },
+        {
+          "evidence_index": 8,
+          "kind": "internal contract",
+          "name": "Internal module import",
+          "reason": "An internal module import is observed; component ownership and target resolution remain unresolved; scope is not expanded",
+          "test_only": false
+        },
+        {
+          "evidence_index": 9,
+          "kind": "internal contract",
+          "name": "Internal module import",
+          "reason": "An internal module import is observed; component ownership and target resolution remain unresolved; scope is not expanded",
+          "test_only": true
+        },
+        {
+          "evidence_index": 12,
+          "kind": "database",
+          "name": "Rusqlite",
+          "reason": "A SQLite API is imported; database creation, ownership and active access remain unverified",
+          "test_only": false
+        },
+        {
+          "evidence_index": 13,
+          "kind": "internal contract",
+          "name": "Internal module import",
+          "reason": "An internal module import is observed; component ownership and target resolution remain unresolved; scope is not expanded",
+          "test_only": true
+        }
+      ],
+      "stack_candidates": [
+        "Internal module import \u00b7 static import",
+        "Internal module import \u00b7 test-scoped import",
+        "Rusqlite \u00b7 static import",
+        "Rust \u00b7 manifest candidate",
+        "Rust \u00b7 parsed source"
+      ]
+    }
+  ],
+  "confirmation": null,
+  "confirmation_readiness": {
+    "components_pending": 1,
+    "integrations_pending": 0,
+    "known_gaps_required": true,
+    "providers_pending": 0,
+    "ready": false
+  },
+  "contexts": [],
+  "exclude": [
+    "src/fonts"
+  ],
+  "gaps": [
+    "A component has no supported hosting evidence; provider may be unknown, self-hosted, different, or not deployed",
+    "Unsupported inventory: 8 paths; component coverage incomplete"
+  ],
+  "id": "public-setup-20261024",
+  "include": [
+    "Cargo.toml",
+    "src"
+  ],
+  "input_fingerprint": "a062a4ea42f6f71cbc68544d735befdac8e6e23ffd0cf6fb6c2ca82def509f12",
+  "integrations": [
+    {
+      "answer": null,
+      "component_id": "component-388998447a91011cea02fe4b40dcfe7fc7046aa70abe0465adc75b57bef56834",
+      "decision": "pending",
+      "evidence": [
+        {
+          "blob": "2fa2407f1851f4cfc74a0c15dcec271b3246d620",
+          "end_line": 5,
+          "path": "src/bin/csb_onboarding/database_copy.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 2
+        }
+      ],
+      "id": "integration-7a97185de684a1c05dcff72b44f4bbf45ac773da0e56f4ace523ebe2c9822c43",
+      "kind": "database",
+      "name": "Rusqlite",
+      "reason": "A SQLite API is imported; database creation, ownership and active access remain unverified",
+      "test_only": false
+    },
+    {
+      "answer": null,
+      "component_id": "component-388998447a91011cea02fe4b40dcfe7fc7046aa70abe0465adc75b57bef56834",
+      "decision": "pending",
+      "evidence": [
+        {
+          "blob": "c35ad14d98417f68a5ab94002662ff524def0c99",
+          "end_line": 75,
+          "path": "src/ai.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 72
+        }
+      ],
+      "id": "integration-c326c5b69a54e6e25ddda9beb49aaaf89a2faeb019cdcfb2d3bb88fab238ae9b",
+      "kind": "interface contract",
+      "name": "ModelAdapter",
+      "reason": "A Rust trait is declared; public exposure, implementation correspondence and cross-component ownership remain unresolved",
+      "test_only": false
+    },
+    {
+      "answer": null,
+      "component_id": "component-388998447a91011cea02fe4b40dcfe7fc7046aa70abe0465adc75b57bef56834",
+      "decision": "pending",
+      "evidence": [
+        {
+          "blob": "c35ad14d98417f68a5ab94002662ff524def0c99",
+          "end_line": 1,
+          "path": "src/ai.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 1
+        },
+        {
+          "blob": "e34f25f519d39872248677480b4528de1c270547",
+          "end_line": 8,
+          "path": "src/architecture.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 1
+        }
+      ],
+      "id": "integration-95d3cb4e4a96e33e11d6417521da28b1055e6936d4aa67a7dd44b976bcbdc2a7",
+      "kind": "internal contract",
+      "name": "Internal module import",
+      "reason": "An internal module import is observed; component ownership and target resolution remain unresolved; scope is not expanded",
+      "test_only": false
+    },
+    {
+      "answer": null,
+      "component_id": "component-388998447a91011cea02fe4b40dcfe7fc7046aa70abe0465adc75b57bef56834",
+      "decision": "pending",
+      "evidence": [
+        {
+          "blob": "c35ad14d98417f68a5ab94002662ff524def0c99",
+          "end_line": 329,
+          "path": "src/ai.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 329
+        },
+        {
+          "blob": "c35ad14d98417f68a5ab94002662ff524def0c99",
+          "end_line": 330,
+          "path": "src/ai.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 330
+        },
+        {
+          "blob": "c31252d741d55d73de08c665573cef425a7cc95a",
+          "end_line": 396,
+          "path": "src/analysis.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 396
+        },
+        {
+          "blob": "e34f25f519d39872248677480b4528de1c270547",
+          "end_line": 768,
+          "path": "src/architecture.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 768
+        },
+        {
+          "blob": "2fa2407f1851f4cfc74a0c15dcec271b3246d620",
+          "end_line": 233,
+          "path": "src/bin/csb_onboarding/database_copy.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 233
+        }
+      ],
+      "id": "integration-84b08d41cee4c8ffc0eb4ee88d7a627d29e5006b87058df66119b0501931e4d6",
+      "kind": "internal contract",
+      "name": "Internal module import",
+      "reason": "An internal module import is observed; component ownership and target resolution remain unresolved; scope is not expanded",
+      "test_only": true
+    }
+  ],
+  "inventory": {
+    "complete": true,
+    "deferred": 0,
+    "enumeration_complete": true,
+    "excluded": 272,
+    "failed": 0,
+    "gaps": [],
+    "items": [
+      {
+        "blob": "1293ee1e4f45cb921b22ce858e4b972210fcb599",
+        "kind": "manifest",
+        "path": "Cargo.toml",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "c35ad14d98417f68a5ab94002662ff524def0c99",
+        "kind": "source",
+        "path": "src/ai.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "c31252d741d55d73de08c665573cef425a7cc95a",
+        "kind": "source",
+        "path": "src/analysis.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "e34f25f519d39872248677480b4528de1c270547",
+        "kind": "source",
+        "path": "src/architecture.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "08e91a8859fb6ae28b47dcee6c8709c37a71aee4",
+        "kind": "source",
+        "path": "src/bin/csb_onboarding.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "2fa2407f1851f4cfc74a0c15dcec271b3246d620",
+        "kind": "source",
+        "path": "src/bin/csb_onboarding/database_copy.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "313779a28bd43379ccaa891c84c1b5800ad05940",
+        "kind": "source",
+        "path": "src/bin/csb_onboarding/hld.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "142d54e807d4d250870298823c69083113f94785",
+        "kind": "source",
+        "path": "src/bin/csb_onboarding/lld.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "b95ee27fc2c89edf6d6618f90f56ab47728a5470",
+        "kind": "source",
+        "path": "src/bin/csb_public_report.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "0ab716a70db2c91138aa030e0b8fa556b4b32b46",
+        "kind": "source",
+        "path": "src/context.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "3c8f64397ca573af1c93809fbaeee415150cc702",
+        "kind": "source",
+        "path": "src/core.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "f3b4018a408dc3446408c90693008675d998e1f2",
+        "kind": "source",
+        "path": "src/design.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "73d5aa37270c0c416fa2034e3f4dbb749f4f741a",
+        "kind": "source",
+        "path": "src/design/diff.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "adaa923dd7715b71729003e9c9e703e71b6f973d",
+        "kind": "source",
+        "path": "src/design/generate.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "4a1c08b108d3d51e136d41111f032ddd7266bce6",
+        "kind": "source",
+        "path": "src/design/render.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "f7d3b883c624cc02e6bff44d46bf96ded7cc2826",
+        "kind": "source",
+        "path": "src/design/tests.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "81db0464fbe6964c0d9355defdab7093058ff49b",
+        "kind": "source",
+        "path": "src/design/wire.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "34d6ee36828cf5d90060964f90f7ad13209b7044",
+        "kind": "source",
+        "path": "src/design_storage.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "d346e1359aaac33f7ccea7770ec51c45dd566c0b",
+        "kind": "source",
+        "path": "src/git.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "12c93cd8613d4cd7de6b0ac8691af4419ebbde21",
+        "kind": "source",
+        "path": "src/github_check.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "3016dcd724ce0d28856e8923c607619e5be3a63e",
+        "kind": "unsupported",
+        "path": "src/github_mvp.html",
+        "repository_index": 0,
+        "status": "unsupported",
+        "variable_names": []
+      },
+      {
+        "blob": "da1727196f0b861b30b2ddb9d317378c6dfbcf6d",
+        "kind": "source",
+        "path": "src/github_mvp.js",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "f80c83dc0be73c5d6655c90e1f65706504a28432",
+        "kind": "source",
+        "path": "src/http.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "8393bb7d0ed01adcb19cd946ff9a8f95ace0232d",
+        "kind": "source",
+        "path": "src/incremental.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "e4162a4f1614638b79208d9e0d926808ab3d1534",
+        "kind": "source",
+        "path": "src/lib.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "06574e66a69cccc5528c53cc95ee971ff5794c35",
+        "kind": "source",
+        "path": "src/lld.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "28915f6ed27b14e4d675272764eaaee1cf0bdda3",
+        "kind": "source",
+        "path": "src/lld/blob.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "95590d5d925d8c9f01e225d30d751b6eba5760f9",
+        "kind": "source",
+        "path": "src/lld/catalog.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "f894ae9ac22cafd06f1401c78a76348969d71eb1",
+        "kind": "source",
+        "path": "src/lld/diff.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "b027037b37168f228cd80d12e5d740598c34d050",
+        "kind": "source",
+        "path": "src/lld/flow.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "54c698f2352712b062c1b74e6090cfa8a028f271",
+        "kind": "source",
+        "path": "src/lld/flow_tests.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "7e6facc11975d8bf15682f0b98ad0bbd4e3d5d40",
+        "kind": "source",
+        "path": "src/lld/render.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "61da2375e08cd451b734e651497902f58e8cd497",
+        "kind": "source",
+        "path": "src/lld/tests.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "5f8f15ee8af44eaf6bd06a971142085203ee63c4",
+        "kind": "source",
+        "path": "src/main.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "d7551a80d1ff0c51e0dc3186ddd016b470d9f6b7",
+        "kind": "source",
+        "path": "src/model.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "b62abb20b26e3f5a1b90f84c7773d09c689af6a9",
+        "kind": "unsupported",
+        "path": "src/onboarding.css",
+        "repository_index": 0,
+        "status": "unsupported",
+        "variable_names": []
+      },
+      {
+        "blob": "a29a5b0cc7bbaa248789244a3dab6d9742549292",
+        "kind": "unsupported",
+        "path": "src/onboarding.html",
+        "repository_index": 0,
+        "status": "unsupported",
+        "variable_names": []
+      },
+      {
+        "blob": "12841b166663201071da84c879599cf12ad7cac4",
+        "kind": "source",
+        "path": "src/onboarding.js",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "dc596bc16d2cd10420ee4635ce5e3319515a4ad0",
+        "kind": "source",
+        "path": "src/onboarding.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "e455b6fcd4b41ae2b6c7992343b962330d7f8225",
+        "kind": "source",
+        "path": "src/onboarding/drift.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "a5436f5649afa941b81ce5a46aff4915f55710fd",
+        "kind": "source",
+        "path": "src/onboarding/providers.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "2eea5a9e70ac258713790295d98a5fe5cbfde699",
+        "kind": "source",
+        "path": "src/onboarding/questions.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "c409d6330bcef5c0878d3d46c4d6cc2c2d6dbe87",
+        "kind": "source",
+        "path": "src/onboarding_detection.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "4bc5b38b2637cd7cbedd1f4d2fef7ab434345e69",
+        "kind": "source",
+        "path": "src/onboarding_review.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "df0c916174f53cdbddacc83de548ecc024a849d2",
+        "kind": "source",
+        "path": "src/onboarding_scan.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "e15f1dce5fd63c91e5c477be049e6144ee4f9a39",
+        "kind": "source",
+        "path": "src/onboarding_service.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "4b7485fdf4ad14aeb1993c09bd9153a799631612",
+        "kind": "source",
+        "path": "src/operations.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "22b633a5f83ebd26cd49d2b3b0ecb04b528328b5",
+        "kind": "source",
+        "path": "src/parser.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "0a0357543e0b4b08d3db92855f8509801047665f",
+        "kind": "source",
+        "path": "src/policy.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "daa5e888fed54289d79cebd38b6dfed7b2827690",
+        "kind": "source",
+        "path": "src/provider.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "340bdd5038773a3e65f102addbb991ff9061920e",
+        "kind": "source",
+        "path": "src/public-workspace.js",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "c16a73f258fcdea3681d96bdf6bcf9ab8ab7cdac",
+        "kind": "source",
+        "path": "src/public_report/mod.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "d8cc8e8aaf71abd19aaeafb6a1a80775c70c6cdc",
+        "kind": "source",
+        "path": "src/public_report/policy.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "4692eaf42365384618d086207d3dc089df971ef2",
+        "kind": "source",
+        "path": "src/public_report/project.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "8b93bf716fecf90771dc671bc1785e59f9af2244",
+        "kind": "source",
+        "path": "src/public_report/validate.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "506c5257c91e2ec153c88566a926d1bd97a75a04",
+        "kind": "source",
+        "path": "src/public_report/write.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "3b9ae4fdbb0a1876471de8458646510ea76bf1ef",
+        "kind": "unsupported",
+        "path": "src/report-dark.css",
+        "repository_index": 0,
+        "status": "unsupported",
+        "variable_names": []
+      },
+      {
+        "blob": "431d1c1c509f43663a619826be4943d52d0bd920",
+        "kind": "source",
+        "path": "src/report.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "46bc539e31ed879cdd56674b6fd90c168e972b43",
+        "kind": "source",
+        "path": "src/review_artifact.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "28e819ed97f4c8b589fbed3bbb8e8e6eba708494",
+        "kind": "source",
+        "path": "src/rollout.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "9aa4b42ccfc95c9af076df05f07cb52b995ec321",
+        "kind": "source",
+        "path": "src/scheduler.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "39ac379853a9415e92911c3dc758450a4e0aab2e",
+        "kind": "source",
+        "path": "src/service.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "e6acf0fa7251e06e4420b2685e154559c7a47b92",
+        "kind": "source",
+        "path": "src/snapshot.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "40cce29d6de26cb1ef640f4178f3016d96d628b0",
+        "kind": "source",
+        "path": "src/storage.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "7e1fa2d54aa9af975466ee11aec6cfc45fcd23f3",
+        "kind": "unsupported",
+        "path": "src/style.css",
+        "repository_index": 0,
+        "status": "unsupported",
+        "variable_names": []
+      },
+      {
+        "blob": "3032b24dc9a9160b3c1e12246864941a3043d580",
+        "kind": "source",
+        "path": "src/ui.js",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "d3a3f0cdc6a4e8cc34c062089b2a12d31ff646e6",
+        "kind": "source",
+        "path": "src/workspace-preferences.js",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "6762f0468dbc2332bafdb861f1b9627bec8dabb9",
+        "kind": "unsupported",
+        "path": "src/workspace-registry.json",
+        "repository_index": 0,
+        "status": "unsupported",
+        "variable_names": []
+      },
+      {
+        "blob": "66fbb638dccef9d8aab2e7019596408fceca15c9",
+        "kind": "unsupported",
+        "path": "src/workspace.css",
+        "repository_index": 0,
+        "status": "unsupported",
+        "variable_names": []
+      },
+      {
+        "blob": "e92d0659189931def5e5a8b667afc5a21832128f",
+        "kind": "unsupported",
+        "path": "src/workspace.html",
+        "repository_index": 0,
+        "status": "unsupported",
+        "variable_names": []
+      },
+      {
+        "blob": "53821aed7b858bb538b7f4e09f9e2c7a7e6286d5",
+        "kind": "source",
+        "path": "src/workspace.js",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      },
+      {
+        "blob": "c538e42cc95798a5224a82b1f7b04f6c1ab3d83f",
+        "kind": "source",
+        "path": "src/workspace_preferences.rs",
+        "repository_index": 0,
+        "status": "indexed",
+        "variable_names": []
+      }
+    ],
+    "manifest_fingerprint": "a062a4ea42f6f71cbc68544d735befdac8e6e23ffd0cf6fb6c2ca82def509f12",
+    "offset": 0,
+    "repository_index": 1,
+    "sensitive_excluded": 0,
+    "unsupported": 8,
+    "version": "csb-inventory-v2"
+  },
+  "onboarding_version": "csb-onboarding-v1",
+  "proposal_fingerprint": "9d0a5d5a1d2e00aebf2c74df670310e85bf0b31e90b379b2dfa5e9b0d018f14a",
+  "providers": [],
+  "questions": [
+    {
+      "category": "component",
+      "component_id": "component-388998447a91011cea02fe4b40dcfe7fc7046aa70abe0465adc75b57bef56834",
+      "decision": "pending",
+      "evidence": [
+        {
+          "blob": "1293ee1e4f45cb921b22ce858e4b972210fcb599",
+          "end_line": 47,
+          "path": "Cargo.toml",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 1
+        },
+        {
+          "blob": "c35ad14d98417f68a5ab94002662ff524def0c99",
+          "end_line": 1,
+          "path": "src/ai.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 1
+        },
+        {
+          "blob": "c35ad14d98417f68a5ab94002662ff524def0c99",
+          "end_line": 329,
+          "path": "src/ai.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 329
+        },
+        {
+          "blob": "c35ad14d98417f68a5ab94002662ff524def0c99",
+          "end_line": 330,
+          "path": "src/ai.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 330
+        },
+        {
+          "blob": "c35ad14d98417f68a5ab94002662ff524def0c99",
+          "end_line": 75,
+          "path": "src/ai.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 72
+        },
+        {
+          "blob": "c35ad14d98417f68a5ab94002662ff524def0c99",
+          "end_line": 575,
+          "path": "src/ai.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 1
+        },
+        {
+          "blob": "c31252d741d55d73de08c665573cef425a7cc95a",
+          "end_line": 396,
+          "path": "src/analysis.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 396
+        },
+        {
+          "blob": "c31252d741d55d73de08c665573cef425a7cc95a",
+          "end_line": 463,
+          "path": "src/analysis.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 1
+        },
+        {
+          "blob": "e34f25f519d39872248677480b4528de1c270547",
+          "end_line": 8,
+          "path": "src/architecture.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 1
+        },
+        {
+          "blob": "e34f25f519d39872248677480b4528de1c270547",
+          "end_line": 768,
+          "path": "src/architecture.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 768
+        },
+        {
+          "blob": "e34f25f519d39872248677480b4528de1c270547",
+          "end_line": 1011,
+          "path": "src/architecture.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 1
+        },
+        {
+          "blob": "08e91a8859fb6ae28b47dcee6c8709c37a71aee4",
+          "end_line": 201,
+          "path": "src/bin/csb_onboarding.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 1
+        },
+        {
+          "blob": "2fa2407f1851f4cfc74a0c15dcec271b3246d620",
+          "end_line": 5,
+          "path": "src/bin/csb_onboarding/database_copy.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 2
+        },
+        {
+          "blob": "2fa2407f1851f4cfc74a0c15dcec271b3246d620",
+          "end_line": 233,
+          "path": "src/bin/csb_onboarding/database_copy.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 233
+        },
+        {
+          "blob": "2fa2407f1851f4cfc74a0c15dcec271b3246d620",
+          "end_line": 460,
+          "path": "src/bin/csb_onboarding/database_copy.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 1
+        },
+        {
+          "blob": "313779a28bd43379ccaa891c84c1b5800ad05940",
+          "end_line": 301,
+          "path": "src/bin/csb_onboarding/hld.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 1
+        },
+        {
+          "blob": "142d54e807d4d250870298823c69083113f94785",
+          "end_line": 771,
+          "path": "src/bin/csb_onboarding/lld.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 1
+        },
+        {
+          "blob": "b95ee27fc2c89edf6d6618f90f56ab47728a5470",
+          "end_line": 85,
+          "path": "src/bin/csb_public_report.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 1
+        }
+      ],
+      "fingerprint": "415b635935c6adc86bb39be43c5ddae6224177f2b92965a05a0fe6ef1dc6c5e5",
+      "id": "component:component-388998447a91011cea02fe4b40dcfe7fc7046aa70abe0465adc75b57bef56834",
+      "integration_id": null,
+      "options": [
+        {
+          "label": "Confirm",
+          "value": "confirmed"
+        },
+        {
+          "label": "Correct",
+          "value": "corrected"
+        },
+        {
+          "label": "Exclude",
+          "value": "rejected"
+        },
+        {
+          "label": "Defer",
+          "value": "deferred"
+        }
+      ],
+      "prompt": "Include Repository 1 \u00b7 . as unclassified at the proposed roots?",
+      "provider_index": null,
+      "reason": "This decision selects architecture boundaries and source paths; observed imports remain qualified evidence. No credentials or secret values are requested."
+    },
+    {
+      "category": "integration",
+      "component_id": "component-388998447a91011cea02fe4b40dcfe7fc7046aa70abe0465adc75b57bef56834",
+      "decision": "pending",
+      "evidence": [
+        {
+          "blob": "2fa2407f1851f4cfc74a0c15dcec271b3246d620",
+          "end_line": 5,
+          "path": "src/bin/csb_onboarding/database_copy.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 2
+        }
+      ],
+      "fingerprint": "51b079d9e6ba3155a6ea715bf7559bf927ded3f9c486f5069798313d718f6939",
+      "id": "integration-7a97185de684a1c05dcff72b44f4bbf45ac773da0e56f4ace523ebe2c9822c43",
+      "integration_id": "integration-7a97185de684a1c05dcff72b44f4bbf45ac773da0e56f4ace523ebe2c9822c43",
+      "options": [
+        {
+          "label": "Include observed context",
+          "value": "include"
+        },
+        {
+          "label": "Exclude",
+          "value": "exclude"
+        },
+        {
+          "label": "Defer",
+          "value": "defer"
+        }
+      ],
+      "prompt": "Include Rusqlite (database) in the architecture context?",
+      "provider_index": null,
+      "reason": "A SQLite API is imported; database creation, ownership and active access remain unverified Include retains only these approved source observations; external documentation and newly referenced repositories are not fetched."
+    },
+    {
+      "category": "integration",
+      "component_id": "component-388998447a91011cea02fe4b40dcfe7fc7046aa70abe0465adc75b57bef56834",
+      "decision": "pending",
+      "evidence": [
+        {
+          "blob": "c35ad14d98417f68a5ab94002662ff524def0c99",
+          "end_line": 75,
+          "path": "src/ai.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 72
+        }
+      ],
+      "fingerprint": "4d34f6ce4dd69ec36675118de9ef303ad154957f49ce0efcc04cedf7a9a17015",
+      "id": "integration-c326c5b69a54e6e25ddda9beb49aaaf89a2faeb019cdcfb2d3bb88fab238ae9b",
+      "integration_id": "integration-c326c5b69a54e6e25ddda9beb49aaaf89a2faeb019cdcfb2d3bb88fab238ae9b",
+      "options": [
+        {
+          "label": "Include observed context",
+          "value": "include"
+        },
+        {
+          "label": "Exclude",
+          "value": "exclude"
+        },
+        {
+          "label": "Defer",
+          "value": "defer"
+        }
+      ],
+      "prompt": "Include ModelAdapter (interface contract) in the architecture context?",
+      "provider_index": null,
+      "reason": "A Rust trait is declared; public exposure, implementation correspondence and cross-component ownership remain unresolved Include retains only these approved source observations; external documentation and newly referenced repositories are not fetched."
+    },
+    {
+      "category": "integration",
+      "component_id": "component-388998447a91011cea02fe4b40dcfe7fc7046aa70abe0465adc75b57bef56834",
+      "decision": "pending",
+      "evidence": [
+        {
+          "blob": "c35ad14d98417f68a5ab94002662ff524def0c99",
+          "end_line": 1,
+          "path": "src/ai.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 1
+        },
+        {
+          "blob": "e34f25f519d39872248677480b4528de1c270547",
+          "end_line": 8,
+          "path": "src/architecture.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 1
+        }
+      ],
+      "fingerprint": "e9bd1157798b993965648868575baf6a671abf6d7a4596db6f9145b4f031a482",
+      "id": "integration-95d3cb4e4a96e33e11d6417521da28b1055e6936d4aa67a7dd44b976bcbdc2a7",
+      "integration_id": "integration-95d3cb4e4a96e33e11d6417521da28b1055e6936d4aa67a7dd44b976bcbdc2a7",
+      "options": [
+        {
+          "label": "Include observed context",
+          "value": "include"
+        },
+        {
+          "label": "Exclude",
+          "value": "exclude"
+        },
+        {
+          "label": "Defer",
+          "value": "defer"
+        }
+      ],
+      "prompt": "Include Internal module import (internal contract) in the architecture context?",
+      "provider_index": null,
+      "reason": "An internal module import is observed; component ownership and target resolution remain unresolved; scope is not expanded Include retains only these approved source observations; external documentation and newly referenced repositories are not fetched."
+    },
+    {
+      "category": "integration",
+      "component_id": "component-388998447a91011cea02fe4b40dcfe7fc7046aa70abe0465adc75b57bef56834",
+      "decision": "pending",
+      "evidence": [
+        {
+          "blob": "c35ad14d98417f68a5ab94002662ff524def0c99",
+          "end_line": 329,
+          "path": "src/ai.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 329
+        },
+        {
+          "blob": "c35ad14d98417f68a5ab94002662ff524def0c99",
+          "end_line": 330,
+          "path": "src/ai.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 330
+        },
+        {
+          "blob": "c31252d741d55d73de08c665573cef425a7cc95a",
+          "end_line": 396,
+          "path": "src/analysis.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 396
+        },
+        {
+          "blob": "e34f25f519d39872248677480b4528de1c270547",
+          "end_line": 768,
+          "path": "src/architecture.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 768
+        },
+        {
+          "blob": "2fa2407f1851f4cfc74a0c15dcec271b3246d620",
+          "end_line": 233,
+          "path": "src/bin/csb_onboarding/database_copy.rs",
+          "producer_version": "csb-component-detectors-v2",
+          "repository_index": 0,
+          "start_line": 233
+        }
+      ],
+      "fingerprint": "bd4edfc357c965ae6e6e6741729d0d1c66a4f209e25ea757b017e0560361d080",
+      "id": "integration-84b08d41cee4c8ffc0eb4ee88d7a627d29e5006b87058df66119b0501931e4d6",
+      "integration_id": "integration-84b08d41cee4c8ffc0eb4ee88d7a627d29e5006b87058df66119b0501931e4d6",
+      "options": [
+        {
+          "label": "Include observed context",
+          "value": "include"
+        },
+        {
+          "label": "Exclude",
+          "value": "exclude"
+        },
+        {
+          "label": "Defer",
+          "value": "defer"
+        }
+      ],
+      "prompt": "Include Internal module import (internal contract) in the architecture context?",
+      "provider_index": null,
+      "reason": "An internal module import is observed; component ownership and target resolution remain unresolved; scope is not expanded Include retains only these approved source observations; external documentation and newly referenced repositories are not fetched."
+    }
+  ],
+  "repository": {
+    "name": "CodeShouldBehave",
+    "owner": "SSC-SDE",
+    "provider": "github",
+    "security_domain": "local"
+  },
+  "review_defaults_active": false,
+  "revision": 8,
+  "scan_version": "csb-inventory-v2",
+  "scope_version": "public-setup-proposal-v1",
+  "state": "awaiting_confirmation"
+}

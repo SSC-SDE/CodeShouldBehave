@@ -1,0 +1,19 @@
+{
+  "schema_version": "csb-public-policy-v1",
+  "repository": {
+    "id": 1423092555,
+    "owner": "SSC-SDE",
+    "name": "CodeShouldBehave"
+  },
+  "public": true,
+  "publication_consent": false,
+  "include": [
+    "Cargo.toml",
+    "src"
+  ],
+  "exclude": [
+    "src/fonts"
+  ],
+  "baseline_mode": "merge_base",
+  "max_details": 100
+}
