@@ -59,3 +59,11 @@ code/dependency evidence only, with no database access, model calls or additiona
 repository access. All four remain pending until you confirm that treatment.
 The inventory completed with zero failed reads and eight unsupported entries;
 unsupported entries must not yield a clean no-change verdict.
+
+Native response caveat: the API includes an `accepted_context` placeholder, but
+`usable=false`, confirmation=null and the accepted scope fingerprint is empty.
+Its generic scan-gap wording does not mean the owner accepted any gaps. The
+session is awaiting_confirmation. Do not install this placeholder as runtime
+context. Validation checks these fields explicitly.
+
+Review PR: https://github.com/SSC-SDE/CodeShouldBehave/pull/2
