@@ -1,0 +1,20 @@
+{
+  "accepted_scope_fingerprint": "efc68c3b77b1a4e0157295dd253e5497fc0004c76fbdbcff47a2bf3ab4e763e3",
+  "affected_components": [],
+  "defaults_changed": false,
+  "gaps": [
+    "Non-Rust source uses byte identity only; semantic drift for changed files is unresolved",
+    "Rust macros, conditional compilation and runtime ownership/direction are not resolved; this is context drift, not a PR impact finding"
+  ],
+  "input_fingerprint": "a062a4ea42f6f71cbc68544d735befdac8e6e23ffd0cf6fb6c2ca82def509f12",
+  "proposal_fingerprint": "41d43d9dd296e28a263a9e922772c62f356100c9dd9a3a25d9fb48fdade19a4d",
+  "reconfirmation_required": false,
+  "reuse_allowed": true,
+  "scope_expanded": false,
+  "session_id": "public-setup-20261024",
+  "session_revision": 19,
+  "source_commit": "ad26461d57b58da1b3782c3854e57672ee9e82b2",
+  "status": "unchanged",
+  "target_commit": "c9a6f78dce6df5bb681a41eced9833df69710a2a",
+  "version": "csb-onboarding-drift-v1"
+}

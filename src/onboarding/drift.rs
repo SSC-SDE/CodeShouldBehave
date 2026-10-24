@@ -463,8 +463,9 @@ pub(crate) fn assess(
                 item.status == "indexed"
                     && ((item.kind == "source" && under(&item.path, root))
                         || (item.kind == "manifest"
-                            && item.path.rsplit_once('/').map_or(".", |(parent, _)| parent)
-                                == root))
+                            && (item.path == *root
+                                || item.path.rsplit_once('/').map_or(".", |(parent, _)| parent)
+                                    == root)))
             }) {
                 affected.entry(component.id.clone()).or_default().0.insert("Previously confirmed root has no indexed source or manifest at the target; moved roots are not added to scope".into());
             }
@@ -676,6 +677,23 @@ mod tests {
         fn drop(&mut self) {
             let _ = std::fs::remove_dir_all(&self.root);
         }
+    }
+    #[test]
+    fn drift_recognizes_exact_manifest_root_and_rejects_missing_manifest() {
+        let mut fixture = fixture();
+        fixture.context["components"][0]["roots"] = json!(["app/Cargo.toml", "app"]);
+        let result = fixture.assess(&fixture.source);
+        assert_eq!(result["reuse_allowed"], true);
+        assert_eq!(result["reconfirmation_required"], false);
+        std::fs::remove_file(fixture.root.join("app/Cargo.toml")).unwrap();
+        let target = commit(&fixture.root);
+        let result = fixture.assess(&target);
+        assert_eq!(result["reuse_allowed"], false);
+        assert!(
+            result["affected_components"]
+                .to_string()
+                .contains("Previously confirmed root")
+        );
     }
     #[test]
     fn body_only_changes_reuse_but_import_contract_provider_dependency_and_root_changes_require_review()
