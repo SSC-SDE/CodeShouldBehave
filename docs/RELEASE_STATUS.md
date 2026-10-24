@@ -63,4 +63,9 @@ tests, Ubuntu 22.04/Rust 1.87 build and hosted attestation passed.
 contains both exact manifest-root corrections. Downloaded asset checksums and
 hosted public provenance passed verification with exact signer/source digests.
 Engine pins and the disabled setup proposal now reference this package.
-Native startup verification of these new pins is pending. Activation remains off.
+The unchanged bootstrap passed against the published URLs. Native startup passed
+in [preflight 40088281103](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/40088281103)
+on pin commit `e90ef4b6317451a4f6a0bd55155dc561109d6bcc`: signed Ubuntu
+Bubblewrap installation, credential-free/networkless sandbox and actual
+`flowdiff --version` execution all passed. This proves package startup, not a
+complete live PR-to-dashboard journey. Activation remains off.

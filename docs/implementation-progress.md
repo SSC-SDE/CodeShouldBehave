@@ -28,6 +28,9 @@ copied into this repository. Branch: `phase-6`; PR base: `main`.
 - Release build and hosted attestation passed: run `40087980741`, attempt 2.
 - Package hashes and exact-source hosted signatures verified. Canary tag:
   `canary-39b89ac088be`. Engine pins updated on `phase-6`, not main.
-- Native sandbox startup with the refreshed pins is pending.
+- Published bootstrap passed. Native sandbox startup passed in run `40088281103`
+  on exact pin commit `e90ef4b6317451a4f6a0bd55155dc561109d6bcc`.
+- Next checkpoint: review/merge the pin PR, then prepare the installation and
+  consent diff for explicit owner approval. Do not activate on merge.
 - Activation remains OFF; publication consent, export permission, defaults and
   runtime operations unchanged. No consumer workflows installed.
