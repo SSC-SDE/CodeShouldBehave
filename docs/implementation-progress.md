@@ -135,3 +135,12 @@ is claimed; deployed release still predates these fixes.
   Installed input/config/budget validation passed. No scope/consent expansion.
 - Next: native sandbox preflight; review/merge pin PR; bounded live canary check
   and Focus HLD/LLD/source journey. Live acceptance remains pending main pins.
+
+- PR #10: https://github.com/SSC-SDE/CodeShouldBehave/pull/10 (phase-6 -> main).
+- Native Linux preflight `40221747369` passed on pin commit
+  `84ab8516e63d779dcd52936b7e02e5431437b469`, including real binary execution
+  inside the required credential-free/networkless sandbox.
+- Pin PR ready for owner review/merge. Runtime proof expires `2026-10-26T06:28:25.632679Z`;
+  refresh from a new real observation if the merge/live run occurs later.
+- Live verification blocked on the pin merge by exact-main controller trust;
+  no bypass, direct main push or merge performed.

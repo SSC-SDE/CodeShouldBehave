@@ -88,6 +88,9 @@ active public-ci engine configuration now select it on phase-6. Fresh runtime
 budget evidence and its digest are updated together; policy, scope and operation
 consents are unchanged. Historical setup proposals remain historical.
 
-Native sandbox preflight is pending. Live PR-to-Pages acceptance requires the
+Native sandbox [preflight 40221747369](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/40221747369) passed on exact pin commit
+`84ab8516e63d779dcd52936b7e02e5431437b469`: verified release download,
+credential-free/networkless Bubblewrap sandbox and actual native binary startup.
+Live PR-to-Pages acceptance requires the
 pin update merged into main: the controller intentionally rejects non-default
 branch runs. No branch result is claimed as a successful live deployment.
