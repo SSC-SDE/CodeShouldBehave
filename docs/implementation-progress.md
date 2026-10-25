@@ -162,3 +162,23 @@ is claimed; deployed release still predates these fixes.
 - PR #11 repurposed as this minimal repair; synthetic fixture removed from final
   diff. No state reset, guard bypass or main merge performed. Live HLD/LLD/source
   verification remains pending repair merge and a new bounded canary.
+
+## 2026-10-26 IST — live native export passed; artifact layout correction
+
+- PR #11 merged at `ded7e3119a9243cec84b8692b58c85a8c184f9fc`.
+- PR #12 fixture head `9653cd8a031568367d019231dbcffb3b572b6409` triggered
+  nudge `40222407518`; controller `40222380852` passed plan and native analysis.
+- Native worker generated verified neutral/partial report
+  `b702295aa536bf031ee1c9c2d99d7b1eef0019e4f4edcb5b40fa0e43f3dadf41`.
+- Publication failed: pinned download-artifact flattens a single matched artifact
+  into handoffs/ despite merge-multiple:false. Publisher expected a named child;
+  it recorded missing analysis, and REST audit then refused missing worker evidence.
+- Normalize only the single flat case using the exact trusted plan request; reject
+  mismatched identity, extra files and symlinks. Existing multiple-artifact folders
+  remain unchanged. Update installed workflow, template and pinned workflow hash.
+  Engine pins, budgets, signed activation and digest validation remain unchanged.
+- Four workflow regression tests pass; public suite 87 pass/four native skips.
+- PR #12 now contains the correction; synthetic fixture removed from final diff.
+  A new engine release is not required for this workflow-side correction. Main
+  merge is required before the live controller can run it. No dashboard link,
+  HLD/LLD browser or source navigation success is claimed for this live attempt.
