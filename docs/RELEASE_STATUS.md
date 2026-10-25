@@ -69,3 +69,28 @@ on pin commit `e90ef4b6317451a4f6a0bd55155dc561109d6bcc`: signed Ubuntu
 Bubblewrap installation, credential-free/networkless sandbox and actual
 `flowdiff --version` execution all passed. This proves package startup, not a
 complete live PR-to-dashboard journey. Activation remains off.
+
+## Refresh after PR #9 — 2026-10-25 UTC
+
+PR #9 merged at `6b2734e73ee14257858394ad67b672d0487b4d2f`, provider verified.
+Fresh GitHub account UI inspection confirmed GitHub Free and account-wide USD 0
+Actions/Packages budgets with Usage blocked. Controls were not changed.
+
+[Build and attestation 40221410115](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/40221410115)
+passed from that exact merge. Source/runtime checksums and offline attestation
+verification passed with exact source and signer digests, the trusted workflow
+identity and hosted runners required.
+
+[Signed canary release](https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-6b2734e73ee1)
+includes the native changed-path priority, public catalog paging priority,
+worker sampling race fix and bounded public projection. Both engine-pins and
+active public-ci engine configuration now select it on phase-6. Fresh runtime
+budget evidence and its digest are updated together; policy, scope and operation
+consents are unchanged. Historical setup proposals remain historical.
+
+Native sandbox [preflight 40221747369](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/40221747369) passed on exact pin commit
+`84ab8516e63d779dcd52936b7e02e5431437b469`: verified release download,
+credential-free/networkless Bubblewrap sandbox and actual native binary startup.
+Live PR-to-Pages acceptance requires the
+pin update merged into main: the controller intentionally rejects non-default
+branch runs. No branch result is claimed as a successful live deployment.

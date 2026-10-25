@@ -123,3 +123,24 @@ is claimed; deployed release still predates these fixes.
   and pins under fresh USD 0 evidence, then rerun the live PR-to-Pages check.
   The deployed old engine cannot load these branch fixes. Local browser success
   is not recorded as live production acceptance. No merge performed.
+
+## 2026-10-25 UTC — PR #9 merge and signed Linux refresh
+
+- Provider verified PR #9 merged at `6b2734e73ee14257858394ad67b672d0487b4d2f`.
+- Fresh GitHub Free and account-wide USD 0 Actions/Packages hard stops observed;
+  renewed twelve-hour release proof passed the hosted guard.
+- Run `40221410115` passed build, public contracts and hosted attestation.
+- Published `canary-6b2734e73ee1` after archive and exact source/signer verification.
+- Updated both active engine configurations and runtime budget proof on phase-6.
+  Installed input/config/budget validation passed. No scope/consent expansion.
+- Next: native sandbox preflight; review/merge pin PR; bounded live canary check
+  and Focus HLD/LLD/source journey. Live acceptance remains pending main pins.
+
+- PR #10: https://github.com/SSC-SDE/CodeShouldBehave/pull/10 (phase-6 -> main).
+- Native Linux preflight `40221747369` passed on pin commit
+  `84ab8516e63d779dcd52936b7e02e5431437b469`, including real binary execution
+  inside the required credential-free/networkless sandbox.
+- Pin PR ready for owner review/merge. Runtime proof expires `2026-10-26T06:28:25.632679Z`;
+  refresh from a new real observation if the merge/live run occurs later.
+- Live verification blocked on the pin merge by exact-main controller trust;
+  no bypass, direct main push or merge performed.
