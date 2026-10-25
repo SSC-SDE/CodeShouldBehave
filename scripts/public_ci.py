@@ -1573,6 +1573,42 @@ def public_policy_digest(config: dict, trusted_root: Path) -> str:
     return digest(canonical(policy))
 
 
+def normalize_handoff_layout(plan_value: dict, handoffs: Path) -> None:
+    """Normalize the pinned download action's flat singleton without trusting its name."""
+    if not handoffs.exists():
+        return
+    if handoffs.is_symlink():
+        raise Refusal("linked handoff root")
+    import stat
+    try:
+        flat = handoffs / 'result.json'
+        if flat.exists() or flat.is_symlink():
+            requests = plan_value['requests']
+            if not (len(requests) == 1):
+                raise Refusal('flat handoff requires exactly one planned request')
+            request_id = requests[0]['request_id']
+            if not (re.fullmatch(r'[a-f0-9]{64}', request_id)):
+                raise Refusal('invalid planned request')
+            files = list(handoffs.iterdir())
+            names = {path.name for path in files}
+            if not ({'result.json', 'budget.json'} <= names <= {'result.json', 'budget.json', 'handoff.tar.gz'}):
+                raise Refusal('unexpected flat handoff files')
+            if not (all(stat.S_ISREG(path.lstat().st_mode) for path in files)):
+                raise Refusal('nonregular handoff')
+            if not (flat.stat().st_size <= 32768):
+                raise Refusal('oversized result')
+            result = json.loads(flat.read_text())
+            if not (result['request'] == requests[0]):
+                raise Refusal('handoff differs from trusted request')
+            target = handoffs / ('csb-public-handoff-' + request_id)
+            target.mkdir()
+            for path in files:
+                path.rename(target / path.name)
+    except (AssertionError, KeyError, ValueError, OSError) as exc:
+        raise Refusal("invalid flat handoff layout") from exc
+
+
+
 def stage_publication(config: dict, plan_value: dict, handoffs: Path, output: Path, *,
                       provider: GitHub, project_root: Path, trusted_root: Path, verifier: Path, check_acks: dict | None = None, get: Callable = http_bytes) -> dict:
     if not config["operations"]["publication"]:
@@ -1601,6 +1637,7 @@ def stage_publication(config: dict, plan_value: dict, handoffs: Path, output: Pa
         pending = next((item for item in state["pending"] if item["pr_number"] == request["pr_number"]), None)
         if pending is None or pending["proposal"] != request["proposal"] or pending["selected_baseline"] != request["selected_baseline"] or pending["comparison_key"] != comparison_key(config, pending) or request["controller_sha"] != trusted["head_sha"] or request["run_id"] != trusted["id"] or request["run_attempt"] != trusted["run_attempt"]:
             raise Refusal("publication request differs from its planned exact comparison")
+    normalize_handoff_layout(plan_value, handoffs)
     results, bundles, observations = [], [], []
     expected_policy = public_policy_digest(config, trusted_root)
     restored = restore_public_site(config, previous, output / "previous", get=get)

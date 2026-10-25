@@ -182,3 +182,20 @@ is claimed; deployed release still predates these fixes.
   A new engine release is not required for this workflow-side correction. Main
   merge is required before the live controller can run it. No dashboard link,
   HLD/LLD browser or source navigation success is claimed for this live attempt.
+
+## 2026-10-26 IST — preserve receipt workflow identity
+
+- PR #12 merge verified: `0bf14b0c197fe7f58e222b2c4263b04b0ae77dfb`.
+- Fresh fixture PR #13 at `f44845d` triggered the controller. Run `40223282098`
+  stopped restoring receipts; no live dashboard was published.
+- The prior workflow-side fix changed the hash to which existing signed receipts
+  are bound. Restore the exact original controller/template bytes and config hash;
+  move singleton handoff normalization into the signed engine's publication stage.
+  This keeps historic receipt validation strict instead of introducing trust aliases
+  or deleting/resetting ledger state. The live workflow fix was therefore incomplete.
+- 87 public tests pass/four native skips, including singleton/multiple/invalid
+  handoffs and the original workflow identity. Synthetic fixture removed from the
+  final PR #13 diff. No scope, activation, budget or receipt-guard relaxation.
+- Required next sequence: merge reviewed source PR #13; build/attest a new engine;
+  update pins through review; then rerun live acceptance. Current release lacks
+  engine-side normalization. HLD/LLD/source live verification remains unconfirmed.
