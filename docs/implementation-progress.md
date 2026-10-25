@@ -95,3 +95,31 @@ file under its one-MiB declaration budget. Export cannot recover omitted native
 entries. Changed-file prioritization must also happen during native indexing
 before the actual canary LLD journey can be accepted. No live successful report
 is claimed; deployed release still predates these fixes.
+
+## 2026-10-25 — PR #9 native changed-path indexing and browser verification
+
+- Prioritize authorized changed paths, including rename old paths, before native
+  LLD input/declaration bounds and one-MiB catalog trimming. Existing unprioritized
+  API remains available; priorities cannot expand scope. Catalog identity binds
+  retained entries and coverage. Limits remain unchanged.
+- Prioritize changed paths in the exported catalog before browser pagination.
+  Browser testing found that prioritizing detail allocation alone left Focus's
+  first page empty; the published order now fixes that additional blocker.
+- Exact historical canary replay: baseline `ad25c3feff864efb14c3187a08891e72bd588292`
+  to proposal `e3590e9740124053ccf6b7e4d1185884fa795e06`. Synthetic code remains
+  absent from the final PR diff. All four changed functions survive export.
+- Verified public bundle `359f424a626e8fae540b53fa98e3fd805bee07a3405cc9220bce381d1b70b36f`:
+  7,488,060 bytes, below the unchanged eight-MiB bound. HLD evidence and LLD
+  details validate. `process_payment` contains 33 nodes/35 edges before Focus
+  value contraction; source routes resolve to exact proposal evidence.
+- Local published-site browser journey passed: Focus HLD -> Zoom to LLD -> four
+  changed functions -> process_payment Mermaid -> denial node -> exact source
+  lines 11–24 and selected line 13. HLD/LLD continue to report incomplete scope,
+  unresolved calls and unverified runtime effects; this is not a clean verdict.
+- Validation: 21 LLD tests, 16 public-report tests, 83 public Python tests passed
+  (four native-dependent Python tests skipped on macOS); Rust 1.87 strict Clippy
+  all-target/all-feature and no-default-feature profiles passed.
+- Deployment gate remains: merge reviewed PR #9, refresh the signed Linux release
+  and pins under fresh USD 0 evidence, then rerun the live PR-to-Pages check.
+  The deployed old engine cannot load these branch fixes. Local browser success
+  is not recorded as live production acceptance. No merge performed.

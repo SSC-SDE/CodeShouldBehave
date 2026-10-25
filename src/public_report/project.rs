@@ -675,7 +675,18 @@ pub(super) fn export(
                 builder.files.values().map(Vec::len).sum::<usize>() + DETAIL_SOURCE_BYTES;
             let mut published = BTreeSet::new();
             let mut catalog_pairs = vec![];
-            let pairs = pair_entries(&lld);
+            let mut pairs = pair_entries(&lld);
+            // The browser pages this catalog before applying Focus filters.
+            // Keep changed paths first here as well as in detail allocation.
+            pairs.sort_by_key(|(before, after)| {
+                let entry = after.or(*before).expect("paired declaration");
+                (
+                    !file_values.iter().any(|file| file["path"] == entry.path),
+                    entry.path.clone(),
+                    entry.start_byte,
+                    entry.id.clone(),
+                )
+            });
             let mut selected = pairs.iter().collect::<Vec<_>>();
             selected.sort_by_key(|(b, a)| {
                 let e = a.or(*b).expect("nonempty pair");

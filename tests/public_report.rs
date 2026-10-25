@@ -29,6 +29,9 @@ impl Fixture {
         Self::with_proposal("pub fn guard(n:i32)->i32 { if n > 5 { return 3; } 0 }\n")
     }
     fn with_proposal(proposed_source: &str) -> Self {
+        Self::with_inventory(proposed_source, "")
+    }
+    fn with_inventory(proposed_source: &str, unchanged_source: &str) -> Self {
         let root = std::env::temp_dir().join(format!(
             "csb-public-{}-{}",
             std::process::id(),
@@ -70,6 +73,9 @@ impl Fixture {
             "pub fn EXCLUDED_PRIVATE_SOURCE_SENTINEL(){}\n",
         )
         .unwrap();
+        if !unchanged_source.is_empty() {
+            fs::write(root.join("src/a_inventory.rs"), unchanged_source).unwrap();
+        }
         git(&["add", "."]);
         git(&["commit", "-qm", "baseline"]);
         let baseline = git(&["rev-parse", "HEAD"]);
@@ -556,4 +562,31 @@ fn large_declaration_inventory_keeps_changed_details_within_public_budget() {
     assert!(bundle.manifest.coverage.deferred_details > 0);
     assert!(!bundle.manifest.coverage.complete);
     assert!(bundle.files.values().map(Vec::len).sum::<usize>() < 8 * 1024 * 1024);
+}
+
+#[test]
+fn changed_file_precedes_unchanged_inventory_in_published_catalog() {
+    let inventory = (0..80)
+        .map(|i| format!("pub fn unchanged_{i}() -> u64 {{ {i} }}\n"))
+        .collect::<String>();
+    let fixture = Fixture::with_inventory(
+        "pub fn guard(n:i32)->i32 { if n > 5 { return 3; } 0 }",
+        &inventory,
+    );
+    let bundle =
+        export_public_report(&fixture.artifact, &fixture.policy, &fixture.expected).unwrap();
+    let catalog: Value = serde_json::from_slice(&bundle.files["lld/catalog.json"]).unwrap();
+    let entries = catalog["entries"].as_array().unwrap();
+    assert_eq!(entries[0]["proposal"]["path"], "src/lib.rs");
+    assert!(
+        entries
+            .iter()
+            .any(|e| e["proposal"]["path"] == "src/a_inventory.rs")
+    );
+    assert!(
+        entries
+            .iter()
+            .take(50)
+            .any(|e| e["proposal"]["name"] == "guard")
+    );
 }

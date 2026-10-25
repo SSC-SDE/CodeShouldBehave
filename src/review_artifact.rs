@@ -267,21 +267,28 @@ impl ReviewArtifact {
             .hld
             .as_ref()
             .ok_or("LLD requires source-backed HLD parents")?;
-        let baseline = crate::lld::generate_lld(
+        let changed_paths = self
+            .files
+            .iter()
+            .flat_map(|file| std::iter::once(file.path.clone()).chain(file.old_path.clone()))
+            .collect::<BTreeSet<_>>();
+        let baseline = crate::lld::generate_lld_prioritized(
             repository,
             &result.baseline,
             result.scope(),
             &context,
             &hld.baseline,
             cancellation,
+            &changed_paths,
         )?;
-        let proposal = crate::lld::generate_lld(
+        let proposal = crate::lld::generate_lld_prioritized(
             repository,
             &result.proposal,
             result.scope(),
             &context,
             &hld.proposal,
             cancellation,
+            &changed_paths,
         )?;
         let delta = crate::lld::compare_lld(&baseline.catalog, &proposal.catalog);
         self.lld_status = match delta.outcome.as_str() {
