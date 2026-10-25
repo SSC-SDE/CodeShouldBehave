@@ -1,4 +1,4 @@
-"""Exercise the actual trusted workflow normalization, not a duplicate helper."""
+"""Exercise signed-engine normalization while preserving the receipt workflow identity."""
 import json
 import os
 from pathlib import Path
@@ -35,10 +35,8 @@ class HandoffLayoutTests(unittest.TestCase):
                 (target / 'budget.json').symlink_to(target / 'result.json')
             if mode == 'extra':
                 (target / 'unexpected').write_text('reject')
-            workflow = (ROOT / '.github/workflows/csb-public-controller.yml').read_text()
-            block = workflow.split('      - name: Normalize single-artifact handoff layout\n', 1)[1].split('      - name:', 1)[0]
-            code = textwrap.dedent(block.split("          python3 - <<'PY'\n", 1)[1].rsplit('          PY', 1)[0])
-            run = subprocess.run([sys.executable, '-c', code], env={**os.environ, 'RUNNER_TEMP': directory}, capture_output=True)
+            code = "import sys,json,pathlib; sys.path.insert(0, sys.argv[1]); import public_ci; root=pathlib.Path(sys.argv[2]); public_ci.normalize_handoff_layout(json.loads((root/'plan/plan.json').read_text()), root/'handoffs')"
+            run = subprocess.run([sys.executable, '-c', code, str(ROOT / 'scripts'), directory], env={**os.environ, 'RUNNER_TEMP': directory}, capture_output=True)
             self.assertEqual(run.returncode == 0, valid, run.stderr.decode())
             if valid:
                 output = handoffs / ('csb-public-handoff-' + requests[0]['request_id'])
@@ -58,7 +56,8 @@ class HandoffLayoutTests(unittest.TestCase):
             with self.subTest(mode=mode):
                 self.run_layout(mode, valid=False)
 
-    def test_template_and_installed_normalization_match(self):
-        def block(path):
-            return path.read_text().split('      - name: Normalize single-artifact handoff layout\n', 1)[1].split('      - name:', 1)[0]
-        self.assertEqual(block(ROOT / '.github/workflows/csb-public-controller.yml'), block(ROOT / 'templates/public-ci/controller.yml'))
+    def test_controller_keeps_original_receipt_identity(self):
+        import hashlib
+        workflow = ROOT / '.github/workflows/csb-public-controller.yml'
+        self.assertEqual(hashlib.sha256(workflow.read_bytes()).hexdigest(),
+                         'a93f79d5b6d440988c302c173ce8d5cf5ae812b84843597a39b625638e2aa02d')

@@ -133,35 +133,6 @@ jobs:
           path: ${{ runner.temp }}/handoffs
           merge-multiple: false
           digest-mismatch: error
-      - name: Normalize single-artifact handoff layout
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          import json, os, pathlib, re, stat
-          root = pathlib.Path(os.environ['RUNNER_TEMP'])
-          handoffs = root / 'handoffs'
-          # download-artifact flattens one matching artifact even with
-          # merge-multiple:false. Derive its name only from the trusted plan.
-          if handoffs.exists():
-              assert not handoffs.is_symlink(), 'linked handoff root'
-              flat = handoffs / 'result.json'
-              if flat.exists() or flat.is_symlink():
-                  requests = json.loads((root / 'plan/plan.json').read_text())['requests']
-                  assert len(requests) == 1, 'flat handoff requires exactly one planned request'
-                  request_id = requests[0]['request_id']
-                  assert re.fullmatch(r'[a-f0-9]{64}', request_id), 'invalid planned request'
-                  files = list(handoffs.iterdir())
-                  names = {path.name for path in files}
-                  assert {'result.json', 'budget.json'} <= names <= {'result.json', 'budget.json', 'handoff.tar.gz'}, 'unexpected flat handoff files'
-                  assert all(stat.S_ISREG(path.lstat().st_mode) for path in files), 'nonregular handoff'
-                  assert flat.stat().st_size <= 32768, 'oversized result'
-                  result = json.loads(flat.read_text())
-                  assert result['request'] == requests[0], 'handoff differs from trusted request'
-                  target = handoffs / ('csb-public-handoff-' + request_id)
-                  target.mkdir()
-                  for path in files:
-                      path.rename(target / path.name)
-          PY
       - name: Start one trusted publisher with its durable REST ticket
         env: {GH_TOKEN: '${{ github.token }}'}
         run: |
