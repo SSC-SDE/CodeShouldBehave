@@ -118,3 +118,6 @@ byte-for-byte. Only engine pins change; runtime budget, original controller hash
 policy, context, receipt identity and consent remain unchanged.
 Native sandbox preflight and the pin merge are the next checkpoints. Live dashboard
 acceptance is not yet complete.
+Native sandbox preflight `40225424957` passed on pin commit
+`9808b790ce547c5ab8597b270d29060a5470a5cf`. PR #14 contains the reviewed
+engine-only deployment change. Live acceptance remains pending its main merge.

@@ -210,3 +210,9 @@ is claimed; deployed release still predates these fixes.
   identities and all scope/consent fields remain unchanged.
 - Native sandbox preflight pending. Live test still requires reviewed main pins;
   no direct main write or self-merge performed.
+- PR #14: https://github.com/SSC-SDE/CodeShouldBehave/pull/14.
+- Native Linux sandbox preflight `40225424957` passed on exact pin commit
+  `9808b790ce547c5ab8597b270d29060a5470a5cf`, including required networkless,
+  credential-free sandbox startup and actual pinned ELF execution.
+- Pin PR ready for review/merge. Remaining acceptance is the live PR-to-Pages
+  HLD/LLD/source journey after main selects this verified package.
