@@ -75,3 +75,23 @@ PR #9 remains DO NOT MERGE: it includes synthetic unlinked code and diagnostic
 workflow changes. A bounded public projection fix and fresh verified release are
 required before the live journey can pass. Raw native stderr was not published;
 diagnostics emitted only fixed categories and code locations.
+
+## 2026-10-25 — exporter budget correction
+
+PR #9 is repurposed as the worker/exporter fix: synthetic src/review_canary.rs
+and diagnostic workflow changes are removed from its final diff. Previous
+DO NOT MERGE warnings refer to the earlier canary contents.
+
+Reserve a 512 KiB incremental detail/source allowance after structural projection,
+and bound duplicate Markdown to a labeled summary when over 256 KiB. Original
+8 MiB bundle and strict final validation stay unchanged. Changed-file entries
+are prioritized among retained declarations. The exact original canary artifact
+now exports and verifies locally at 7,679,364 bytes, with HLD and LLD catalog plus
+64 detail aliases and explicitly incomplete coverage. Fifteen exporter tests pass,
+including a large declaration inventory; strict all-target/all-feature Clippy passes.
+
+Important remaining limitation: the original native catalog omitted the canary
+file under its one-MiB declaration budget. Export cannot recover omitted native
+entries. Changed-file prioritization must also happen during native indexing
+before the actual canary LLD journey can be accepted. No live successful report
+is claimed; deployed release still predates these fixes.

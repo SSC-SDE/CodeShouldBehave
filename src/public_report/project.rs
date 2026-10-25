@@ -235,9 +235,14 @@ fn markdown_escape(value: &str) -> String {
         .collect()
 }
 
+// Reserve room for catalog, aggregate evidence and manifest within the unchanged 8 MiB cap.
+const DETAIL_SOURCE_BYTES: usize = 512 * 1024;
+const MARKDOWN_BYTES: usize = 256 * 1024;
+
 struct Builder {
     files: BTreeMap<String, Vec<u8>>,
     source_bytes: usize,
+    detail_source_limit: usize,
     routes: PublicRoutes,
     gaps: BTreeSet<String>,
     deferred: usize,
@@ -261,7 +266,11 @@ impl Builder {
                 .saturating_add(bytes.len())
                 > 7 * 1024 * 1024
         {
-            return Err("Public projection file/byte limit".into());
+            return Err(format!(
+                "Public projection file/byte limit at {path}: {} existing bytes, {} new bytes",
+                self.files.values().map(Vec::len).sum::<usize>(),
+                bytes.len()
+            ));
         }
         self.files.insert(path.into(), bytes);
         Ok(())
@@ -323,6 +332,15 @@ impl Builder {
             "start_line":span.start_line,"end_line":end,"text":lines.join("\n"),"truncated":end<span.end_line});
         let bytes = canonical_json(&value)?;
         let path = format!("evidence/{}.json", sha256(&bytes));
+        if !self.files.contains_key(&path)
+            && self.files.values().map(Vec::len).sum::<usize>() + bytes.len()
+                > self.detail_source_limit
+        {
+            self.gaps.insert(
+                "Some exact source excerpts were deferred by the static source/file budget".into(),
+            );
+            return Ok(None);
+        }
         if !self.files.contains_key(&path) {
             self.raw(&path, bytes)?;
             self.source_bytes += size;
@@ -498,6 +516,7 @@ pub(super) fn export(
     let mut builder = Builder {
         files: BTreeMap::new(),
         source_bytes: 0,
+        detail_source_limit: DETAIL_SOURCE_BYTES,
         routes: PublicRoutes::default(),
         gaps: BTreeSet::new(),
         deferred: 0,
@@ -652,6 +671,8 @@ pub(super) fn export(
                 }
             }
             lld.delta = crate::lld::compare_lld(&lld.baseline.catalog, &lld.proposal.catalog);
+            builder.detail_source_limit =
+                builder.files.values().map(Vec::len).sum::<usize>() + DETAIL_SOURCE_BYTES;
             let mut published = BTreeSet::new();
             let mut catalog_pairs = vec![];
             let pairs = pair_entries(&lld);
@@ -662,7 +683,14 @@ pub(super) fn export(
                     c.baseline_entry_id.as_deref() == Some(&e.id)
                         || c.proposal_entry_id.as_deref() == Some(&e.id)
                 });
-                (!changed, e.kind != "function", &e.path, e.start_byte, &e.id)
+                (
+                    !file_values.iter().any(|file| file["path"] == e.path),
+                    !changed,
+                    e.kind != "function",
+                    &e.path,
+                    e.start_byte,
+                    &e.id,
+                )
             });
             let mut count = 0;
             for (b, a) in selected {
@@ -715,7 +743,7 @@ pub(super) fn export(
                 let path = format!("lld/detail/{}.json", sha256(&canonical_json(&value)?));
                 if builder.files.values().map(Vec::len).sum::<usize>()
                     + canonical_json(&value)?.len()
-                    > 5 * 1024 * 1024
+                    > builder.detail_source_limit
                     || builder.files.len() > 850
                 {
                     builder.deferred += 1;
@@ -946,6 +974,15 @@ pub(super) fn export(
     ));
     for gap in &builder.gaps {
         markdown.push_str(&format!("- {}\n", markdown_escape(gap)));
+    }
+    if markdown.len() > MARKDOWN_BYTES {
+        markdown = format!(
+            "# CodeShouldBehave review\n\nBaseline: {}\nProposal: {}\n\nHLD outcome: {hld_status}\nLLD outcome: {lld_status}\n\nThe full Markdown diagram export exceeds its presentation budget. Inspect the verified HLD and LLD JSON views in the dashboard. This summary does not establish runtime equivalence.\n",
+            expected.baseline, expected.proposal
+        );
+        for gap in &builder.gaps {
+            markdown.push_str(&format!("- {}\n", markdown_escape(gap)));
+        }
     }
     builder.raw("exports/review.md", markdown.into_bytes())?;
     builder

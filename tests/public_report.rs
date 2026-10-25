@@ -538,3 +538,22 @@ fn actual_manifest_bytes_count_toward_the_directory_cap() {
             .contains("byte limit")
     );
 }
+
+#[test]
+fn large_declaration_inventory_keeps_changed_details_within_public_budget() {
+    let mut source = String::from("pub fn guard(n:i32)->i32 { if n > 1 { return 2; } 0 }\n");
+    for index in 0..160 {
+        source.push_str(&format!(
+            "pub fn changed_{index}(n:i32)->i32 {{ if n > 10 {{ return n; }} n + 1 }}\n"
+        ));
+    }
+    let mut f = Fixture::with_proposal(&source);
+    f.policy.max_details = 100;
+    let bundle = export_public_report(&f.artifact, &f.policy, &f.expected).unwrap();
+    assert!(bundle.manifest.routes.hld.is_some());
+    assert!(bundle.manifest.routes.lld_catalog.is_some());
+    assert!(!bundle.manifest.routes.lld_details.is_empty());
+    assert!(bundle.manifest.coverage.deferred_details > 0);
+    assert!(!bundle.manifest.coverage.complete);
+    assert!(bundle.files.values().map(Vec::len).sum::<usize>() < 8 * 1024 * 1024);
+}
