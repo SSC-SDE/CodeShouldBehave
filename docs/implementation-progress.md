@@ -144,3 +144,21 @@ is claimed; deployed release still predates these fixes.
   refresh from a new real observation if the merge/live run occurs later.
 - Live verification blocked on the pin merge by exact-main controller trust;
   no bypass, direct main push or merge performed.
+
+## 2026-10-26 IST — live trigger verified; activation continuity repair
+
+- PR #10 provider-confirmed merge: `3912a85ddbcb9d91d18dc0638f0955cdba35fafc`.
+- Current USD 0 evidence was freshly checked during the preceding release work;
+  no account controls changed. Opened bounded live canary PR #11 at `b7bcc72`.
+- Nudge `40222017944` passed. Controller `40222027727` refused before analysis:
+  `budget policy changed; recent activation is required`.
+- Root cause: the PR #10 runtime observation refresh changed the budget identity
+  bound to existing signed state. Release proof freshness and runtime activation
+  continuity are separate; the earlier pin handoff incorrectly treated them alike.
+- Restore the exact original runtime observation and budget block from `6b2734e`,
+  preserving the refreshed signed engine pins, all hard limits and signed state.
+  Existing regression explicitly tests that an attested activation survives proof
+  expiry only for an unchanged policy; fresh initial activation still rejects expiry.
+- PR #11 repurposed as this minimal repair; synthetic fixture removed from final
+  diff. No state reset, guard bypass or main merge performed. Live HLD/LLD/source
+  verification remains pending repair merge and a new bounded canary.

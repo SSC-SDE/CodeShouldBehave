@@ -167,3 +167,19 @@ this public repository and is not needed to contribute.
 Project code is MIT licensed; retain copyright and license notices when
 redistributing. Dependencies and bundled fonts retain their own licenses; see
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and [font notices](src/fonts/README.md).
+
+### Preserve the activated budget identity during release refreshes
+
+The signed controller state retains the budget policy and observation digest from
+initial activation. Keep that exact runtime budget configuration and evidence
+when changing engine pins. Its observation expiry gates **initial activation**;
+previously verified activation can continue only with the identical budget policy
+and the operator maintaining the USD 0 hard stops. It does not claim a live billing
+API reading. A renewed release-build observation is separate and must not replace
+this runtime identity. Record subsequent real control checks in the release log.
+
+If a pin update inadvertently replaced the runtime observation, restore the exact
+previously activated evidence and budget block through a reviewed PR. Preserve
+engine pins and signed state. Never delete receipts, manufacture activation, or
+relax policy comparison to get a run through. A deliberate budget-policy change
+requires a separately designed and reviewed reactivation path.
