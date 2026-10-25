@@ -94,3 +94,14 @@ credential-free/networkless Bubblewrap sandbox and actual native binary startup.
 Live PR-to-Pages acceptance requires the
 pin update merged into main: the controller intentionally rejects non-default
 branch runs. No branch result is claimed as a successful live deployment.
+
+### Runtime observation correction after live attempt
+
+The new release and sandbox preflight remain valid. The runtime observation
+refresh in the pin update was incorrect for an already activated signed ledger:
+it changed its immutable budget identity. Live controller `40222027727` refused
+before analysis. PR #11 restores the original runtime budget identity while
+retaining the new engine pins. The fresh release-build proof stays separate.
+An existing attested activation may outlive the observation expiry with unchanged
+policy and maintained hard-zero controls; initial activation still requires fresh
+proof. This does not assert current billing controls from historical evidence.
