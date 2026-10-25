@@ -105,3 +105,16 @@ retaining the new engine pins. The fresh release-build proof stays separate.
 An existing attested activation may outlive the observation expiry with unchanged
 policy and maintained hard-zero controls; initial activation still requires fresh
 proof. This does not assert current billing controls from historical evidence.
+
+## Corrected signed-engine release after PR #13
+
+PR #13 merged at `3983c86730f275015a8eebf0a59cd2f55770213a`.
+[Build/attestation 40223827336](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/40223827336)
+passed using the still-fresh independent USD 0 release observation.
+[Release canary-3983c86730f2](https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-3983c86730f2)
+passed archive checksums, exact hosted source/signer provenance and actual-URL
+production bootstrap. The extracted publisher script matches the corrected source
+byte-for-byte. Only engine pins change; runtime budget, original controller hash,
+policy, context, receipt identity and consent remain unchanged.
+Native sandbox preflight and the pin merge are the next checkpoints. Live dashboard
+acceptance is not yet complete.

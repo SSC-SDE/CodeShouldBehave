@@ -199,3 +199,14 @@ is claimed; deployed release still predates these fixes.
 - Required next sequence: merge reviewed source PR #13; build/attest a new engine;
   update pins through review; then rerun live acceptance. Current release lacks
   engine-side normalization. HLD/LLD/source live verification remains unconfirmed.
+
+## 2026-10-26 IST — corrected release prepared
+
+- PR #13 merge verified: `3983c86730f275015a8eebf0a59cd2f55770213a`.
+- Trusted build/attestation `40223827336` passed. Published signed release
+  `canary-3983c86730f2`; archive, exact hosted signatures and production bootstrap
+  verified. Extracted publisher bytes match the corrected source.
+- New pin update changes engine identity only. Runtime budget/receipt/workflow
+  identities and all scope/consent fields remain unchanged.
+- Native sandbox preflight pending. Live test still requires reviewed main pins;
+  no direct main write or self-merge performed.
