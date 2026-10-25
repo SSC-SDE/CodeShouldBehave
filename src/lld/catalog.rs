@@ -522,6 +522,27 @@ pub fn generate_lld(
     hld: &DesignVersion,
     cancellation: &Cancellation,
 ) -> Result<LldSnapshot, String> {
+    generate_lld_prioritized(
+        repository,
+        snapshot,
+        scope,
+        context,
+        hld,
+        cancellation,
+        &BTreeSet::new(),
+    )
+}
+
+/// Priorities only reorder already authorized paths; they never expand scope.
+pub fn generate_lld_prioritized(
+    repository: &Path,
+    snapshot: &SnapshotId,
+    scope: &ScopeRecord,
+    context: &ConfirmedDesignContext,
+    hld: &DesignVersion,
+    cancellation: &Cancellation,
+    changed_paths: &BTreeSet<String>,
+) -> Result<LldSnapshot, String> {
     context.validate(scope)?;
     crate::design::validate_design_scope(hld, scope)?;
     if hld.snapshot != *snapshot || hld.level != DesignLevel::Hld {
@@ -547,32 +568,33 @@ pub fn generate_lld(
         coverage: LldCoverage::default(),
     };
     let mut inputs = vec![];
-    let entries = match crate::design::generate::cancelable_tree(repository, snapshot, cancellation)
-    {
-        Ok(bytes) => {
-            let (entries, unsupported) = crate::design::generate::parse_tree(&bytes, scope);
-            catalog.coverage.unsupported += unsupported;
-            if unsupported > 0 {
-                catalog.coverage.structure_complete = false;
-                catalog.coverage.gaps.push(
-                    "Selected symlinks/submodules/nonregular entries are not followed".into(),
-                );
+    let mut entries =
+        match crate::design::generate::cancelable_tree(repository, snapshot, cancellation) {
+            Ok(bytes) => {
+                let (entries, unsupported) = crate::design::generate::parse_tree(&bytes, scope);
+                catalog.coverage.unsupported += unsupported;
+                if unsupported > 0 {
+                    catalog.coverage.structure_complete = false;
+                    catalog.coverage.gaps.push(
+                        "Selected symlinks/submodules/nonregular entries are not followed".into(),
+                    );
+                }
+                entries
             }
-            entries
-        }
-        Err(error) => {
-            if cancellation.is_cancelled() {
-                return Err(error);
+            Err(error) => {
+                if cancellation.is_cancelled() {
+                    return Err(error);
+                }
+                catalog.coverage.inventory_complete = false;
+                catalog.coverage.failed += 1;
+                catalog
+                    .coverage
+                    .gaps
+                    .push("Pinned tree enumeration unavailable or exceeds its bound".into());
+                vec![]
             }
-            catalog.coverage.inventory_complete = false;
-            catalog.coverage.failed += 1;
-            catalog
-                .coverage
-                .gaps
-                .push("Pinned tree enumeration unavailable or exceeds its bound".into());
-            vec![]
-        }
-    };
+        };
+    entries.sort_by_key(|(path, _)| (!changed_paths.contains(path), path.clone()));
     if entries.len() > MAX_PATHS {
         catalog.coverage.inventory_complete = false;
         catalog.coverage.deferred += entries.len() - MAX_PATHS;
@@ -818,7 +840,20 @@ pub fn generate_lld(
             .push("Bounded inventory/declaration/input omissions prevent complete result".into());
     }
     catalog.entries.sort_by(|a, b| {
-        (&a.path, a.start_byte, &a.kind, &a.id).cmp(&(&b.path, b.start_byte, &b.kind, &b.id))
+        (
+            !changed_paths.contains(&a.path),
+            &a.path,
+            a.start_byte,
+            &a.kind,
+            &a.id,
+        )
+            .cmp(&(
+                !changed_paths.contains(&b.path),
+                &b.path,
+                b.start_byte,
+                &b.kind,
+                &b.id,
+            ))
     });
     catalog.evidence.sort_by(|a, b| a.id.cmp(&b.id));
     catalog.evidence.dedup_by(|a, b| a.id == b.id);

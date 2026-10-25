@@ -97,6 +97,13 @@ impl Fixture {
         SnapshotId::new(self.git(&["rev-parse", "HEAD"])).unwrap()
     }
     fn snapshot(&self, commit: &SnapshotId) -> (DesignVersion, LldSnapshot) {
+        self.prioritized_snapshot(commit, &BTreeSet::new())
+    }
+    fn prioritized_snapshot(
+        &self,
+        commit: &SnapshotId,
+        priorities: &BTreeSet<String>,
+    ) -> (DesignVersion, LldSnapshot) {
         let context = ConfirmedDesignContext {
             accepted_commit: commit.clone(),
             session_id: "lld-context".into(),
@@ -128,13 +135,14 @@ impl Fixture {
             &Cancellation::default(),
         )
         .unwrap();
-        let lld = generate_lld(
+        let lld = generate_lld_prioritized(
             &self.root,
             commit,
             &self.scope,
             &context,
             &hld,
             &Cancellation::default(),
+            priorities,
         )
         .unwrap();
         (hld, lld)
@@ -776,4 +784,35 @@ fn unsupported_union_preserves_exact_frontier_without_misparenting_its_fields() 
         compare_lld(&snapshot.catalog, &snapshot.catalog).outcome,
         "incomplete"
     );
+}
+
+#[test]
+fn changed_paths_survive_catalog_bounds_without_expanding_scope() {
+    let fixture = Fixture::new();
+    let source = (0..900)
+        .map(|i| format!("pub fn unchanged_{i}() -> u64 {{ {i} }}\n"))
+        .collect::<String>();
+    fixture.write("src/a_inventory.rs", &source);
+    fixture.write(
+        "src/z_changed.rs",
+        "pub fn changed(value: bool) -> u64 { if value { 1 } else { 2 } }",
+    );
+    fixture.write("private/secret.rs", "pub fn secret() {}");
+    let commit = fixture.commit();
+    let priorities = BTreeSet::from(["src/z_changed.rs".into(), "private/secret.rs".into()]);
+    let (_, snapshot) = fixture.prioritized_snapshot(&commit, &priorities);
+    assert!(snapshot.catalog.coverage.deferred > 0);
+    assert!(!snapshot.catalog.coverage.structure_complete);
+    assert!(serde_json::to_vec(&snapshot.catalog).unwrap().len() <= MAX_LLD_CATALOG_BYTES);
+    assert!(
+        !snapshot
+            .catalog
+            .entries
+            .iter()
+            .any(|e| e.path.starts_with("private/"))
+    );
+    let entry = function(&snapshot, "changed");
+    build_lld_detail(&snapshot, &entry.id, &Cancellation::default()).unwrap();
+    let (_, repeated) = fixture.prioritized_snapshot(&commit, &priorities);
+    assert_eq!(snapshot.catalog.id, repeated.catalog.id);
 }

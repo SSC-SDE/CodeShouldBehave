@@ -14,7 +14,8 @@ use serde::{Deserialize, Serialize};
 
 pub(crate) use catalog::semantic_tokens;
 pub use catalog::{
-    build_lld_detail, generate_lld, lld_detail_design, lld_source, validate_lld_snapshot,
+    build_lld_detail, generate_lld, generate_lld_prioritized, lld_detail_design, lld_source,
+    validate_lld_snapshot,
 };
 pub use diff::{compare_lld, compare_lld_detail, compare_lld_with_correspondence};
 pub use render::{render_lld_markdown, render_lld_mermaid};
