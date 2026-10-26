@@ -575,7 +575,27 @@ class PublicationTests(unittest.TestCase):
             self.assertEqual(body["output"]["title"], title)
             self.assertIn("&design=lld", body["details_url"])
             self.assertIn("&mode=focus", body["details_url"])
+            self.assertIn(f"[Open CodeShouldBehave report]({body['details_url']})", body["output"]["summary"])
             self.assertIn(self.request["proposal"], body["output"]["summary"])
+
+    def test_actions_owned_details_accepts_only_exact_summary_link(self):
+        update = {"request": self.request, "public_report_id": "e" * 64,
+                  "conclusion": "neutral", "reason": "", "verdict": "incomplete"}
+        self.previous["check_updates"] = [update]
+        ci.repair_checks(self.config, provider=self.provider)
+        body = [call[1]["body"] for call in self.calls if call[1].get("method") in ("PATCH", "POST")][-1]
+        delivered = {"app": {"slug": "github-actions"},
+            "external_id": "csb-public-v1:" + self.request["request_id"],
+            "head_sha": self.request["proposal"], "status": "completed", "conclusion": "neutral",
+            "details_url": "https://github.com/example/public/runs/123", "output": body["output"]}
+        self.provider.api = lambda *a, **k: {"check_runs": [delivered]}
+        ci.acknowledge_delivered_checks(self.config, self.previous, self.provider)
+        self.assertEqual(self.previous["check_updates"], [])
+        for summary in ("Open Details", body["output"]["summary"].replace("e" * 64, "f" * 64)):
+            self.previous["check_updates"] = [update]
+            delivered["output"] = {"summary": summary}
+            ci.acknowledge_delivered_checks(self.config, self.previous, self.provider)
+            self.assertEqual(len(self.previous["check_updates"]), 1)
 
     def test_repair_limits_six_and_does_not_assume_neutral_is_merge_approval(self):
         for number in range(1, 8):

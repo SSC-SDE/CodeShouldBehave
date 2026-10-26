@@ -233,3 +233,12 @@ only this exact path may be reconstructed, and only when the signed manifest
 binds zero bytes and SHA256(empty). No HTTP fallback applies to other paths.
 Every report, source excerpt, script and asset still requires exact live length
 and hash verification, followed by full site validation before signed promotion.
+
+### GitHub Actions check links
+
+GitHub may replace an Actions-owned check's Details URL with its own check page.
+The publisher therefore also supplies an **Open CodeShouldBehave report** link
+in the check summary. That link pins the public report and opens Focus mode.
+Delivery acknowledgment accepts only the exact expected report link from the
+matching Actions app, head SHA and external ID. A neutral/incomplete check
+means coverage requires review; it is not merge approval or proof of no change.

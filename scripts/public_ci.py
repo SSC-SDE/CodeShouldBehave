@@ -1448,7 +1448,8 @@ def acknowledge_delivered_checks(config: dict, state: dict, provider: GitHub, *,
         matches = [item for item in runs if item.get("app", {}).get("slug") == "github-actions" and item.get("external_id") == "csb-public-v1:" + request["request_id"] and item.get("head_sha") == request["proposal"]]
         if len(matches) > 1:
             raise Refusal("ambiguous delivered check")
-        if matches and matches[0].get("status") == "completed" and matches[0].get("conclusion") in (verdict_conclusion(update), "cancelled") and (expected_url is None or matches[0].get("details_url") == expected_url):
+        if matches and matches[0].get("status") == "completed" and matches[0].get("conclusion") in (verdict_conclusion(update), "cancelled") and (expected_url is None or matches[0].get("details_url") == expected_url or
+            f"[Open CodeShouldBehave report]({expected_url})" in matches[0].get("output", {}).get("summary", "")):
             acknowledged.add(request["request_id"])
     state["check_updates"] = [item for item in state.get("check_updates", []) if item["request"]["request_id"] not in acknowledged]
 
@@ -1491,11 +1492,14 @@ def repair_checks(config: dict, *, provider: GitHub, state: dict | None = None) 
             "This check does not approve merging.\n\n"
             + ("A newer PR head, scope or engine requires another comparison. Any linked report is historical, not the current PR result." if conclusion == "cancelled" else
                "No verified report is available. Check the workflow logs and retry analysis; this is not a no-change result." if conclusion == "failure" or update["public_report_id"] is None else
-               "Open Details for Architecture, HLD, LLD and exact source differences. Coverage gaps remain visible in the report.")
+               "Use the report link below for Architecture, HLD, LLD and exact source differences. Coverage gaps remain visible in the report.")
             + f"\n\nBaseline: `{request['baseline']}` → Proposal: `{request['proposal']}`")}
         body = {"status": "completed", "conclusion": conclusion, "completed_at": timestamp(), "output": output}
         if update["public_report_id"] is not None:
             body["details_url"] = config["site"]["origin"] + config["site"]["base_path"] + "workspace/#review=" + update["public_report_id"] + "&bundle=" + update["public_report_id"] + "&layout=architecture&side=diff&design=lld&mode=focus"
+            # GitHub Actions owns the Details destination and may replace it.
+            # Keep a durable exact-report link in the rendered check summary.
+            output["summary"] += f"\n\n[Open CodeShouldBehave report]({body['details_url']})"
         if matches:
             check_id = integer(matches[0]["id"], 1, 2**63 - 1, "repair check id")
             provider.api(f"{provider.prefix}/check-runs/{check_id}", method="PATCH", body=body)
