@@ -10,7 +10,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import base64
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import hashlib
 import gzip
 import json
@@ -615,7 +615,11 @@ class GitHub:
         if status == 404 and allow_404:
             return None
         if not 200 <= status < 300:
-            raise Refusal(f"provider operation refused ({status}); no paid fallback")
+            operation = ("pages_create" if method == "POST" and path == self.prefix + "/pages/deployments" else
+                         "pages_status" if method == "GET" and path.startswith(self.prefix + "/pages/deployments/") else
+                         "artifact_metadata" if method == "GET" and path.startswith(self.prefix + "/actions/artifacts/") else
+                         "provider_read" if method == "GET" else "provider_write")
+            raise Refusal(f"{operation}: HTTP {status}; no paid fallback")
         return value
 
     def repository_info(self) -> dict:
@@ -748,6 +752,22 @@ class GitHub:
         return verified[0]
 
 
+def recovery_authorization(config: dict, root: Path, state: dict, run: dict, now: datetime) -> dict:
+    """Exact-state, expiring maintainer consent; never taken from a PR artifact."""
+    if run.get("event") != "workflow_dispatch" or state.get("promotion_intent") is None:
+        raise Refusal("signed-intent recovery requires manual dispatch and pending intent")
+    approval = read_json(root / ".codeshouldbehave/pages-recovery.json", 4096)
+    object_fields(approval, {"schema_version", "repository", "action", "state_sha256", "intent_sha256", "expires_at"}, name="recovery authorization")
+    if approval["schema_version"] != "csb-pages-recovery-v1" or approval["repository"] != config["repository"] or approval["action"] != "resume_exact_intent":
+        raise Refusal("unsupported recovery authorization")
+    if approval["state_sha256"] != digest(canonical(state)) or approval["intent_sha256"] != digest(canonical(state["promotion_intent"])):
+        raise Refusal("recovery authorization does not match current signed state")
+    expiry = utc(approval["expires_at"])
+    if not now < expiry <= now + timedelta(hours=24):
+        raise Refusal("recovery authorization expired or exceeds 24 hours")
+    return approval
+
+
 def github_plan(config: dict, trusted_root: Path, output: Path, *, provider: GitHub | None = None) -> dict:
     load_config(config, runtime=True)
     if config["operations"]["analysis"] is not True:
@@ -759,7 +779,13 @@ def github_plan(config: dict, trusted_root: Path, output: Path, *, provider: Git
     run = provider.trusted_run(run_id, require_current=True)
     previous = provider.restore_state()
     if previous.get("promotion_intent") is not None:
-        raise Refusal("indeterminate Pages promotion requires explicit recovery")
+        approval = recovery_authorization(config, trusted_root, previous, run, datetime.now(timezone.utc))
+        budget_activation(config, trusted_root, previous, datetime.now(timezone.utc))
+        public_policy_digest(config, trusted_root)
+        result = {"requests": [], "previous_state": previous, "state": previous,
+                  "run": run, "recovery": approval, "deferred": 0, "provider_calls": provider.calls}
+        write_new_json(output, result, 512 * 1024)
+        return result
     now = datetime.now(timezone.utc)
     activated = budget_activation(config, trusted_root, previous, now)
     policy = read_json(trusted_root / config["policy_path"], MAX_CONFIG_BYTES)
@@ -1618,8 +1644,17 @@ def stage_publication(config: dict, plan_value: dict, handoffs: Path, output: Pa
     if trusted != plan_value["run"]:
         raise Refusal("publisher plan run differs from current trusted controller")
     previous = provider.restore_state()
-    if canonical(previous) != canonical(plan_value["previous_state"]) or previous.get("promotion_intent") is not None:
-        raise Refusal("publisher state changed/indeterminate; replan instead of overwriting")
+    if canonical(previous) != canonical(plan_value["previous_state"]):
+        raise Refusal("publisher state changed; replan instead of overwriting")
+    if plan_value.get("recovery") is not None:
+        approval = recovery_authorization(config, trusted_root, previous, trusted, datetime.now(timezone.utc))
+        if approval != plan_value["recovery"] or plan_value["requests"]:
+            raise Refusal("recovery plan differs from current exact authorization")
+        final = recover_pages_intent(config, previous, trusted, provider=provider, get=get)
+        return {"site": None, "recovery_final": final, "run": trusted,
+                "previous_state": previous, "state": final["state"], "results": []}
+    if previous.get("promotion_intent") is not None:
+        raise Refusal("indeterminate Pages promotion requires explicit recovery")
     if output.exists() or output.is_symlink():
         raise Refusal("publication staging must be new")
     output.mkdir(parents=True)
@@ -1768,7 +1803,11 @@ def deploy_pages(config: dict, intent_subject: dict, *, provider: GitHub, token:
     value = provider.api(provider.prefix + "/pages/deployments", method="POST", body={"artifact_id": intent["artifact_id"], "pages_build_version": intent["pages_build_version"], "environment": "github-pages", "oidc_token": token()})
     deployment_id = text(value.get("id"), PAGES_ID, "actual Pages deployment id")
     for _ in range(30):
-        status = provider.api(f"{provider.prefix}/pages/deployments/{deployment_id}")
+        status = provider.api(f"{provider.prefix}/pages/deployments/{deployment_id}", allow_404=True)
+        # Creation may precede status visibility. Never retry POST here.
+        if status is None:
+            sleep(5)
+            continue
         if status.get("status") == "succeed":
             return {"pages_deployment_id": deployment_id, "site_sha256": intent["site_manifest_sha256"], "status": "succeed"}
         if status.get("status") in ("deployment_failed", "deployment_content_failed", "deployment_cancelled", "deployment_lost"):
@@ -1776,6 +1815,50 @@ def deploy_pages(config: dict, intent_subject: dict, *, provider: GitHub, token:
         sleep(5)
     provider.api(f"{provider.prefix}/pages/deployments/{deployment_id}/cancel", method="POST", body={})
     raise Refusal("Pages deadline exhausted; intent remains indeterminate")
+
+
+def recover_pages_intent(config: dict, previous: dict, run: dict, *, provider: GitHub,
+                         get: Callable = http_bytes, token: Callable = github_oidc_token,
+                         sleep: Callable = time.sleep) -> dict:
+    """Resume immutable bytes; promote only after verified served-site readback.
+
+    Authorization is checked against main by stage_publication immediately before
+    this call. Failed/missing/expired artifacts never clear or replace the intent.
+    Pending PRs stay pending so a later ordinary pass reconstructs exact checks.
+    """
+    if not config["operations"]["publication"] or not provider.allow_writes:
+        raise Refusal("Pages recovery has not been activated")
+    provider.repository_info()
+    if canonical(provider.restore_state()) != canonical(previous):
+        raise Refusal("recovery state changed")
+    intent = previous.get("promotion_intent")
+    if intent is None:
+        raise Refusal("no signed intent to recover")
+    origin = provider.trusted_run(intent["run_id"], require_current=False, run_attempt=intent["run_attempt"])
+    original = provider.api(f"{provider.prefix}/contents/.codeshouldbehave/public-ci.json?ref={origin['head_sha']}")
+    if original.get("encoding") != "base64" or original.get("type") != "file" or not 0 < original.get("size", 0) <= MAX_CONFIG_BYTES:
+        raise Refusal("original deployment policy unavailable")
+    origin_config = json.loads(base64.b64decode(original["content"].replace("\n", ""), validate=True))
+    if any(origin_config.get(key) != config[key] for key in ("repository", "policy_sha256", "context_sha256", "site")):
+        raise Refusal("recovery cannot republish under changed scope or destination")
+    status = provider.api(f"{provider.prefix}/pages/deployments/{intent['pages_build_version']}", allow_404=True)
+    if status and status.get("status") == "succeed":
+        deployment = {"pages_deployment_id": intent["pages_build_version"], "site_sha256": intent["site_manifest_sha256"], "status": "succeed"}
+    else:
+        # Explicit manual consent permits one recreation of the SAME immutable
+        # artifact/version. A scheduled pass can never enter this path.
+        deployment = deploy_pages(config, {"state": previous, "controller_sha": origin["head_sha"]}, provider=provider, token=token, sleep=sleep)
+    with tempfile.TemporaryDirectory(prefix="csb-recovery-readback-") as temporary:
+        proposed = dict(previous, site_generation=intent["site_generation"],
+                        site_manifest_sha256=intent["site_manifest_sha256"],
+                        pages_deployment_id=deployment["pages_deployment_id"], promotion_intent=None)
+        restore_public_site(config, proposed, Path(temporary) / "site", get=get)
+    if canonical(provider.restore_state()) != canonical(previous):
+        raise Refusal("recovery state changed before receipt")
+    state = dict(proposed, sequence=previous["sequence"] + 1,
+                 previous_receipt_sha256=digest(canonical(previous)),
+                 previous_site_artifact_id=previous.get("site_artifact_id"), site_artifact_id=intent["artifact_id"])
+    return receipt_subject(config, previous, state, run, kind="site_promotion")
 
 
 def finalize_publication(config: dict, publication: dict, deployment: dict | None, *,
@@ -1910,7 +1993,7 @@ def publisher_server(config: dict, plan_value: dict, manifest: dict, budget_dire
                             write_new_json(work / "deployment.json", deployment)
                             phase = "deployed"; result = {"status": "succeed"}
                         elif command == "finalize" and ((phase == "staged" and publication["site"] is None) or phase == "deployed"):
-                            final = finalize_publication(config, publication, deployment, provider=provider)
+                            final = publication.get("recovery_final") or finalize_publication(config, publication, deployment, provider=provider)
                             write_subject(work / "final.json", final)
                             phase = "final"; result = {"kind": final["kind"]}
                         elif command == "commit" and phase == "final":

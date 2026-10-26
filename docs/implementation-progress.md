@@ -216,3 +216,31 @@ is claimed; deployed release still predates these fixes.
   credential-free sandbox startup and actual pinned ELF execution.
 - Pin PR ready for review/merge. Remaining acceptance is the live PR-to-Pages
   HLD/LLD/source journey after main selects this verified package.
+
+## 2026-10-26 IST — bounded diagnostics and explicit signed-intent recovery
+
+- Maintenance branch `codex/pages-intent-recovery` isolates recovery from the
+  phase-6 canary. PR #15 remains open, unchanged and unmerged at `7e09fc1`.
+- Implemented category-only HTTP diagnostics and bounded post-creation status
+  404 polling without repeat POSTs. The actual cause of the live creation/status
+  404 remains unconfirmed until this diagnostic engine runs.
+- Implemented exact-state, expiring, manual-dispatch-only recovery through the
+  existing controller workflow. Workflow bytes, budget identities and receipt
+  verifier are unchanged. Scope/origin validation and verified served-site readback
+  precede a normal signed site_promotion receipt; no ledger reset or deletion.
+- Prepared expiring authorization for existing receipt `7323471755`, artifact
+  `12626065953`. Runtime cryptographic verification remains mandatory; API reads
+  used to prepare this file are not treated as verified signature evidence.
+- Public tests: 97 passed, four native-dependent skips. Tests cover plan/stage
+  wiring, expiry, state mismatch, scope change, immutable replay, failed readback,
+  concurrent receipts, 404 polling and redacted diagnostics.
+- Deployment gates: review/merge recovery source; build/verify signed release;
+  review/merge pins; manually recover; normal live PR #15 analysis; browser
+  HLD/LLD/exact-source acceptance. No live recovery or end-to-end success claimed.
+
+- Recovery source commit: `75b73765675d2d563b7447062a2dc30f1d8a5e77`.
+- Maintenance PR #16: https://github.com/SSC-SDE/CodeShouldBehave/pull/16.
+  Provider check `wake` passed (run `40269704766`); this is scheduling
+  evidence only, not live recovery or dashboard acceptance.
+- Provider reconfirmed PR #15 OPEN at the unchanged full head
+  `7e09fc19477719b8d9fe2b9548bdc7e3514425fe`.

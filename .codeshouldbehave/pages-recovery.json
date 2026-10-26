@@ -1,0 +1,12 @@
+{
+  "schema_version": "csb-pages-recovery-v1",
+  "repository": {
+    "id": 1423092555,
+    "name": "CodeShouldBehave",
+    "owner": "SSC-SDE"
+  },
+  "action": "resume_exact_intent",
+  "state_sha256": "5196a558abdd67c4dcad93df8984f57308f36ee04b70d128201232b0a5e25a25",
+  "intent_sha256": "8c8c8cf6908347754cd86d522e147c51945d44f97815f065525983cb81a22f23",
+  "expires_at": "2026-10-27T03:32:33Z"
+}

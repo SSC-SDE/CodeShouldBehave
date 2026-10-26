@@ -183,3 +183,33 @@ previously activated evidence and budget block through a reviewed PR. Preserve
 engine pins and signed state. Never delete receipts, manufacture activation, or
 relax policy comparison to get a run through. A deliberate budget-policy change
 requires a separately designed and reviewed reactivation path.
+
+### Explicit recovery of a signed Pages intent
+
+Recovery does not delete receipts or reset state. A maintainer-reviewed
+`.codeshouldbehave/pages-recovery.json` must name the exact repository, SHA-256
+of the current signed state, SHA-256 of its pending intent, action
+`resume_exact_intent`, schema `csb-pages-recovery-v1`, and an expiry within 24 hours.
+The file authorizes only that immutable artifact/version. It is read from trusted
+main, never from the PR being reviewed. Refresh expiry only after reconfirming the
+same intended state and operator authorization; changed state needs fresh review.
+
+Deploy the signed engine containing this support, then manually dispatch the
+unchanged public controller on main. Scheduled/nudge runs cannot recover. Planning
+creates zero analysis requests; publication rechecks the exact approval and state.
+Recovery checks the originating trusted run and unchanged scope/destination. If
+Pages already succeeded it verifies the served site; otherwise it may recreate the
+same unexpired artifact/version once. A missing status is polled within the existing
+30-poll bound without repeating the creation request. Missing/expired artifacts,
+scope drift, readback digest mismatch or concurrent state changes leave the intent
+intact. No paid fallback or state deletion is used.
+
+After successful readback, the normal workflow attests and appends a chained
+`site_promotion` receipt. The authorization cannot replay against the new state.
+An ordinary subsequent controller pass analyzes open PRs and publishes their
+exact-head checks; recovery alone does not declare reviewer acceptance.
+
+Diagnostics expose only operation categories (`pages_create`, `pages_status`,
+`artifact_metadata`, `provider_read`, `provider_write`) and HTTP status codes.
+Tokens and provider bodies are never added to error messages. A creation 404 is
+not treated as a successful deployment or automatically retried.
