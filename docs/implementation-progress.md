@@ -264,3 +264,11 @@ is claimed; deployed release still predates these fixes.
   2026-10-27T03:32:33Z. No state reset, live recovery or dashboard success claimed.
 - Remaining: reviewed pin merge, manual recovery, fresh PR analysis, and live
   check-link HLD/LLD/exact-source navigation acceptance.
+
+- Production bootstrap passed against the published URLs; extracted
+  `scripts/public_ci.py` byte-matches merged recovery source.
+- Native sandbox preflight `40271067920` passed on pin commit
+  `e3d0cdf9c59a3fdb2baaf0cf384a9890d134edf2`, including signed package
+  verification and actual ELF startup inside the credential-free networkless sandbox.
+- Pin PR #17: https://github.com/SSC-SDE/CodeShouldBehave/pull/17.
+  Ready for owner merge; no main write or self-merge performed.

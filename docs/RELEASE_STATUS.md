@@ -132,3 +132,9 @@ and exact-source hosted provenance independently verified. This adds explicit
 signed-intent recovery and category-only Pages diagnostics. The pending pin
 update does not change scope, consent, controller or runtime budget identity.
 Live Pages recovery and PR #15 HLD/LLD/source acceptance remain unverified.
+
+Published bootstrap and helper byte comparison passed.
+[Native preflight 40271067920](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/40271067920)
+passed on `e3d0cdf9c59a3fdb2baaf0cf384a9890d134edf2`.
+[Pin PR #17](https://github.com/SSC-SDE/CodeShouldBehave/pull/17) is ready for
+owner merge. PR #15 remains unchanged and unmerged.
