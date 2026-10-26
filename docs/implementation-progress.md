@@ -424,3 +424,10 @@ is claimed; deployed release still predates these fixes.
   checksums and exact-source hosted signature passed independent verification.
 - Release: https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-bb0bfa67cb62.
 - Pin diff verified engine-only; no workflow/scope/consent/runtime budget changes.
+
+- Published production bootstrap passed; helper bytes match merged source.
+- Native sandbox preflight `40287650116` passed on
+  `7b9afa5d23795c38b008d418c3ab550a9b79cf6c`.
+- Pin PR #23: https://github.com/SSC-SDE/CodeShouldBehave/pull/23.
+  Ready for owner merge; no main write or self-merge. Final live check-summary
+  delivery and browser click-through require a controller run after main pins.
