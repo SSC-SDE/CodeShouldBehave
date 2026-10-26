@@ -244,3 +244,23 @@ is claimed; deployed release still predates these fixes.
   evidence only, not live recovery or dashboard acceptance.
 - Provider reconfirmed PR #15 OPEN at the unchanged full head
   `7e09fc19477719b8d9fe2b9548bdc7e3514425fe`.
+
+## 2026-10-26 — signed recovery engine and pin refresh
+
+- PR #16 provider-confirmed merge: `56b23fc7edf29ad4521f3a1ea603d215c75965ef`.
+- PR #15 remains OPEN at `7e09fc19477719b8d9fe2b9548bdc7e3514425fe`;
+  its branch is unchanged. Maintenance branch `codex/recovery-release-pins`
+  isolates engine pins from the phase-6 canary.
+- Account UI rechecked at approximately 04:44 UTC: Actions and Packages USD 0,
+  Usage blocked. Existing release evidence is valid until 06:28:25 UTC and
+  passed the hosted build gate. Runtime budget identity remains unchanged.
+- Trusted Linux build/public contract tests/attestation passed in run
+  `40270731162`, exact merged source above. Both archive checksums passed;
+  runtime signature verified with exact source/signer and hosted runners only.
+- Published release: https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-56b23fc7edf2.
+- Pins change engine identity only. Native startup preflight pending.
+- Signed intent remains deployment `7323471755`; artifact `12626065953` is
+  unexpired, with expiry 2026-10-27T03:34:09Z. Recovery authorization expires
+  2026-10-27T03:32:33Z. No state reset, live recovery or dashboard success claimed.
+- Remaining: reviewed pin merge, manual recovery, fresh PR analysis, and live
+  check-link HLD/LLD/exact-source navigation acceptance.
