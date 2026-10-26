@@ -138,3 +138,16 @@ Published bootstrap and helper byte comparison passed.
 passed on `e3d0cdf9c59a3fdb2baaf0cf384a9890d134edf2`.
 [Pin PR #17](https://github.com/SSC-SDE/CodeShouldBehave/pull/17) is ready for
 owner merge. PR #15 remains unchanged and unmerged.
+
+## Pages commit-version correction — 2026-10-26
+
+[canary-54b841656901](https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-54b841656901)
+is built from merged PR #18, exact source
+`54b841656901147f77ba405e37cac8e9cead6440`.
+Build/tests/attestation `40272553688`, archive checksums and exact-source hosted
+provenance passed. Native sandbox preflight `40272854755` passed on pin commit
+`6e1fe301511ff714c1a82803b8f80a6ad39a9041`, including published bootstrap
+and networkless ELF startup. USD 0 controls were rechecked before dispatch.
+[PR #19](https://github.com/SSC-SDE/CodeShouldBehave/pull/19) selects this engine
+without altering workflow, scope, consent, runtime budget or signed history.
+Live recovery and PR #15 HLD/LLD/source navigation still require verification.

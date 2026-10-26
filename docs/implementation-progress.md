@@ -314,3 +314,10 @@ is claimed; deployed release still predates these fixes.
 - Release: https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-54b841656901.
 - Pin diff verified to change engine identity only; workflow, runtime budget,
   scope, consent and recovery authorization are unchanged.
+
+- Native sandbox preflight `40272854755` passed on exact pin commit
+  `6e1fe301511ff714c1a82803b8f80a6ad39a9041`: published bootstrap/signatures
+  and actual ELF startup in the networkless credential-free sandbox.
+- Pin PR #19: https://github.com/SSC-SDE/CodeShouldBehave/pull/19.
+  Ready for owner merge; no main write or self-merge. Live recovery and
+  HLD/LLD/exact-source acceptance remain pending the reviewed main pins.
