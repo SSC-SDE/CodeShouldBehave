@@ -431,3 +431,12 @@ is claimed; deployed release still predates these fixes.
 - Pin PR #23: https://github.com/SSC-SDE/CodeShouldBehave/pull/23.
   Ready for owner merge; no main write or self-merge. Final live check-summary
   delivery and browser click-through require a controller run after main pins.
+
+- User requests a single deployment PR and deployment now. PR #23 also updates
+  explicit recovery authorization to signed state deployment `7326385331`,
+  sequence 33, artifact `12633562944`, from run `40286001442`. Pages currently
+  serves its exact manifest `27e2724beb927014573bfd1dc2d7e7eee4d34cfe62b819d607e6ebb82c8d818f`;
+  original run checked too early and safely refused stale readback.
+- Authorization names exact state/intent hashes with twelve-hour expiry; it
+  neither replaces history nor grants arbitrary artifact recovery. Current
+  SHA-based intent uses resume_exact_intent, without legacy commit remapping.
