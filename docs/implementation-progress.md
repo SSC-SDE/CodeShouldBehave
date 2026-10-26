@@ -199,3 +199,20 @@ is claimed; deployed release still predates these fixes.
 - Required next sequence: merge reviewed source PR #13; build/attest a new engine;
   update pins through review; then rerun live acceptance. Current release lacks
   engine-side normalization. HLD/LLD/source live verification remains unconfirmed.
+
+## 2026-10-26 IST — corrected release prepared
+
+- PR #13 merge verified: `3983c86730f275015a8eebf0a59cd2f55770213a`.
+- Trusted build/attestation `40223827336` passed. Published signed release
+  `canary-3983c86730f2`; archive, exact hosted signatures and production bootstrap
+  verified. Extracted publisher bytes match the corrected source.
+- New pin update changes engine identity only. Runtime budget/receipt/workflow
+  identities and all scope/consent fields remain unchanged.
+- Native sandbox preflight pending. Live test still requires reviewed main pins;
+  no direct main write or self-merge performed.
+- PR #14: https://github.com/SSC-SDE/CodeShouldBehave/pull/14.
+- Native Linux sandbox preflight `40225424957` passed on exact pin commit
+  `9808b790ce547c5ab8597b270d29060a5470a5cf`, including required networkless,
+  credential-free sandbox startup and actual pinned ELF execution.
+- Pin PR ready for review/merge. Remaining acceptance is the live PR-to-Pages
+  HLD/LLD/source journey after main selects this verified package.
