@@ -371,3 +371,11 @@ is claimed; deployed release still predates these fixes.
 - Release: https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-c35deed32251.
 - Runtime configuration diff verified engine-only; signed budget identity,
   workflow, scope, consent and recovery authorization are unchanged.
+
+- Published production bootstrap passed; extracted recovery helper byte-matches
+  merged source. Native sandbox preflight `40284804053` passed on
+  `a14c40d78ea67039b78ea88d4a9b7233eb9aa963`.
+- Pin PR #21: https://github.com/SSC-SDE/CodeShouldBehave/pull/21.
+  Ready for owner merge. Main remains untouched; PR #15 remains open.
+- PR #15 is sufficient for first branch/source-navigation acceptance; a wider
+  cross-component demo is separate from completing this verified check link.
