@@ -350,3 +350,24 @@ is claimed; deployed release still predates these fixes.
   PR check publication still await the merged, signed engine.
 
 - Correction commit `d934ae9`; PR #20: https://github.com/SSC-SDE/CodeShouldBehave/pull/20.
+
+## 2026-10-26 — marker readback signed release refresh
+
+- PR #20 merge verified: `c35deed322516d80c0b821645b40449dc475c96c`.
+- PR #15 remains open at unchanged `7e09fc19477719b8d9fe2b9548bdc7e3514425fe`.
+- Fresh browser reload verified account Actions/Packages USD 0 Usage blocked
+  and GitHub Free. New release-only observation at 07:12:17Z expires 19:12:17Z.
+  Prior expired observation was not reused; runtime budget identity unchanged.
+- Trusted build dispatched `40284382933`, exact merged source above.
+- Original signed recovery artifact remains unexpired until 2026-10-27T03:34:09Z;
+  authorization expires two minutes earlier. Receipt history is unchanged.
+- Isolated pin branch `codex/pages-marker-release-pins`; remaining validation
+  is signed release verification, native sandbox preflight, reviewed pins and
+  hosted recovery/check publication. Prior live HLD/LLD/source evidence remains
+  valid for the published exact comparison, not proof of check publication.
+
+- Build/public tests/hosted attestation `40284382933` passed. Archive checksums
+  and exact-source hosted provenance passed independent verification.
+- Release: https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-c35deed32251.
+- Runtime configuration diff verified engine-only; signed budget identity,
+  workflow, scope, consent and recovery authorization are unchanged.
