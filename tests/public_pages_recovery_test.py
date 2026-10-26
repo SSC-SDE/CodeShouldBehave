@@ -166,3 +166,46 @@ class PagesRecoveryTests(unittest.TestCase):
                 self.assertEqual(staged['recovery_final'], final)
                 self.assertEqual(authorize.call_count, 2)
                 resume.assert_called_once()
+
+    def test_new_intent_uses_actual_controller_commit(self):
+        self.assertEqual(self.state['promotion_intent']['pages_build_version'], self.origin['head_sha'])
+
+    def test_legacy_version_mapping_is_explicit_and_exact(self):
+        intent = self.state['promotion_intent']
+        intent['pages_build_version'] = 'csb-111-2-1'
+        with self.assertRaises(ci.Refusal):
+            ci.pages_build_commit(intent, self.origin['head_sha'])
+        with self.assertRaises(ci.Refusal):
+            ci.pages_build_commit(intent, self.origin['head_sha'], 'd' * 40)
+        self.assertEqual(ci.pages_build_commit(intent, self.origin['head_sha'], self.origin['head_sha']), self.origin['head_sha'])
+        intent['pages_build_version'] = 'csb-112-2-1'
+        with self.assertRaises(ci.Refusal):
+            ci.pages_build_commit(intent, self.origin['head_sha'], self.origin['head_sha'])
+
+    def test_legacy_recovery_preserves_intent_and_posts_origin_commit(self):
+        self.state['promotion_intent']['pages_build_version'] = 'csb-111-2-1'
+        saved = copy.deepcopy(self.state)
+        initial = True
+        def api(path, **kwargs):
+            nonlocal initial
+            if '/contents/' in path or '/actions/artifacts/' in path:
+                return self.api(path, **kwargs)
+            self.calls.append((path, kwargs))
+            if kwargs.get('method') == 'POST':
+                self.assertEqual(kwargs['body']['artifact_id'], 44)
+                self.assertEqual(kwargs['body']['pages_build_version'], self.origin['head_sha'])
+                return {'id': self.origin['head_sha']}
+            if initial:
+                initial = False
+                return None
+            return {'status': 'succeed'}
+        self.provider.api = api
+        with patch.object(ci, 'restore_public_site', return_value=Path('verified')) as readback:
+            final = ci.recover_pages_intent(self.config, self.state, self.current,
+                provider=self.provider, token=lambda: 'SECRET', sleep=lambda _: None,
+                recovery_commit=self.origin['head_sha'])
+        readback.assert_called_once()
+        self.assertEqual(self.state, saved)
+        self.assertEqual(final['state']['pages_deployment_id'], self.origin['head_sha'])
+        self.assertEqual(final['state']['site_manifest_sha256'], saved['promotion_intent']['site_manifest_sha256'])
+        self.assertEqual(sum(k.get('method') == 'POST' for _, k in self.calls), 1)

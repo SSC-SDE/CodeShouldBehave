@@ -757,11 +757,15 @@ def recovery_authorization(config: dict, root: Path, state: dict, run: dict, now
     if run.get("event") != "workflow_dispatch" or state.get("promotion_intent") is None:
         raise Refusal("signed-intent recovery requires manual dispatch and pending intent")
     approval = read_json(root / ".codeshouldbehave/pages-recovery.json", 4096)
-    object_fields(approval, {"schema_version", "repository", "action", "state_sha256", "intent_sha256", "expires_at"}, name="recovery authorization")
-    if approval["schema_version"] != "csb-pages-recovery-v1" or approval["repository"] != config["repository"] or approval["action"] != "resume_exact_intent":
+    object_fields(approval, {"schema_version", "repository", "action", "state_sha256", "intent_sha256", "expires_at"}, {"pages_build_version"}, name="recovery authorization")
+    if approval["schema_version"] != "csb-pages-recovery-v1" or approval["repository"] != config["repository"] or approval["action"] not in ("resume_exact_intent", "resume_exact_artifact_at_origin_commit"):
         raise Refusal("unsupported recovery authorization")
     if approval["state_sha256"] != digest(canonical(state)) or approval["intent_sha256"] != digest(canonical(state["promotion_intent"])):
         raise Refusal("recovery authorization does not match current signed state")
+    if approval["action"] == "resume_exact_artifact_at_origin_commit":
+        text(approval.get("pages_build_version"), COMMIT, "authorized recovery commit")
+    elif "pages_build_version" in approval:
+        raise Refusal("unexpected recovery commit override")
     expiry = utc(approval["expires_at"])
     if not now < expiry <= now + timedelta(hours=24):
         raise Refusal("recovery authorization expired or exceeds 24 hours")
@@ -1650,7 +1654,8 @@ def stage_publication(config: dict, plan_value: dict, handoffs: Path, output: Pa
         approval = recovery_authorization(config, trusted_root, previous, trusted, datetime.now(timezone.utc))
         if approval != plan_value["recovery"] or plan_value["requests"]:
             raise Refusal("recovery plan differs from current exact authorization")
-        final = recover_pages_intent(config, previous, trusted, provider=provider, get=get)
+        final = recover_pages_intent(config, previous, trusted, provider=provider, get=get,
+            recovery_commit=approval.get("pages_build_version"))
         return {"site": None, "recovery_final": final, "run": trusted,
                 "previous_state": previous, "state": final["state"], "results": []}
     if previous.get("promotion_intent") is not None:
@@ -1744,7 +1749,7 @@ def begin_promotion(config: dict, publication: dict, artifact_id: int, *, now: s
     state["promotion_intent"] = {"site_generation": previous["site_generation"] + 1,
                                  "site_manifest_sha256": publication["site"]["site_sha256"],
                                  "artifact_id": integer(artifact_id, 1, 2**63 - 1, "site artifact"),
-                                 "pages_build_version": f"csb-{publication['run']['id']}-{publication['run']['run_attempt']}-{previous['site_generation'] + 1}",
+                                 "pages_build_version": text(publication["run"]["head_sha"], COMMIT, "Pages build commit"),
                                  "run_id": publication["run"]["id"], "run_attempt": publication["run"]["run_attempt"], "created_at": now}
     return receipt_subject(config, previous, state, publication["run"], kind="site_intent")
 
@@ -1788,8 +1793,22 @@ def github_oidc_token() -> str:
     return jwt
 
 
+def pages_build_commit(intent: dict, controller_sha: str, recovery_commit: str | None = None) -> str:
+    """Pages accepts a repository commit, not our legacy synthetic version."""
+    commit = text(controller_sha, COMMIT, "Pages origin commit")
+    version = intent["pages_build_version"]
+    if recovery_commit is not None:
+        legacy = f"csb-{intent['run_id']}-{intent['run_attempt']}-{intent['site_generation']}"
+        if recovery_commit != commit or version != legacy:
+            raise Refusal("recovery commit differs from exact legacy origin")
+        return commit
+    if version != commit:
+        raise Refusal("Pages version must match origin commit; explicit legacy recovery required")
+    return commit
+
+
 def deploy_pages(config: dict, intent_subject: dict, *, provider: GitHub, token: Callable = github_oidc_token,
-                 sleep: Callable = time.sleep) -> dict:
+                 sleep: Callable = time.sleep, recovery_commit: str | None = None) -> dict:
     if not config["operations"]["publication"] or not provider.allow_writes:
         raise Refusal("Pages writes have not been activated")
     provider.repository_info()
@@ -1797,10 +1816,11 @@ def deploy_pages(config: dict, intent_subject: dict, *, provider: GitHub, token:
     if canonical(current) != canonical(intent_subject["state"]) or current.get("promotion_intent") is None:
         raise Refusal("Pages requires the exact committed attested intent")
     intent = current["promotion_intent"]
+    version = pages_build_commit(intent, intent_subject["controller_sha"], recovery_commit)
     artifact = provider.api(f"{provider.prefix}/actions/artifacts/{intent['artifact_id']}")
     if artifact.get("workflow_run", {}).get("id") != intent["run_id"] or artifact.get("workflow_run", {}).get("head_sha") != intent_subject["controller_sha"] or artifact.get("expired") is not False or artifact.get("name") != f"csb-public-pages-{intent['run_id']}-{intent['run_attempt']}" or integer(artifact.get("size_in_bytes"), 1, MAX_SITE_ARCHIVE, "Pages artifact bytes") > MAX_SITE_ARCHIVE:
         raise Refusal("Pages artifact is not from this trusted publisher run")
-    value = provider.api(provider.prefix + "/pages/deployments", method="POST", body={"artifact_id": intent["artifact_id"], "pages_build_version": intent["pages_build_version"], "environment": "github-pages", "oidc_token": token()})
+    value = provider.api(provider.prefix + "/pages/deployments", method="POST", body={"artifact_id": intent["artifact_id"], "pages_build_version": version, "environment": "github-pages", "oidc_token": token()})
     deployment_id = text(value.get("id"), PAGES_ID, "actual Pages deployment id")
     for _ in range(30):
         status = provider.api(f"{provider.prefix}/pages/deployments/{deployment_id}", allow_404=True)
@@ -1819,7 +1839,7 @@ def deploy_pages(config: dict, intent_subject: dict, *, provider: GitHub, token:
 
 def recover_pages_intent(config: dict, previous: dict, run: dict, *, provider: GitHub,
                          get: Callable = http_bytes, token: Callable = github_oidc_token,
-                         sleep: Callable = time.sleep) -> dict:
+                         sleep: Callable = time.sleep, recovery_commit: str | None = None) -> dict:
     """Resume immutable bytes; promote only after verified served-site readback.
 
     Authorization is checked against main by stage_publication immediately before
@@ -1841,13 +1861,14 @@ def recover_pages_intent(config: dict, previous: dict, run: dict, *, provider: G
     origin_config = json.loads(base64.b64decode(original["content"].replace("\n", ""), validate=True))
     if any(origin_config.get(key) != config[key] for key in ("repository", "policy_sha256", "context_sha256", "site")):
         raise Refusal("recovery cannot republish under changed scope or destination")
-    status = provider.api(f"{provider.prefix}/pages/deployments/{intent['pages_build_version']}", allow_404=True)
+    version = pages_build_commit(intent, origin["head_sha"], recovery_commit)
+    status = provider.api(f"{provider.prefix}/pages/deployments/{version}", allow_404=True)
     if status and status.get("status") == "succeed":
-        deployment = {"pages_deployment_id": intent["pages_build_version"], "site_sha256": intent["site_manifest_sha256"], "status": "succeed"}
+        deployment = {"pages_deployment_id": version, "site_sha256": intent["site_manifest_sha256"], "status": "succeed"}
     else:
         # Explicit manual consent permits one recreation of the SAME immutable
         # artifact/version. A scheduled pass can never enter this path.
-        deployment = deploy_pages(config, {"state": previous, "controller_sha": origin["head_sha"]}, provider=provider, token=token, sleep=sleep)
+        deployment = deploy_pages(config, {"state": previous, "controller_sha": origin["head_sha"]}, provider=provider, token=token, sleep=sleep, recovery_commit=recovery_commit)
     with tempfile.TemporaryDirectory(prefix="csb-recovery-readback-") as temporary:
         proposed = dict(previous, site_generation=intent["site_generation"],
                         site_manifest_sha256=intent["site_manifest_sha256"],

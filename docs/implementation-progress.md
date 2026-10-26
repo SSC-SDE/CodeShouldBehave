@@ -272,3 +272,23 @@ is claimed; deployed release still predates these fixes.
   verification and actual ELF startup inside the credential-free networkless sandbox.
 - Pin PR #17: https://github.com/SSC-SDE/CodeShouldBehave/pull/17.
   Ready for owner merge; no main write or self-merge performed.
+
+## 2026-10-26 — live recovery diagnostic and Pages version correction
+
+- PR #17 merge verified: `96667f0e70da4e26e63b4c940bd940f46cb4543f`.
+- Manual recovery run `40272099786` verified the signed intent and authorized
+  plan, then failed at `pages_create: HTTP 404`. No promotion receipt or reset.
+- Publisher token has Pages write permission; Pages workflow configuration is
+  present; original artifact remains unexpired.
+- Identified compatibility defect: synthetic `csb-run-attempt-generation` build
+  versions instead of repository commit SHAs. GitHub's official deploy action
+  uses GITHUB_SHA; its issue #383 documents matching 404s for other strings.
+  https://github.com/actions/deploy-pages/issues/383
+- New intents bind the actual controller SHA. Explicit legacy recovery maps
+  only the exact synthetic identity to its verified original run SHA, requires
+  that SHA in trusted expiring authorization, preserves artifact/digest/history,
+  and verifies served bytes before a new signed promotion receipt.
+- 100 public tests passed, four native-dependent skips; added exact mapping,
+  unauthorized mapping refusal, original artifact and immutable history tests.
+- PR #15 remains open/unmodified. Live HLD/LLD/source verification is blocked
+  until this correction is merged, signed and selected by reviewed engine pins.

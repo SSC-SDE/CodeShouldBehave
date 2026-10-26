@@ -213,3 +213,14 @@ Diagnostics expose only operation categories (`pages_create`, `pages_status`,
 `artifact_metadata`, `provider_read`, `provider_write`) and HTTP status codes.
 Tokens and provider bodies are never added to error messages. A creation 404 is
 not treated as a successful deployment or automatically retried.
+
+### Pages commit-version compatibility
+
+New Pages intents use the exact controller commit SHA. GitHub's deployment
+service rejects synthetic version strings despite the REST field's general
+wording. Legacy synthetic intents require the explicit
+`resume_exact_artifact_at_origin_commit` authorization action with a
+`pages_build_version` equal to the verified original controller SHA. Existing
+state/intent hashes and expiry still apply. No artifact, site digest, scope or
+historical signed receipt changes. Successful served-site readback remains
+mandatory; a green workflow alone is not dashboard acceptance.
