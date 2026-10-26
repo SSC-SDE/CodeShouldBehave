@@ -379,3 +379,30 @@ is claimed; deployed release still predates these fixes.
   Ready for owner merge. Main remains untouched; PR #15 remains open.
 - PR #15 is sufficient for first branch/source-navigation acceptance; a wider
   cross-component demo is separate from completing this verified check link.
+
+## 2026-10-26 — signed recovery completed
+
+- PR #21 merge verified: `3e4d2923c304c75a57681b13257e31af0099b696`.
+- Manual signed recovery `40285079425` passed all jobs, including actual served
+  file readback, hosted attestation and durable promotion receipt.
+- New signed state deployment `7326240939`, kind site_promotion, sequence 30,
+  promotion_intent null. Original ledger preserved; no reset/deletion.
+- Normal PR analysis dispatched in `40285306791` on exact merged main.
+- PR #15 remains open at `7e09fc19477719b8d9fe2b9548bdc7e3514425fe`.
+  Check-link/browser acceptance evidence follows after actual completion.
+
+- Normal analysis/publication `40285306791` passed all jobs. Signed state
+  deployment `7326296300`, sequence 32, records report
+  `462de65d977d9965908d1cc8ee87f960e1e35b1a82fc45372b22e63e3b1a3aee`.
+- Architecture check `121448420436` exists on exact PR #15 head; conclusion
+  neutral, title Incomplete · Review required (coverage gaps retained).
+- GitHub replaces Actions-owned details_url with its own check page, despite
+  the publisher supplying the correct dashboard URL. Manual correction via
+  maintainer CLI refused HTTP 403 (GitHub App required); no bypass attempted.
+- Added explicit exact-report Markdown link to check summaries and exact-link
+  delivery acknowledgment. Missing/wrong links remain pending; app, head and
+  external_id fences unchanged. 106 public tests passed, four skips.
+- Browser verified supplied immutable report URL opens Focus automatically
+  and loads the four-function LLD catalog. Same published report identity as
+  prior verified HLD/LLD/exact-source journey. Check summary fallback still
+  requires signed engine rollout; end-to-end PR link is not claimed finalized.
