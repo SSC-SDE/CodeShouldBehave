@@ -292,3 +292,5 @@ is claimed; deployed release still predates these fixes.
   unauthorized mapping refusal, original artifact and immutable history tests.
 - PR #15 remains open/unmodified. Live HLD/LLD/source verification is blocked
   until this correction is merged, signed and selected by reviewed engine pins.
+
+- Correction commit `d571502`; PR #18: https://github.com/SSC-SDE/CodeShouldBehave/pull/18.
