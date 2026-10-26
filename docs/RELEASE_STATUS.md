@@ -163,3 +163,16 @@ Native networkless sandbox startup `40284804053` passed on pin commit
 evidence expires 2026-10-26T19:12:17Z; runtime budget identity is unchanged.
 [Pin PR #21](https://github.com/SSC-SDE/CodeShouldBehave/pull/21) is ready for
 owner merge. Signed promotion and final automatic PR check link are pending.
+
+## Explicit check report-link release — 2026-10-26
+
+[canary-bb0bfa67cb62](https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-bb0bfa67cb62)
+is built from merged PR #22, `bb0bfa67cb629a375f50459691b25c7a76f82e6e`.
+Build/tests/attestation `40287232950`, exact-source hosted signatures, checksums,
+published production bootstrap and helper byte comparison passed.
+Native networkless sandbox startup `40287650116` passed on pin commit
+`7b9afa5d23795c38b008d418c3ab550a9b79cf6c`. Hard-zero controls rechecked;
+release evidence valid until 2026-10-26T19:12:17Z.
+[Pin PR #23](https://github.com/SSC-SDE/CodeShouldBehave/pull/23) is ready for
+owner merge. Signed recovery and report publication already pass; actual check
+summary link delivery remains pending this rollout. PR #15 remains unmerged.

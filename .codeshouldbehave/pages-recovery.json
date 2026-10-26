@@ -5,9 +5,8 @@
     "name": "CodeShouldBehave",
     "owner": "SSC-SDE"
   },
-  "action": "resume_exact_artifact_at_origin_commit",
-  "state_sha256": "5196a558abdd67c4dcad93df8984f57308f36ee04b70d128201232b0a5e25a25",
-  "intent_sha256": "8c8c8cf6908347754cd86d522e147c51945d44f97815f065525983cb81a22f23",
-  "expires_at": "2026-10-27T03:32:33Z",
-  "pages_build_version": "f64c45f5f64fdeeb33ef3446a5d045d5ece3ebc4"
+  "action": "resume_exact_intent",
+  "state_sha256": "bb061e2828477f5b0c17dab62cbc0b05d261219aec909878e5b4a4c3a78c61ac",
+  "intent_sha256": "ed6e52a9cd4ebcf2bb7613eca950866ef5fc8ac24ca6b30cf94fc0e742f8a92d",
+  "expires_at": "2026-10-26T19:49:07.882734Z"
 }

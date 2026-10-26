@@ -406,3 +406,37 @@ is claimed; deployed release still predates these fixes.
   and loads the four-function LLD catalog. Same published report identity as
   prior verified HLD/LLD/exact-source journey. Check summary fallback still
   requires signed engine rollout; end-to-end PR link is not claimed finalized.
+
+## 2026-10-26 — check summary-link signed release
+
+- PR #22 merge verified: `bb0bfa67cb629a375f50459691b25c7a76f82e6e`.
+- USD 0 Actions/Packages Usage blocked rechecked from freshly loaded billing
+  page at approximately 07:40 UTC. Release observation remains valid until
+  19:12:17Z; runtime budget identity unchanged.
+- Trusted build `40287232950` dispatched on exact merged source.
+- Pin branch `codex/check-link-release-pins` isolates this update from PR #15,
+  which remains open at `7e09fc19477719b8d9fe2b9548bdc7e3514425fe`.
+- Signed recovery and report publication already passed. This rollout delivers
+  the explicit check-summary link because GitHub rewrites Actions Details URLs.
+  Final browser click-through remains pending main pins and controller run.
+
+- Build/public tests/hosted attestation `40287232950` passed; both archive
+  checksums and exact-source hosted signature passed independent verification.
+- Release: https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-bb0bfa67cb62.
+- Pin diff verified engine-only; no workflow/scope/consent/runtime budget changes.
+
+- Published production bootstrap passed; helper bytes match merged source.
+- Native sandbox preflight `40287650116` passed on
+  `7b9afa5d23795c38b008d418c3ab550a9b79cf6c`.
+- Pin PR #23: https://github.com/SSC-SDE/CodeShouldBehave/pull/23.
+  Ready for owner merge; no main write or self-merge. Final live check-summary
+  delivery and browser click-through require a controller run after main pins.
+
+- User requests a single deployment PR and deployment now. PR #23 also updates
+  explicit recovery authorization to signed state deployment `7326385331`,
+  sequence 33, artifact `12633562944`, from run `40286001442`. Pages currently
+  serves its exact manifest `27e2724beb927014573bfd1dc2d7e7eee4d34cfe62b819d607e6ebb82c8d818f`;
+  original run checked too early and safely refused stale readback.
+- Authorization names exact state/intent hashes with twelve-hour expiry; it
+  neither replaces history nor grants arbitrary artifact recovery. Current
+  SHA-based intent uses resume_exact_intent, without legacy commit remapping.
