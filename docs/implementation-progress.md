@@ -294,3 +294,30 @@ is claimed; deployed release still predates these fixes.
   until this correction is merged, signed and selected by reviewed engine pins.
 
 - Correction commit `d571502`; PR #18: https://github.com/SSC-SDE/CodeShouldBehave/pull/18.
+
+## 2026-10-26 — corrected Pages version release refresh
+
+- PR #18 merge verified: `54b841656901147f77ba405e37cac8e9cead6440`.
+- PR #15 remains open at `7e09fc19477719b8d9fe2b9548bdc7e3514425fe`.
+- USD 0 Actions/Packages Usage blocked controls rechecked at approximately
+  05:07 UTC. Existing release observation remains valid until 06:28:25 UTC;
+  runtime budget identity is unchanged.
+- Bounded trusted build dispatched: `40272553688`, exact merged source above.
+- Signed intent deployment `7323471755` is still latest. Original artifact
+  `12626065953` remains unexpired. Explicit original-SHA recovery authorization
+  expires 2026-10-27T03:32:33Z. No reset or replacement of signed history.
+- Pin preparation uses `codex/pages-sha-release-pins`, isolated from PR #15.
+  Release verification, native preflight and pin PR evidence follow below.
+
+- Build/public tests/hosted attestation `40272553688` passed. Both archive
+  checksums and exact-source hosted signature verified independently.
+- Release: https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-54b841656901.
+- Pin diff verified to change engine identity only; workflow, runtime budget,
+  scope, consent and recovery authorization are unchanged.
+
+- Native sandbox preflight `40272854755` passed on exact pin commit
+  `6e1fe301511ff714c1a82803b8f80a6ad39a9041`: published bootstrap/signatures
+  and actual ELF startup in the networkless credential-free sandbox.
+- Pin PR #19: https://github.com/SSC-SDE/CodeShouldBehave/pull/19.
+  Ready for owner merge; no main write or self-merge. Live recovery and
+  HLD/LLD/exact-source acceptance remain pending the reviewed main pins.
