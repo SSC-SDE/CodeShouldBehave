@@ -237,3 +237,10 @@ is claimed; deployed release still predates these fixes.
 - Deployment gates: review/merge recovery source; build/verify signed release;
   review/merge pins; manually recover; normal live PR #15 analysis; browser
   HLD/LLD/exact-source acceptance. No live recovery or end-to-end success claimed.
+
+- Recovery source commit: `75b73765675d2d563b7447062a2dc30f1d8a5e77`.
+- Maintenance PR #16: https://github.com/SSC-SDE/CodeShouldBehave/pull/16.
+  Provider check `wake` passed (run `40269704766`); this is scheduling
+  evidence only, not live recovery or dashboard acceptance.
+- Provider reconfirmed PR #15 OPEN at the unchanged full head
+  `7e09fc19477719b8d9fe2b9548bdc7e3514425fe`.
