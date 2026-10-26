@@ -151,3 +151,15 @@ and networkless ELF startup. USD 0 controls were rechecked before dispatch.
 [PR #19](https://github.com/SSC-SDE/CodeShouldBehave/pull/19) selects this engine
 without altering workflow, scope, consent, runtime budget or signed history.
 Live recovery and PR #15 HLD/LLD/source navigation still require verification.
+
+## Empty marker readback release — 2026-10-26
+
+[canary-c35deed32251](https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-c35deed32251)
+is built from merged PR #20, `c35deed322516d80c0b821645b40449dc475c96c`.
+Build/tests/attestation `40284382933`, exact-source hosted signature checks,
+archive checksums and published production bootstrap passed.
+Native networkless sandbox startup `40284804053` passed on pin commit
+`a14c40d78ea67039b78ea88d4a9b7233eb9aa963`. Fresh UI-observed release budget
+evidence expires 2026-10-26T19:12:17Z; runtime budget identity is unchanged.
+[Pin PR #21](https://github.com/SSC-SDE/CodeShouldBehave/pull/21) is ready for
+owner merge. Signed promotion and final automatic PR check link are pending.
