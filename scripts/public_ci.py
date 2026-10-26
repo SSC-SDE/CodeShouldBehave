@@ -1317,7 +1317,16 @@ def restore_public_site(config: dict, state: dict, output: Path, *, get: Callabl
             total += size
             if total > MAX_SITE_BYTES or time.monotonic() - started > 120:
                 raise Refusal("site restore deadline/byte budget exhausted")
-            value = get(url + rel, size)
+            # Pages' artifact uploader excludes dotfiles by default. This empty
+            # deployment marker is not report content and need not be served.
+            # Reconstruct ONLY its unique, signed empty bytes; every other path
+            # must still pass HTTP readback and the original digest checks.
+            if rel == ".nojekyll":
+                if size != 0 or item["sha256"] != digest(b""):
+                    raise Refusal("invalid deployment marker in signed manifest")
+                value = b""
+            else:
+                value = get(url + rel, size)
             if len(value) != size or digest(value) != text(item["sha256"], SHA256, "site file digest"):
                 raise Refusal("restored site content mismatch")
             destination = output / rel; destination.parent.mkdir(parents=True, exist_ok=True)

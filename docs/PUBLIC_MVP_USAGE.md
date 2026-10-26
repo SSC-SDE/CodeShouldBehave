@@ -224,3 +224,12 @@ wording. Legacy synthetic intents require the explicit
 state/intent hashes and expiry still apply. No artifact, site digest, scope or
 historical signed receipt changes. Successful served-site readback remains
 mandatory; a green workflow alone is not dashboard acceptance.
+
+### Empty Pages deployment marker
+
+The root `.nojekyll` file is a zero-byte deployment marker, not a report asset.
+The Pages artifact uploader excludes hidden files by default. During restoration,
+only this exact path may be reconstructed, and only when the signed manifest
+binds zero bytes and SHA256(empty). No HTTP fallback applies to other paths.
+Every report, source excerpt, script and asset still requires exact live length
+and hash verification, followed by full site validation before signed promotion.
