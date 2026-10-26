@@ -406,3 +406,21 @@ is claimed; deployed release still predates these fixes.
   and loads the four-function LLD catalog. Same published report identity as
   prior verified HLD/LLD/exact-source journey. Check summary fallback still
   requires signed engine rollout; end-to-end PR link is not claimed finalized.
+
+## 2026-10-26 — check summary-link signed release
+
+- PR #22 merge verified: `bb0bfa67cb629a375f50459691b25c7a76f82e6e`.
+- USD 0 Actions/Packages Usage blocked rechecked from freshly loaded billing
+  page at approximately 07:40 UTC. Release observation remains valid until
+  19:12:17Z; runtime budget identity unchanged.
+- Trusted build `40287232950` dispatched on exact merged source.
+- Pin branch `codex/check-link-release-pins` isolates this update from PR #15,
+  which remains open at `7e09fc19477719b8d9fe2b9548bdc7e3514425fe`.
+- Signed recovery and report publication already passed. This rollout delivers
+  the explicit check-summary link because GitHub rewrites Actions Details URLs.
+  Final browser click-through remains pending main pins and controller run.
+
+- Build/public tests/hosted attestation `40287232950` passed; both archive
+  checksums and exact-source hosted signature passed independent verification.
+- Release: https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-bb0bfa67cb62.
+- Pin diff verified engine-only; no workflow/scope/consent/runtime budget changes.
