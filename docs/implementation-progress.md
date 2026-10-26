@@ -321,3 +321,30 @@ is claimed; deployed release still predates these fixes.
 - Pin PR #19: https://github.com/SSC-SDE/CodeShouldBehave/pull/19.
   Ready for owner merge; no main write or self-merge. Live recovery and
   HLD/LLD/exact-source acceptance remain pending the reviewed main pins.
+
+## 2026-10-26 — Pages served; empty deployment marker readback correction
+
+- PR #19 merge verified: `4d5bc0cd735e51bdbb4c94be249d35b1625a109f`.
+- Recovery `40273022299` successfully created Pages at original commit
+  `f64c45f5f64fdeeb33ef3446a5d045d5ece3ebc4`; the creation 404 is resolved.
+  Both that run and readback retry `40273194314` stopped before signing a
+  promotion receipt because the excluded root `.nojekyll` marker returns 404.
+- Independently fetched all 257 manifest entries: only the zero-byte deployment
+  marker is absent; all 256 served files match length and digest.
+- Browser verified actual public PR #15 HLD component, LLD function catalog,
+  process_payment flow and exact added source lines 11–24 at proposal 7e09fc19.
+  Baseline f64c45f5 correctly shows absence for this newly added file.
+- Fix reconstructs only root `.nojekyll` when its signed size is zero and digest
+  equals SHA256(empty). Every report/asset still requires live byte/hash readback;
+  complete local site verification and signed promotion remain mandatory.
+- Tests: 105 passed, four native-dependent skips. Cases reject nonempty/wrong-hash
+  markers, missing reports, other hidden files and corrupted report content.
+- PR #15 remains unmerged. Main signed engine refresh/pins still gate runtime
+  use of this helper; automatic check-link publication is not yet finalized.
+
+- Corrected production `restore_public_site` passed against live Pages and
+  original signed manifest digest
+  `3430ffa6d922783f6e1fce9f9294d06b054315110f61d121944b2f1e350c2e7f`: 257
+  entries, including full `public_site.verify_site`. This is real network
+  readback evidence, not a mocked verification. Hosted signed promotion and
+  PR check publication still await the merged, signed engine.
