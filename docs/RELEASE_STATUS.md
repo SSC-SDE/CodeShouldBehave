@@ -121,3 +121,20 @@ acceptance is not yet complete.
 Native sandbox preflight `40225424957` passed on pin commit
 `9808b790ce547c5ab8597b270d29060a5470a5cf`. PR #14 contains the reviewed
 engine-only deployment change. Live acceptance remains pending its main merge.
+
+## Recovery release — 2026-10-26
+
+Current candidate: [canary-56b23fc7edf2](https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-56b23fc7edf2),
+source `56b23fc7edf29ad4521f3a1ea603d215c75965ef`.
+[Build and attestation 40270731162](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/40270731162)
+passed, including the fresh hard-zero gate and public contract tests. Checksums
+and exact-source hosted provenance independently verified. This adds explicit
+signed-intent recovery and category-only Pages diagnostics. The pending pin
+update does not change scope, consent, controller or runtime budget identity.
+Live Pages recovery and PR #15 HLD/LLD/source acceptance remain unverified.
+
+Published bootstrap and helper byte comparison passed.
+[Native preflight 40271067920](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/40271067920)
+passed on `e3d0cdf9c59a3fdb2baaf0cf384a9890d134edf2`.
+[Pin PR #17](https://github.com/SSC-SDE/CodeShouldBehave/pull/17) is ready for
+owner merge. PR #15 remains unchanged and unmerged.
