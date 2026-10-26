@@ -348,3 +348,5 @@ is claimed; deployed release still predates these fixes.
   entries, including full `public_site.verify_site`. This is real network
   readback evidence, not a mocked verification. Hosted signed promotion and
   PR check publication still await the merged, signed engine.
+
+- Correction commit `d934ae9`; PR #20: https://github.com/SSC-SDE/CodeShouldBehave/pull/20.
