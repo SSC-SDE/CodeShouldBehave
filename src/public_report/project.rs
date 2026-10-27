@@ -108,6 +108,20 @@ fn public_hld(version: &DesignVersion) -> Result<(Value, String, DesignVersion),
     clean.coverage.profile = crate::design::HLD_PROFILE.into();
     clean.mermaid = crate::design::render_hld_mermaid(&clean);
     clean.markdown = crate::design::render_hld_markdown(&clean);
+    // Markdown repeats the full fact inventory in several export views. Keep
+    // the diagram and exact JSON evidence rather than spending the report byte
+    // budget on duplicate prose and refusing an otherwise useful comparison.
+    if clean.markdown.len() > 64 * 1024 {
+        clean.markdown = format!(
+            "# High-level design\n\nSnapshot: {}\n\nThe detailed Markdown inventory exceeds the presentation budget. Inspect the retained elements, relationships and exact evidence in the dashboard HLD view. Static evidence does not prove runtime behavior.\n",
+            clean.snapshot.as_str()
+        );
+        if clean.mermaid.len() < 60 * 1024 {
+            clean
+                .markdown
+                .push_str(&format!("\n```mermaid\n{}\n```\n", clean.mermaid));
+        }
+    }
     let value = serde_json::to_value(&clean).map_err(|_| "Cannot project HLD")?;
     let mut projected = select(
         &value,
@@ -676,19 +690,10 @@ pub(super) fn export(
             let mut published = BTreeSet::new();
             let mut catalog_pairs = vec![];
             let mut pairs = pair_entries(&lld);
-            // The browser pages this catalog before applying Focus filters.
-            // Keep changed paths first here as well as in detail allocation.
-            pairs.sort_by_key(|(before, after)| {
-                let entry = after.or(*before).expect("paired declaration");
-                (
-                    !file_values.iter().any(|file| file["path"] == entry.path),
-                    entry.path.clone(),
-                    entry.start_byte,
-                    entry.id.clone(),
-                )
-            });
-            let mut selected = pairs.iter().collect::<Vec<_>>();
-            selected.sort_by_key(|(b, a)| {
+            // Page order and detail/source allocation share the same relevance
+            // order. A modified public function with both sides must not lose
+            // its exact evidence to alphabetically earlier added declarations.
+            pairs.sort_by_key(|(b, a)| {
                 let e = a.or(*b).expect("nonempty pair");
                 let changed = lld.delta.changes.iter().any(|c| {
                     c.baseline_entry_id.as_deref() == Some(&e.id)
@@ -698,11 +703,14 @@ pub(super) fn export(
                     !file_values.iter().any(|file| file["path"] == e.path),
                     !changed,
                     e.kind != "function",
-                    &e.path,
+                    !e.visibility.starts_with("pub"),
+                    b.is_none() || a.is_none(),
+                    e.path.clone(),
                     e.start_byte,
-                    &e.id,
+                    e.id.clone(),
                 )
             });
+            let selected = pairs.iter().collect::<Vec<_>>();
             let mut count = 0;
             for (b, a) in selected {
                 if count >= policy.max_details || started.elapsed() > Duration::from_secs(105) {

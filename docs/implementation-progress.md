@@ -440,3 +440,45 @@ is claimed; deployed release still predates these fixes.
 - Authorization names exact state/intent hashes with twelve-hour expiry; it
   neither replaces history nor grants arbitrary artifact recovery. Current
   SHA-based intent uses resume_exact_intent, without legacy commit remapping.
+
+## 2026-10-27 — meaningful scheduler demo and evidence retention
+
+- PR #23 merge verified at `ed06b6c8d36ce382c55abbb697145981ac124b21`.
+- Demo PR #24: https://github.com/SSC-SDE/CodeShouldBehave/pull/24,
+  head `b312bbf3c3f01299d04745b73ca3b81d24582a40`. Adds a local retry-policy
+  package and changes the existing scheduler failure path: bounded Retry-After,
+  deterministic jitter, attempt limit and explicit overflow failure. It preserves
+  lease validation and transactional job updates. PR #15 remains unmerged.
+- The wider comparison exposed HLD byte pruning that discarded dependency
+  topology before the contract inventory. Generator v4 defers contracts first,
+  retaining topology and source evidence within the existing bounded storage.
+- Public export now bounds duplicated Markdown prose while retaining exact JSON
+  evidence. Catalog and source allocation prioritize modified public functions
+  with both counterparts so added declarations cannot starve the useful diff.
+- Pages finalization may wait for the exact previously signed manifest only:
+  at most twelve reads with five-second intervals. Unknown bytes fail immediately;
+  desired manifest and every served file still require exact verification.
+- Run `40454018716` analyzed PR #24 but refused stale Pages readback. Signed state
+  deployment `7350943683`, sequence 40, remains a pending intent. Its hosted
+  signature and current served manifest were independently verified. Prepared
+  exact-intent recovery authorization expires at 2026-10-27T17:19:38.924970Z;
+  no recovery dispatch or engine deployment is claimed here.
+- Fresh Actions and Packages USD 0 / Usage blocked controls checked in billing
+  UI at approximately 05:07 UTC. Runtime budget identity, workflow, installation,
+  scope, consent and permissions remain unchanged.
+- Validation: 221 Rust library tests, 18 public-export integration tests,
+  114 Python publication tests (four skips), 85 dashboard tests, strict Clippy
+  with all features and no default features, formatting and diff checks passed.
+- Local browser acceptance on the exact demo head: Focus HLD split shows the
+  added csb-retry-policy dependency; LLD opens Scheduler::fail first and shows
+  both flows. Clicking proposal retry_decision shows baseline scheduler.rs
+  lines 402–445 at ed06b6c8 and proposal lines 407–453 at b312bbf3, with the
+  selected call at line 434. Partial coverage remains explicit.
+- Local public bundle: `932756172a88be745bf6b1edc502f393e6fe14d434ac3a16b4d5a325d5157200`.
+  This is local acceptance, not successful hosted PR-check acceptance. Remaining:
+  owner-authorized engine merge, signed release/pins, signed recovery, fresh PR
+  analysis and browser verification from the actual GitHub check-summary link.
+- Consolidated engine fix PR #25:
+  https://github.com/SSC-SDE/CodeShouldBehave/pull/25. Source commit
+  `ed37223` contains the fixes and local validation above. Explicit owner merge
+  approval requested before any main-branch merge or signed engine rollout.

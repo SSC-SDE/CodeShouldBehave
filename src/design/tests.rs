@@ -399,6 +399,86 @@ fn oversized_derived_inventory_is_explicitly_partial_and_fits_storage() {
 }
 
 #[test]
+fn oversized_contract_inventory_preserves_dependency_diff_and_exact_evidence() {
+    let fixture = Fixture::new();
+    let source = fixture.simple();
+    let declarations = (0..900)
+        .map(|index| {
+            format!(
+                "pub struct Contract{index} {{ pub payload: [u64; 32], pub metadata: [u8; 128] }}\n"
+            )
+        })
+        .collect::<String>();
+    fixture.write(
+        "src/lib.rs",
+        &format!("use reqwest::Client;\n{declarations}"),
+    );
+    let baseline = fixture.commit();
+    let before = generate(&fixture, &baseline, &scope(), &context(&source));
+    fixture.write(
+        "Cargo.toml",
+        "[package]\nname='fixture'\nversion='0.1.0'\n[dependencies]\nreqwest='0.12'\nlapin='3'\n",
+    );
+    fixture.write(
+        "src/lib.rs",
+        &format!("use reqwest::Client;\nuse lapin::Connection;\n{declarations}"),
+    );
+    let proposal = fixture.commit();
+    let after = generate(&fixture, &proposal, &scope(), &context(&source));
+    for version in [&before, &after] {
+        assert!(serde_json::to_vec(version).unwrap().len() <= 900 * 1024);
+        assert!(!version.coverage.complete);
+        assert!(version.coverage.deferred > 0);
+        assert!(
+            version
+                .elements
+                .iter()
+                .any(|element| element.name == "reqwest package")
+        );
+        validate_design_scope(version, &scope()).unwrap();
+    }
+    assert!(
+        !before
+            .elements
+            .iter()
+            .any(|element| element.name == "lapin package")
+    );
+    let dependency = after
+        .elements
+        .iter()
+        .find(|element| element.name == "lapin package")
+        .unwrap();
+    for kind in ["declares_package_dependency", "imports_declared_package"] {
+        let relation = after
+            .relations
+            .iter()
+            .find(|relation| relation.to == dependency.id && relation.kind == kind)
+            .unwrap();
+        for id in &relation.evidence_ids {
+            let evidence = after
+                .evidence
+                .iter()
+                .find(|evidence| evidence.id == *id)
+                .unwrap();
+            assert_eq!(evidence.commit, proposal);
+            assert!(matches!(
+                evidence.path.as_str(),
+                "Cargo.toml" | "src/lib.rs"
+            ));
+        }
+    }
+    let delta = compare_hld(&before, &after).unwrap();
+    assert!(
+        delta
+            .changes
+            .iter()
+            .any(|change| change.after_name.as_deref() == Some("lapin package"))
+    );
+    // The dependency difference remains visible without claiming full coverage.
+    assert_eq!(delta.outcome, DesignOutcome::Incomplete);
+}
+
+#[test]
 fn schema_introduction_and_declared_feature_or_lock_changes_remain_qualified() {
     let fixture = Fixture::new();
     let source = fixture.simple();
