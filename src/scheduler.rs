@@ -1,4 +1,5 @@
 use crate::Storage;
+use csb_retry_policy::{FailureClass, RetryDecision, retry_decision};
 use rusqlite::{OptionalExtension, TransactionBehavior, params};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -19,6 +20,10 @@ impl JobLane {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RetryClass {
     Retryable,
+    /// Provider-requested delay; waits above 60 seconds require operator review.
+    RateLimited {
+        retry_after_ms: u64,
+    },
     Terminal,
     Cancelled,
 }
@@ -417,16 +422,19 @@ impl<'a> Scheduler<'a> {
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(|error| format!("Cannot start failure transaction: {error}"))?;
         verify_lease(&transaction, job, worker, now)?;
-        let (state, available) = match class {
-            RetryClass::Retryable if job.attempt < 5 => {
-                let exponent = u32::try_from(job.attempt.saturating_sub(1))
-                    .unwrap_or(31)
-                    .min(6);
-                let delay = 1_000_i64.saturating_mul(1_i64 << exponent).min(60_000);
-                ("retry", now.saturating_add(delay))
+        let failure = match class {
+            RetryClass::Retryable => FailureClass::Retryable,
+            RetryClass::RateLimited { retry_after_ms } => {
+                FailureClass::RateLimited { retry_after_ms }
             }
-            RetryClass::Retryable | RetryClass::Terminal => ("failed", now),
-            RetryClass::Cancelled => ("cancelled", now),
+            RetryClass::Terminal => FailureClass::Terminal,
+            RetryClass::Cancelled => FailureClass::Cancelled,
+        };
+        let job_id = u64::try_from(job.id).map_err(|_| "Invalid job identity")?;
+        let (state, available) = match retry_decision(failure, job.attempt, job_id, now) {
+            RetryDecision::RetryAt(available_at) => ("retry", available_at),
+            RetryDecision::Failed => ("failed", now),
+            RetryDecision::Cancelled => ("cancelled", now),
         };
         transaction.execute(
             "UPDATE jobs SET state=?1,available_at_ms=?2,lease_owner=NULL,lease_expires_at_ms=NULL,
@@ -792,19 +800,97 @@ mod tests {
         scheduler
             .fail(&other, "worker-b", RetryClass::Terminal, "invalid", 12)
             .unwrap();
+        let available: i64 = scheduler
+            .storage
+            .connection
+            .query_row(
+                "SELECT available_at_ms FROM jobs WHERE id=?1",
+                [first.id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!((1_010..=1_260).contains(&available));
         assert!(
             scheduler
-                .claim("worker-a", JobLane::Warm, 4, 1_000, 1_009)
+                .claim("worker-a", JobLane::Warm, 4, 1_000, available as u64 - 1)
                 .unwrap()
                 .is_none()
         );
         assert_eq!(
             scheduler
-                .claim("worker-a", JobLane::Warm, 4, 1_000, 1_010)
+                .claim("worker-a", JobLane::Warm, 4, 1_000, available as u64)
                 .unwrap()
                 .unwrap()
                 .review_id,
             "review-a"
+        );
+        drop(scheduler);
+        drop(storage);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn rate_limit_delay_is_persisted_and_wrong_worker_cannot_reschedule() {
+        let (mut storage, _, root, repository, scope) = fixture("rate-limit");
+        let mut scheduler = Scheduler::new(&mut storage);
+        review(&mut scheduler, "rate-review", repository, scope, '2', 0);
+        scheduler
+            .observe_pr(
+                repository,
+                "rate",
+                1,
+                "rate-review",
+                &commit('2'),
+                &commit('1'),
+                0,
+            )
+            .unwrap();
+        scheduler
+            .enqueue("rate-review", "analyze", 1, JobLane::Warm, "rate", 1, 0)
+            .unwrap();
+        let job = scheduler
+            .claim("worker", JobLane::Warm, 4, 1_000, 1)
+            .unwrap()
+            .unwrap();
+        let rate_limit = RetryClass::RateLimited {
+            retry_after_ms: 30_000,
+        };
+        assert!(
+            scheduler
+                .fail(&job, "wrong-worker", rate_limit, "limited", 10)
+                .is_err()
+        );
+        scheduler
+            .fail(&job, "worker", rate_limit, "limited", 10)
+            .unwrap();
+        assert!(
+            scheduler
+                .claim("worker", JobLane::Warm, 4, 1_000, 30_009)
+                .unwrap()
+                .is_none()
+        );
+        let retry = scheduler
+            .claim("worker", JobLane::Warm, 4, 1_000, 30_010)
+            .unwrap()
+            .unwrap();
+        assert_eq!(retry.attempt, 2);
+        scheduler
+            .fail(
+                &retry,
+                "worker",
+                RetryClass::RateLimited {
+                    retry_after_ms: 60_001,
+                },
+                "wait exceeds automatic budget",
+                30_011,
+            )
+            .unwrap();
+        assert_eq!(scheduler.stats(30_012).unwrap().failed, 1);
+        assert!(
+            scheduler
+                .claim("worker", JobLane::Warm, 4, 1_000, 100_000)
+                .unwrap()
+                .is_none()
         );
         drop(scheduler);
         drop(storage);

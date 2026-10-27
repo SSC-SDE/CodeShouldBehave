@@ -114,6 +114,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "csb-retry-policy"
+version = "0.1.0"
+
+[[package]]
 name = "digest"
 version = "0.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -152,6 +156,7 @@ name = "flowdiff"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "csb-retry-policy",
  "http-body-util",
  "rusqlite",
  "serde",
