@@ -1,0 +1,10 @@
+[package]
+name = "csb-retry-policy"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.87"
+license = "MIT"
+description = "Pure bounded retry decisions for the CodeShouldBehave scheduler"
+
+[lib]
+path = "src/lib.rs"

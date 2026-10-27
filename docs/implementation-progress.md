@@ -440,3 +440,28 @@ is claimed; deployed release still predates these fixes.
 - Authorization names exact state/intent hashes with twelve-hour expiry; it
   neither replaces history nor grants arbitrary artifact recovery. Current
   SHA-based intent uses resume_exact_intent, without legacy commit remapping.
+
+## 2026-10-27 — meaningful core behavior demo PR
+
+- User requested a new live demo PR with actual before/after HLD and LLD changes,
+  keeping PR #15 unmerged. Isolated branch `codex/demo-scheduler-retry-policy`
+  starts from PR #23's merged main `ed06b6c8d36ce382c55abbb697145981ac124b21`.
+- Extracted scheduler retry decisions into local `csb-retry-policy`, introduced
+  bounded rate-limit handling and deterministic staggering, retained lease checks
+  and transactional writes. Existing `Scheduler::fail` supplies both source sides.
+- No change to accepted scope, component context, workflows or engine pins.
+  HLD depicts the added package dependency rather than inventing a new service.
+- Fresh GitHub billing page reload on 2026-10-27 confirmed Actions and Packages
+  each USD 0 / USD 0, Usage blocked. Activated runtime budget identity preserved.
+- Validation: 221 all-feature library tests and three new policy tests passed;
+  strict Clippy passed for all targets with all features and no default features,
+  plus the standalone policy package. Six scheduler tests pass including the new
+  real SQLite retry-after/worker-ownership regression.
+- Presenter walkthrough: `docs/DEMO_RETRY_POLICY.md`. Live check and browser
+  acceptance remain pending creation and automatic analysis of the exact PR head.
+
+- Local native preflight on `20146d3` confirms both `fail` counterparts and
+  LLD change detection. It also exposed an HLD truncation bug: reverse-ID pruning
+  drops all dependency elements in a large contract inventory. A separate engine
+  fix on `codex/hld-retain-dependency-evidence` is required for the HLD demo;
+  do not claim live HLD acceptance before that signed engine is deployed.

@@ -27,6 +27,7 @@ path = "src/bin/csb_public_report.rs"
 required-features = ["server"]
 
 [dependencies]
+csb-retry-policy = { path = "src/retry_policy" }
 sha2 = { version = "=0.11.0", default-features = false }
 rusqlite = { version = "=0.40.2", default-features = false, features = ["bundled", "backup"] }
 tree-sitter = { version = "=0.25.10", default-features = false }
