@@ -478,3 +478,7 @@ is claimed; deployed release still predates these fixes.
   This is local acceptance, not successful hosted PR-check acceptance. Remaining:
   owner-authorized engine merge, signed release/pins, signed recovery, fresh PR
   analysis and browser verification from the actual GitHub check-summary link.
+- Consolidated engine fix PR #25:
+  https://github.com/SSC-SDE/CodeShouldBehave/pull/25. Source commit
+  `ed37223` contains the fixes and local validation above. Explicit owner merge
+  approval requested before any main-branch merge or signed engine rollout.
