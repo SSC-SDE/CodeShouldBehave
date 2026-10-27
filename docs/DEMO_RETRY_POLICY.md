@@ -26,6 +26,14 @@ credentials, service accounts or paid infrastructure. `RateLimited` is an API
 capability for callers; this PR does not wire a new HTTP provider adapter.
 The new enum variant requires downstream exhaustive matches to be updated.
 
+## HLD rollout dependency
+
+Local preflight found that the current signed engine truncates dependency nodes
+when this repository exceeds the HLD storage budget. A separate engine fix must
+retain dependencies before the HLD portion below can be accepted live. LLD has
+both versions of `fail`; this PR stays unmerged while that engine fix is deployed.
+The expected route below is not yet a claim of live acceptance.
+
 ## Three-minute presenter route
 
 1. Open this PR's **CodeShouldBehave / Architecture** check and click

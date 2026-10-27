@@ -459,3 +459,9 @@ is claimed; deployed release still predates these fixes.
   real SQLite retry-after/worker-ownership regression.
 - Presenter walkthrough: `docs/DEMO_RETRY_POLICY.md`. Live check and browser
   acceptance remain pending creation and automatic analysis of the exact PR head.
+
+- Local native preflight on `20146d3` confirms both `fail` counterparts and
+  LLD change detection. It also exposed an HLD truncation bug: reverse-ID pruning
+  drops all dependency elements in a large contract inventory. A separate engine
+  fix on `codex/hld-retain-dependency-evidence` is required for the HLD demo;
+  do not claim live HLD acceptance before that signed engine is deployed.
