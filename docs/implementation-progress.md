@@ -580,3 +580,6 @@ is claimed; deployed release still predates these fixes.
 - Pending signed intent sequence 42 and its exact recovery authorization remain
   intact. Deployment requires the pin PR merge; final check delivery is pending.
   Demo PR #24 stays unmerged.
+- Native Linux sandbox preflight [42083297591](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/42083297591)
+  passed on pin commit `451fbccd1cc19fead155dab94b00c1adadab73ea`, including
+  published package verification and actual networkless ELF startup.
