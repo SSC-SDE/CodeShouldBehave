@@ -522,3 +522,25 @@ is claimed; deployed release still predates these fixes.
 - Pin PR #26: https://github.com/SSC-SDE/CodeShouldBehave/pull/26.
   Ready for explicit owner merge approval. Live #24 acceptance requires this
   engine selection on main and a fresh controller run.
+
+## 2026-11-05 — live demo deployed; final receipt recovery
+
+- PR #26 merge verified at `7f3c193beadd88069ccaf9aa19cffe501ade61ee`.
+- Automatic PR controller `42070853667` analyzed #24 successfully; publication
+  refused an HTTPError before state mutation. All 727 signed existing files then
+  independently passed bounded parallel readback. One normal retry was dispatched.
+- Retry `42072060623` analyzed, staged and deployed the new dashboard; final
+  sequential HTTP readback refused an HTTPError before creating the check.
+- Signed deployment 7580235538 / sequence 42 records exact intent generation 6,
+  manifest `915139824ee08e7f3f92be09538cc2f7641e7750ba05ee2d47932629aba9c4b4`.
+  Its signature and live manifest were verified. All 997 manifest entries passed
+  independent size/hash readback (signed empty .nojekyll reconstructed).
+- Live browser acceptance passed directly on report
+  `4b0d25a5a53b9d0229a147a07a784f88ff3055a8b6003c518fd8dd6036abba1f`:
+  Focus default; HLD Unified and Split show the new package; Zoom to LLD opens
+  changed functions; fail shows both flows; retry_decision opens exact baseline
+  scheduler.rs:402–445 at ed06b6c8 and proposal :407–453 at b312bbf3, including
+  changed line 434. This is a hosted report, not a localhost preview.
+- Refreshed exact-intent approval expires 2026-11-06T05:17:52Z. Recovery must use
+  the existing signed deployment; no ledger reset, scope change or engine rebuild.
+  Actual GitHub check-summary link delivery remains pending recovery.
