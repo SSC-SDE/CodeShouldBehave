@@ -585,3 +585,30 @@ is claimed; deployed release still predates these fixes.
   published package verification and actual networkless ELF startup.
 - Pin PR #29: https://github.com/SSC-SDE/CodeShouldBehave/pull/29.
   Ready for explicit owner merge/deployment approval; no live pin change yet.
+
+## 2026-11-05 — live PR demo acceptance complete
+
+- PR #29 merged with explicit owner approval at
+  `a1ca6d35749b5ee66163fff9fc6811455e6af93d`. Signed recovery
+  [42083630233](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/42083630233)
+  passed using the existing exact intent and the released concurrent verifier.
+- Automatic controller [42083656278](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/42083656278)
+  passed analysis, publication, live readback, receipt commit and check delivery.
+  Final deployment record: `7581743834`; REST audit: 71/100 calls, complete
+  evidence for plan, analyzer and publisher. USD 0 controls remain unchanged.
+- [PR #24 Architecture check](https://github.com/SSC-SDE/CodeShouldBehave/runs/127446113035)
+  is completed/neutral with title **Ready · Changes to review**. Its summary
+  includes the actual public report link. Neutral denotes review is required,
+  not a failed analysis and not merge approval.
+- Browser acceptance followed that exact check link: Focus loads automatically;
+  HLD Unified/Split shows the added csb-retry-policy dependency; Zoom to LLD
+  opens seven changed declarations; fail shows baseline/proposal control flows;
+  proposal Call retry_decision opens both source diffs and exact line 434.
+- Source identities verified: baseline `ed06b6c8d36ce382c55abbb697145981ac124b21`
+  scheduler.rs:402–445; proposal `b312bbf3c3f01299d04745b73ca3b81d24582a40`
+  :407–453, selected line 434, blob `122707f0a511026cb9450112441b1b20580a98d0`.
+- Hosted bundle: `4b0d25a5a53b9d0229a147a07a784f88ff3055a8b6003c518fd8dd6036abba1f`.
+  Partial static coverage and unresolved effects remain explicitly visible.
+- PR #24 stays open/unmerged; its description now includes the verified check
+  entry and a three-minute presenter walkthrough. This completes the requested
+  live demo checkpoint, not broader beta readiness or universal runtime proof.
