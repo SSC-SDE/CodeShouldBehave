@@ -201,3 +201,22 @@ passed on pin commit `669c390faa6263d92bfaf73bcd28ecf0fcc8ff7c`.
 [Signed recovery 42069928076](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/42069928076)
 also passed. [Pin PR #26](https://github.com/SSC-SDE/CodeShouldBehave/pull/26)
 is ready for merge; hosted demo acceptance follows its deployment.
+
+## 2026-11-05 — concurrent readback signed release
+
+- PR #28 merged with explicit owner approval at
+  `c46c28a509b649802ab68da2bee7594c2ff15fdd`.
+- Trusted Linux build/tests/hosted attestation
+  [42082187739](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/42082187739)
+  passed. [Signed release canary-c46c28a509b6](https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-c46c28a509b6)
+  is published. All archive checksums and exact-source hosted provenance passed.
+- Production bootstrap from published assets passed; the extracted public_ci.py
+  byte-matches the merged repair. Only engine pins change in runtime config.
+- Fresh USD 0 release observation remains valid until 2026-11-06T04:53:50Z;
+  runtime budget identity, workflow, scope and consent are unchanged.
+- Pending signed intent sequence 42 and its exact recovery authorization remain
+  intact. Deployment requires the pin PR merge; final check delivery is pending.
+  Demo PR #24 stays unmerged.
+- Native Linux sandbox preflight [42083297591](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/42083297591)
+  passed on pin commit `451fbccd1cc19fead155dab94b00c1adadab73ea`, including
+  published package verification and actual networkless ELF startup.
