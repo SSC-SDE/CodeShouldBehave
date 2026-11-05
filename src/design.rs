@@ -16,7 +16,7 @@ pub use diff::{compare_hld, evaluate_hld_constraints};
 pub use generate::generate_hld;
 pub use render::{render_hld_markdown, render_hld_mermaid};
 
-pub const HLD_GENERATOR_VERSION: &str = "csb-hld-rust-static-v3";
+pub const HLD_GENERATOR_VERSION: &str = "csb-hld-rust-static-v4";
 pub const HLD_PROFILE: &str = "Rust public declarations, explicit package dependencies, schema artifacts and static deployment configuration; runtime behavior unverified";
 
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]

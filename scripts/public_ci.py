@@ -1279,7 +1279,8 @@ def http_bytes(url: str, cap: int, *, timeout: float = 10) -> bytes:
     return value
 
 
-def restore_public_site(config: dict, state: dict, output: Path, *, get: Callable = http_bytes) -> Path | None:
+def restore_public_site(config: dict, state: dict, output: Path, *, get: Callable = http_bytes,
+                        lagging_manifest_sha256: str | None = None, sleep: Callable = time.sleep) -> Path | None:
     """Restore only exact digest-pinned inert bytes, including the live-state fence."""
     url = config["site"]["origin"] + config["site"]["base_path"]
     if state["site_generation"] == 0:
@@ -1292,9 +1293,20 @@ def restore_public_site(config: dict, state: dict, output: Path, *, get: Callabl
         raise Refusal("existing/indeterminate site cannot be overwritten without a trusted receipt")
     if output.exists() or output.is_symlink():
         raise Refusal("restore output must be new")
-    data = get(url + "site-manifest.json", 4 * MIB)
-    if digest(data) != state["site_manifest_sha256"]:
-        raise Refusal("indeterminate live Pages generation; promotion refused")
+    if lagging_manifest_sha256 is not None:
+        text(lagging_manifest_sha256, SHA256, "last verified site digest")
+    # Pages can report success before the CDN serves the new generation. Wait
+    # only for the exact previously signed generation, never arbitrary bytes.
+    # Fetch no source files until the desired manifest matches. The bounded
+    # 12 manifest reads / 55 seconds of waits do not create another deployment.
+    for attempt in range(12):
+        data = get(url + "site-manifest.json", 4 * MIB)
+        actual = digest(data)
+        if actual == state["site_manifest_sha256"]:
+            break
+        if lagging_manifest_sha256 is None or actual != lagging_manifest_sha256 or attempt == 11:
+            raise Refusal("indeterminate live Pages generation; promotion refused")
+        sleep(5)
     try:
         manifest = json.loads(data)
     except (ValueError, UnicodeError) as exc:
@@ -1886,7 +1898,8 @@ def recover_pages_intent(config: dict, previous: dict, run: dict, *, provider: G
         proposed = dict(previous, site_generation=intent["site_generation"],
                         site_manifest_sha256=intent["site_manifest_sha256"],
                         pages_deployment_id=deployment["pages_deployment_id"], promotion_intent=None)
-        restore_public_site(config, proposed, Path(temporary) / "site", get=get)
+        restore_public_site(config, proposed, Path(temporary) / "site", get=get,
+                            lagging_manifest_sha256=previous.get("site_manifest_sha256"))
     if canonical(provider.restore_state()) != canonical(previous):
         raise Refusal("recovery state changed before receipt")
     state = dict(proposed, sequence=previous["sequence"] + 1,
@@ -1912,7 +1925,8 @@ def finalize_publication(config: dict, publication: dict, deployment: dict | Non
         raise Refusal("completed exact Pages deployment is required")
     with tempfile.TemporaryDirectory(prefix="csb-readback-") as temporary:
         proposed = dict(previous, site_generation=intent["site_generation"], site_manifest_sha256=intent["site_manifest_sha256"], pages_deployment_id=deployment["pages_deployment_id"], promotion_intent=None)
-        restore_public_site(config, proposed, Path(temporary) / "site", get=get)
+        restore_public_site(config, proposed, Path(temporary) / "site", get=get,
+                            lagging_manifest_sha256=previous.get("site_manifest_sha256"))
     state.update(site_generation=intent["site_generation"], site_manifest_sha256=intent["site_manifest_sha256"], pages_deployment_id=deployment["pages_deployment_id"], promotion_intent=None,
                  previous_site_artifact_id=previous.get("site_artifact_id"), site_artifact_id=intent["artifact_id"])
     provider.repository_info()

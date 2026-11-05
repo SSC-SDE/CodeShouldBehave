@@ -590,3 +590,73 @@ fn changed_file_precedes_unchanged_inventory_in_published_catalog() {
             .any(|e| e["proposal"]["name"] == "guard")
     );
 }
+
+#[test]
+fn large_hld_markdown_keeps_diagram_and_evidence_without_duplicate_inventory() {
+    let inventory = (0..600)
+        .map(|i| {
+            format!(
+                "pub struct Contract{i} {{ pub payload: [u64; 32], pub metadata: [u8; 128] }}\n"
+            )
+        })
+        .collect::<String>();
+    let fixture = Fixture::with_inventory(
+        "pub fn guard(n:i32)->i32 { if n > 5 { return 3; } 0 }",
+        &inventory,
+    );
+    let bundle =
+        export_public_report(&fixture.artifact, &fixture.policy, &fixture.expected).unwrap();
+    let hld: Value = serde_json::from_slice(&bundle.files["hld.json"]).unwrap();
+    for side in ["baseline", "proposal"] {
+        assert!(hld[side]["markdown"].as_str().unwrap().len() < 64 * 1024);
+        assert!(
+            hld[side]["markdown"]
+                .as_str()
+                .unwrap()
+                .contains("presentation budget")
+        );
+        assert!(!hld[side]["mermaid"].as_str().unwrap().is_empty());
+        assert_eq!(
+            hld[side]["elements"].as_array().unwrap().len(),
+            fixture.artifact["hld"][side]["elements"]
+                .as_array()
+                .unwrap()
+                .len()
+        );
+        assert!(!hld[side]["evidence"].as_array().unwrap().is_empty());
+    }
+    assert!(!bundle.manifest.routes.lld_details.is_empty());
+    assert!(!bundle.manifest.routes.sources.is_empty());
+    assert!(bundle.files.values().map(Vec::len).sum::<usize>() < 7 * 1024 * 1024);
+    bundle.validate().unwrap();
+}
+
+#[test]
+fn modified_public_counterpart_keeps_first_detail_and_both_source_sides() {
+    let mut source = (0..80)
+        .map(|i| format!("pub fn added_{i}(n:i32)->i32 {{ if n > 3 {{ return n; }} 0 }}\n"))
+        .collect::<String>();
+    source.push_str("pub fn guard(n:i32)->i32 { if n > 9 { return 4; } 0 }\n");
+    let mut fixture = Fixture::with_proposal(&source);
+    fixture.policy.max_details = 1;
+    let bundle =
+        export_public_report(&fixture.artifact, &fixture.policy, &fixture.expected).unwrap();
+    let catalog: Value = serde_json::from_slice(&bundle.files["lld/catalog.json"]).unwrap();
+    let entry = &catalog["entries"][0];
+    assert_eq!(entry["proposal"]["name"], "guard");
+    assert_eq!(entry["baseline"]["detail_state"], "published");
+    assert_eq!(entry["proposal"]["detail_state"], "published");
+    for side in ["baseline", "proposal"] {
+        let id = entry[side]["id"].as_str().unwrap();
+        assert!(
+            bundle
+                .manifest
+                .routes
+                .sources
+                .iter()
+                .any(|route| route.entry.as_deref() == Some(id))
+        );
+    }
+    assert!(bundle.manifest.coverage.deferred_details > 0);
+    bundle.validate().unwrap();
+}

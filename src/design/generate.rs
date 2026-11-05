@@ -1052,11 +1052,31 @@ pub fn generate_hld(
         if !version.coverage.gaps.contains(&gap) {
             version.coverage.gaps.push(gap);
         }
+        // IDs are hashes, not importance. Reverse lexical truncation used to
+        // remove every dependency before the much larger contract inventory.
+        // Defer declarations first; preserve topology and its source evidence
+        // whenever it fits. Recheck the byte bound between priority classes.
+        let priority = |kind: &DesignElementKind| match kind {
+            DesignElementKind::Contract => 0,
+            DesignElementKind::Schema => 1,
+            DesignElementKind::Dependency => 2,
+            DesignElementKind::Deployment => 3,
+            DesignElementKind::Component => 4,
+        };
+        let next_priority = version
+            .elements
+            .iter()
+            .filter(|element| element.kind != DesignElementKind::Component)
+            .map(|element| priority(&element.kind))
+            .min();
         let remove = version
             .elements
             .iter()
             .rev()
-            .filter(|element| element.kind != DesignElementKind::Component)
+            .filter(|element| {
+                element.kind != DesignElementKind::Component
+                    && Some(priority(&element.kind)) == next_priority
+            })
             .take(50)
             .map(|element| element.id.clone())
             .collect::<BTreeSet<_>>();
@@ -1973,8 +1993,8 @@ mod tests {
             compare_hld(&before, &after).unwrap().outcome,
             DesignOutcome::Incomplete
         );
-        assert_eq!(before.generator_version, "csb-hld-rust-static-v3");
-        // Reading immutable v2 history does not relabel it as the v3 profile.
+        assert_eq!(before.generator_version, "csb-hld-rust-static-v4");
+        // Reading immutable v2 history does not relabel it as the v4 profile.
         let mut legacy = before.clone();
         legacy.generator_version = "csb-hld-rust-static-v2".into();
         for evidence in &mut legacy.evidence {
