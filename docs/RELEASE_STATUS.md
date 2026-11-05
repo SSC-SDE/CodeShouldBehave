@@ -176,3 +176,28 @@ release evidence valid until 2026-10-26T19:12:17Z.
 [Pin PR #23](https://github.com/SSC-SDE/CodeShouldBehave/pull/23) is ready for
 owner merge. Signed recovery and report publication already pass; actual check
 summary link delivery remains pending this rollout. PR #15 remains unmerged.
+
+## Larger scheduler demo engine — 2026-11-05
+
+PR #25 merge verified: `00055eaead6173451e73bb63d8dc4a7a80d710e8`.
+[Build and hosted attestation 42069590687](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/42069590687)
+passed from that exact source with a freshly UI-observed GitHub Free / USD 0
+Actions and Packages proof. No billing settings changed.
+
+[Signed release canary-00055eaead61](https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-00055eaead61)
+contains HLD topology retention, bounded Markdown duplication, shared LLD catalog
+and source prioritization, and exact previous-generation Pages propagation waits.
+All archive checksums and exact source/signer hosted provenance independently
+passed. This pin change affects only the engine identity; runtime budget, scope,
+accepted context, consent and workflow remain unchanged.
+
+PR #15 was merged by the owner on November 1. Demo PR #24 remains open with
+meaningful scheduler before/after changes. Live acceptance is recorded after the
+new pinned engine analyzes it and its actual check link is verified in-browser.
+
+Production bootstrap and native sandbox preflight
+[42070465549](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/42070465549)
+passed on pin commit `669c390faa6263d92bfaf73bcd28ecf0fcc8ff7c`.
+[Signed recovery 42069928076](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/42069928076)
+also passed. [Pin PR #26](https://github.com/SSC-SDE/CodeShouldBehave/pull/26)
+is ready for merge; hosted demo acceptance follows its deployment.
