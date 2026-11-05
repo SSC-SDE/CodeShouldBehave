@@ -10,6 +10,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import base64
+import concurrent.futures
 from datetime import datetime, timezone, timedelta
 import hashlib
 import gzip
@@ -48,6 +49,7 @@ MAX_HANDOFF_BYTES = 5 * MIB
 MAX_HANDOFF_TOTAL = 32 * MIB
 MAX_SITE_BYTES = 64 * MIB
 MAX_SITE_ARCHIVE = 70 * MIB
+MAX_SITE_READBACK_SECONDS = 120
 MAX_REPOSITORY_ARTIFACT_BYTES = 172 * MIB
 SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 COMMIT = re.compile(r"[0-9a-f]{40}\Z")
@@ -1314,36 +1316,79 @@ def restore_public_site(config: dict, state: dict, output: Path, *, get: Callabl
     object_fields(manifest, {"schema_version", "observed_at", "files"}, name="site manifest")
     if manifest["schema_version"] != "csb-public-site-v1" or not isinstance(manifest["files"], list) or len(manifest["files"]) > 20_000:
         raise Refusal("unsupported/bounded site manifest required")
+    # Validate the entire signed inventory before any source request. The total
+    # declared size bounds all in-flight bytes, not just files already written.
+    total, seen, entries = len(data), {"site-manifest.json"}, []
+    for item in manifest["files"]:
+        object_fields(item, {"path", "bytes", "sha256"}, name="site file")
+        rel = relative_path(item["path"])
+        if rel in seen:
+            raise Refusal("duplicate restored site file")
+        seen.add(rel)
+        size = integer(item["bytes"], 0, MAX_SITE_BYTES, "site file byte length")
+        total += size
+        if total > MAX_SITE_BYTES:
+            raise Refusal("site restore deadline/byte budget exhausted")
+        expected = text(item["sha256"], SHA256, "site file digest")
+        if rel == ".nojekyll" and (size != 0 or expected != digest(b"")):
+            raise Refusal("invalid deployment marker in signed manifest")
+        entries.append((rel, size, expected))
     output.mkdir(parents=True)
-    total, seen = len(data), {"site-manifest.json"}
-    started = time.monotonic()
+    deadline = time.monotonic() + MAX_SITE_READBACK_SECONDS
+    def read(entry):
+        rel, size, expected = entry
+        if time.monotonic() >= deadline:
+            raise Refusal("site restore deadline/byte budget exhausted")
+        if rel == ".nojekyll":
+            # Only the signed empty deployment marker may be reconstructed.
+            value = b""
+        else:
+            for attempt in range(2):
+                try:
+                    value = get(url + rel, size)
+                    break
+                except urllib.error.HTTPError as exc:
+                    # One bounded retry for transient HTTP service failures.
+                    # Missing paths, redirects and bad bytes still fail closed.
+                    if attempt or exc.code not in (429, 500, 502, 503, 504) or time.monotonic() + .25 >= deadline:
+                        raise
+                    sleep(.25)
+        if len(value) != size or digest(value) != expected:
+            raise Refusal("restored site content mismatch")
+        return rel, value
     try:
         (output / "site-manifest.json").write_bytes(data)
-        for item in manifest["files"]:
-            object_fields(item, {"path", "bytes", "sha256"}, name="site file")
-            rel = relative_path(item["path"])
-            if rel in seen:
-                raise Refusal("duplicate restored site file")
-            seen.add(rel)
-            size = integer(item["bytes"], 0, MAX_SITE_BYTES, "site file byte length")
-            total += size
-            if total > MAX_SITE_BYTES or time.monotonic() - started > 120:
-                raise Refusal("site restore deadline/byte budget exhausted")
-            # Pages' artifact uploader excludes dotfiles by default. This empty
-            # deployment marker is not report content and need not be served.
-            # Reconstruct ONLY its unique, signed empty bytes; every other path
-            # must still pass HTTP readback and the original digest checks.
-            if rel == ".nojekyll":
-                if size != 0 or item["sha256"] != digest(b""):
-                    raise Refusal("invalid deployment marker in signed manifest")
-                value = b""
-            else:
-                value = get(url + rel, size)
-            if len(value) != size or digest(value) != text(item["sha256"], SHA256, "site file digest"):
-                raise Refusal("restored site content mismatch")
-            destination = output / rel; destination.parent.mkdir(parents=True, exist_ok=True)
-            with destination.open("xb") as target:
-                target.write(value)
+        # Six workers, at most six submitted reads. A 1,000-file snapshot must
+        # not spend its whole deadline on serial network round trips. Workers
+        # only fetch/verify inert bytes; the coordinator alone writes files.
+        with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:
+            remaining = iter(entries)
+            pending = set()
+            for entry in remaining:
+                pending.add(pool.submit(read, entry))
+                if len(pending) == 6:
+                    break
+            try:
+                while pending:
+                    wait = deadline - time.monotonic()
+                    if wait <= 0:
+                        raise Refusal("site restore deadline/byte budget exhausted")
+                    done, pending = concurrent.futures.wait(pending, timeout=wait,
+                        return_when=concurrent.futures.FIRST_COMPLETED)
+                    if not done or time.monotonic() >= deadline:
+                        raise Refusal("site restore deadline/byte budget exhausted")
+                    for future in done:
+                        rel, value = future.result()
+                        destination = output / rel
+                        destination.parent.mkdir(parents=True, exist_ok=True)
+                        with destination.open("xb") as target:
+                            target.write(value)
+                        entry = next(remaining, None)
+                        if entry is not None:
+                            pending.add(pool.submit(read, entry))
+            finally:
+                for future in pending:
+                    future.cancel()
         import public_site
         public_site.verify_site(output, state["site_manifest_sha256"])
         return output

@@ -544,3 +544,23 @@ is claimed; deployed release still predates these fixes.
 - Refreshed exact-intent approval expires 2026-11-06T05:17:52Z. Recovery must use
   the existing signed deployment; no ledger reset, scope change or engine rebuild.
   Actual GitHub check-summary link delivery remains pending recovery.
+
+## 2026-11-05 — bounded Pages readback repair
+
+- PR #27 merged at `eb6b37e34d6c22c4b18f9ded9c361939fa30bc5c` after explicit
+  owner approval. Recovery `42074803971` refused the 120-second site restore
+  deadline while reading the 997-file site sequentially. Signed intent sequence
+  42 remains intact; dashboard/source browser acceptance remains valid.
+- Readback now prevalidates the full signed inventory and aggregate byte cap,
+  then uses six workers with at most six submitted reads. Only the coordinator
+  writes files; every length/digest and final site validation remain required.
+  The same 120-second deadline and 64 MiB site cap remain enforced.
+- One retry is allowed only for transient HTTP 429/500/502/503/504 responses.
+  Missing files, redirects, corrupted bytes and unsupported markers still fail.
+- 119 publication tests passed (four skips), including real concurrency bounds,
+  bounded transient retries, whole-inventory byte rejection and deadline cleanup.
+- The repaired production restore function independently verified the ACTUAL
+  signed 997-file deployed snapshot within its original deadline, including final
+  public_site verification. No locally weakened limits or skipped files were used.
+- Rollout requires merging this helper repair and selecting its signed package.
+  Demo PR #24 remains open and contains the verified direct live report link.
