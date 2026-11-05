@@ -194,3 +194,10 @@ accepted context, consent and workflow remain unchanged.
 PR #15 was merged by the owner on November 1. Demo PR #24 remains open with
 meaningful scheduler before/after changes. Live acceptance is recorded after the
 new pinned engine analyzes it and its actual check link is verified in-browser.
+
+Production bootstrap and native sandbox preflight
+[42070465549](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/42070465549)
+passed on pin commit `669c390faa6263d92bfaf73bcd28ecf0fcc8ff7c`.
+[Signed recovery 42069928076](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/42069928076)
+also passed. [Pin PR #26](https://github.com/SSC-SDE/CodeShouldBehave/pull/26)
+is ready for merge; hosted demo acceptance follows its deployment.

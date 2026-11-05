@@ -514,3 +514,11 @@ is claimed; deployed release still predates these fixes.
   Native preflight and final hosted PR #24 acceptance remain to be recorded.
 - Production bootstrap passed against published release URLs; extracted
   public_ci.py byte-matches merged source. Native Linux preflight is next.
+- Native Linux sandbox startup `42070465549` passed on pin commit
+  `669c390faa6263d92bfaf73bcd28ecf0fcc8ff7c`: verified release download,
+  hosted signature and actual binary startup inside the networkless sandbox.
+- Manual signed recovery `42069928076` passed all jobs. The old pending Pages
+  deployment is recovered; no reset or replacement of signed history occurred.
+- Pin PR #26: https://github.com/SSC-SDE/CodeShouldBehave/pull/26.
+  Ready for explicit owner merge approval. Live #24 acceptance requires this
+  engine selection on main and a fresh controller run.
