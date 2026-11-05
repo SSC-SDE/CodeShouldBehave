@@ -564,3 +564,19 @@ is claimed; deployed release still predates these fixes.
   public_site verification. No locally weakened limits or skipped files were used.
 - Rollout requires merging this helper repair and selecting its signed package.
   Demo PR #24 remains open and contains the verified direct live report link.
+
+## 2026-11-05 — concurrent readback signed release
+
+- PR #28 merged with explicit owner approval at
+  `c46c28a509b649802ab68da2bee7594c2ff15fdd`.
+- Trusted Linux build/tests/hosted attestation
+  [42082187739](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/42082187739)
+  passed. [Signed release canary-c46c28a509b6](https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-c46c28a509b6)
+  is published. All archive checksums and exact-source hosted provenance passed.
+- Production bootstrap from published assets passed; the extracted public_ci.py
+  byte-matches the merged repair. Only engine pins change in runtime config.
+- Fresh USD 0 release observation remains valid until 2026-11-06T04:53:50Z;
+  runtime budget identity, workflow, scope and consent are unchanged.
+- Pending signed intent sequence 42 and its exact recovery authorization remain
+  intact. Deployment requires the pin PR merge; final check delivery is pending.
+  Demo PR #24 stays unmerged.
