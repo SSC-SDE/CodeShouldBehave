@@ -2,6 +2,8 @@
 
 Date: November 6, 2026 (IST). Branch: `phase-6`. Base:
 `c877af8ae2d25c2cf2773c70a0c6fa8499ba3d84` (merged PR #30).
+Implementation commit: `39e658145c944202e3e96459f936f43b027f472b`.
+Draft integration: [PR #31](https://github.com/SSC-SDE/CodeShouldBehave/pull/31).
 Status: **in_progress**. Local test evidence is not live App acceptance.
 No reviewer acceptance, deployment approval or completed phase gate is inferred.
 
@@ -28,8 +30,10 @@ and ordinary `server` builds keep their previous network dependency boundary.
 - Fresh/reopened storage and upgrade tests pass without altering existing review
   schema or saved preference revision/document.
 - Exact-lockfile license inventory passed: 108 packages, 200 original notice files.
+  Committed distribution boundary/secret-pattern scan passed for 349 files;
+  pattern scanning does not establish an exhaustive secret audit.
 - Strict Rust 1.87 Clippy passed with all targets for both all-feature and
-  no-default-feature builds. The no-default-feature test suite also passed.
+  no-default-feature builds. All 119 no-default-feature tests passed.
 - All 119 Python publication tests passed with local Unix sockets allowed. The
   first sandboxed run could not start the synthetic publisher socket; rerunning
   unchanged tests with socket permission passed. No live provider was used.

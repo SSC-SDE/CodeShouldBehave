@@ -659,3 +659,11 @@ is claimed; deployed release still predates these fixes.
   [APP-1 evidence](evidence/P6.app1/acceptance.md). No App setting, release pin,
   workflow, live consent or hosted report changed. PR #24 verified OPEN at
   `b312bbf3c3f01299d04745b73ca3b81d24582a40`.
+
+- Implementation commit: `39e658145c944202e3e96459f936f43b027f472b`.
+  Draft integration [PR #31](https://github.com/SSC-SDE/CodeShouldBehave/pull/31)
+  targets `main` from `phase-6`; no merge or deployment is authorized.
+- Verification complete for this local slice: 292 all-feature Rust tests, 119
+  no-default-feature Rust tests, 119 publication tests, strict Clippy in both
+  configurations, 30 documentation links, and a 349-file committed distribution
+  boundary/secret-pattern scan. No live OAuth or browser setup acceptance claimed.
