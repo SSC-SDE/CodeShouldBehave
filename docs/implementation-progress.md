@@ -583,3 +583,5 @@ is claimed; deployed release still predates these fixes.
 - Native Linux sandbox preflight [42083297591](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/42083297591)
   passed on pin commit `451fbccd1cc19fead155dab94b00c1adadab73ea`, including
   published package verification and actual networkless ELF startup.
+- Pin PR #29: https://github.com/SSC-SDE/CodeShouldBehave/pull/29.
+  Ready for explicit owner merge/deployment approval; no live pin change yet.
