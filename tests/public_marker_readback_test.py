@@ -1,6 +1,7 @@
 """Only the exact empty deployment marker can be reconstructed during readback."""
 import sys
 import tempfile
+import threading
 import unittest
 import urllib.error
 from pathlib import Path
@@ -58,6 +59,76 @@ class MarkerReadbackTests(unittest.TestCase):
     def test_corrupt_report_still_refused(self):
         with self.assertRaisesRegex(ci.Refusal, 'content mismatch'):
             self.restore([self.entry('.nojekyll'), self.entry('report.json', b'{}')], lambda *_: b'[]')
+
+    def test_many_files_use_bounded_concurrent_reads_and_preserve_every_digest(self):
+        barrier = threading.Barrier(6)
+        lock = threading.Lock()
+        active = peak = started = 0
+        def read(url, cap):
+            nonlocal active, peak, started
+            with lock:
+                active += 1
+                peak = max(peak, active)
+                started += 1
+                first_batch = started <= 6
+            try:
+                if first_batch:
+                    barrier.wait(timeout=2)
+                return b'{}'
+            finally:
+                with lock:
+                    active -= 1
+        entries = [self.entry(f'reports/{n}.json', b'{}') for n in range(30)]
+        calls = self.restore(entries, read)
+        self.assertEqual(len(calls), 30)
+        self.assertEqual(len(set(calls)), 30)
+        self.assertEqual(peak, 6)
+
+    def test_transient_http_failure_retried_once_with_original_digest_required(self):
+        attempts = []
+        def read(url, cap):
+            attempts.append(url)
+            if len(attempts) == 1:
+                raise urllib.error.HTTPError('redacted', 503, 'busy', {}, None)
+            return b'{}'
+        self.restore([self.entry('report.json', b'{}')], read)
+        self.assertEqual(len(attempts), 2)
+
+    def test_persistent_http_failure_has_bounded_attempts(self):
+        attempts = []
+        def read(url, cap):
+            attempts.append(url)
+            raise urllib.error.HTTPError('redacted', 503, 'busy', {}, None)
+        with self.assertRaises(urllib.error.HTTPError):
+            self.restore([self.entry('report.json', b'{}')], read)
+        self.assertEqual(len(attempts), 2)
+
+    def test_invalid_total_inventory_is_rejected_before_source_reads(self):
+        reads = []
+        entry = self.entry('too-large.json'); entry['bytes'] = ci.MAX_SITE_BYTES
+        with self.assertRaisesRegex(ci.Refusal, 'byte budget'):
+            self.restore([entry], lambda *args: reads.append(args))
+        self.assertEqual(reads, [])
+
+    def test_expired_readback_deadline_removes_partial_output(self):
+        config = configuration()
+        data = ci.canonical({'schema_version': 'csb-public-site-v1',
+            'observed_at': '2026-11-05T17:00:00Z',
+            'files': [self.entry('report.json', b'{}')]})
+        state = dict(ci.empty_state(config), site_generation=1, site_manifest_sha256=ci.digest(data))
+        reads = []
+        def get(url, cap):
+            if url.endswith('site-manifest.json'):
+                return data
+            reads.append(url)
+            return b'{}'
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder) / 'site'
+            with patch.object(ci, 'MAX_SITE_READBACK_SECONDS', 0):
+                with self.assertRaisesRegex(ci.Refusal, 'deadline'):
+                    ci.restore_public_site(config, state, output, get=get)
+            self.assertFalse(output.exists())
+        self.assertEqual(reads, [])
 
 
 class PagesConvergenceTests(unittest.TestCase):
