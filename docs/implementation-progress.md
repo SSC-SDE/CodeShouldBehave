@@ -482,3 +482,22 @@ is claimed; deployed release still predates these fixes.
   https://github.com/SSC-SDE/CodeShouldBehave/pull/25. Source commit
   `ed37223` contains the fixes and local validation above. Explicit owner merge
   approval requested before any main-branch merge or signed engine rollout.
+
+## 2026-11-05 — resume demo deployment
+
+- Owner requested completion of the remaining demo work after the explicit
+  PR #25 merge/release checkpoint. Continuing the tested engine rollout.
+- GitHub now confirms PR #15 was merged externally on November 1 at
+  `adf5c771ad155dd561531c5d82e521768b8b3e83`. This task does not rewrite that
+  history. PR #24 remains the unmerged scheduler demo at `b312bbf3`.
+- Updated the existing #25 branch with current main; no conflicting code changes.
+  Fresh validation: Rust library and public export tests, 114 Python publication
+  tests (four skips), 85 dashboard tests and formatting passed.
+- Fresh browser observation: GitHub Free; SSC-SDE account-wide Actions and
+  Packages each USD 0, Usage blocked. New release-only proof created from these
+  observed values. Runtime budget identity remains unchanged.
+- Signed state deployment 7350943683, sequence 40, cryptographically verified
+  again against its original hosted run; live Pages manifest matches its intent.
+  Exact recovery authorization refreshed to 2026-11-06T04:53:51Z.
+- Public controller currently refuses scheduled recovery because manual dispatch
+  is required. Recovery and final PR #24 browser acceptance follow signed rollout.
