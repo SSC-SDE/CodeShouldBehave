@@ -501,3 +501,16 @@ is claimed; deployed release still predates these fixes.
   Exact recovery authorization refreshed to 2026-11-06T04:53:51Z.
 - Public controller currently refuses scheduled recovery because manual dispatch
   is required. Recovery and final PR #24 browser acceptance follow signed rollout.
+
+## 2026-11-05 — signed demo engine rollout
+
+- PR #25 merged at `00055eaead6173451e73bb63d8dc4a7a80d710e8`, provider verified.
+- Trusted build/tests/attestation `42069590687` passed. Signed release
+  https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-00055eaead61.
+  Archive checksums and hosted exact-source signature independently passed.
+- Pin branch `codex/demo-evidence-release-pins` starts from that merged source.
+  Only engine identities change; runtime budget and authorization scope remain.
+- Manual exact-intent recovery run `42069928076` dispatched on verified main.
+  Native preflight and final hosted PR #24 acceptance remain to be recorded.
+- Production bootstrap passed against published release URLs; extracted
+  public_ci.py byte-matches merged source. Native Linux preflight is next.
