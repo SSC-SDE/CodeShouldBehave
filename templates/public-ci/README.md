@@ -1,11 +1,14 @@
 # Public repository CI templates
 
-These templates are inactive. Nothing in this directory installs a GitHub App,
-changes repository visibility, uploads a release, enables Actions, or publishes
-source. `config/public-ci.example.json` is deliberately disabled and contains
-unresolved trust pins. Runtime validation rejects it.
+Files in this template directory are inert until installed. The upstream
+repository now has active copies under `.github/workflows/` and a verified live
+PR demo. Copying templates into another repository does not supply its consent,
+confirmed architecture, valid budget evidence or Pages configuration. Nothing
+in this directory installs a GitHub App or changes repository visibility.
+`config/public-ci.example.json` is deliberately disabled and contains unresolved
+trust pins. Runtime validation rejects it.
 
-The implementation supports the following intended journey after installation and acceptance:
+After reviewed installation and activation, this profile implements the following journey:
 
 1. A source-free `pull_request` nudge wakes a default-branch controller. Fork
    workflow edits, checkout contents and artifacts are never consumed. A ten-minute
@@ -43,22 +46,43 @@ workflow source, hosted runner and certificate-bound run/attempt.
 
 ## Prerequisites and installation boundary
 
-Live installation is not accepted yet. The outstanding gates are:
+The own-repository live demo is accepted: [PR #24 Architecture check](https://github.com/SSC-SDE/CodeShouldBehave/runs/127446113035)
+opens Focus with HLD, LLD and exact source diffs. Signed recovery and automatic
+controller [42083656278](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/42083656278)
+passed; its complete application REST evidence used 71 of 100 calls. This does
+not establish arbitrary-repository, fork or 100+ PR/day capacity acceptance.
 
-- The project is now public at [SSC-SDE/CodeShouldBehave](https://github.com/SSC-SDE/CodeShouldBehave)
-  under MIT. Publication does not activate consumer workflows or Pages.
-- The [current experimental Linux release](https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-2917f1bb352b)
-  passed build, signing, checksum and bootstrap verification. Its exact pins are
-  in `.codeshouldbehave/engine-pins.json`; native sandbox startup and full worker
-  acceptance remain required. See [release status](../../docs/RELEASE_STATUS.md).
-- Live-provider acceptance of the enforced **aggregate** application REST budget
-  of at most 100 calls per logical controller pass. The local broker and complete
-  three-worker fake-provider pipeline are tested, but those tests are not hosted
-  provider latency, SDK request-count or capacity evidence.
-- Real-provider validation of custom receipt attestations, Deployment payload
-  retention, Pages string-ID lifecycle/readback, fork handling and recovery.
-- Declared live/performance/capacity acceptance in the implementation plan. Local
-  synthetic/provider-fake tests do not stand in for those gates.
+The deployed [canary-c46c28a509b6](https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-c46c28a509b6)
+passed signed bootstrap and Linux sandbox startup. Current exact engine pins
+are in `.codeshouldbehave/engine-pins.json`; use the [release record](../../docs/RELEASE_STATUS.md)
+for evidence. New repositories still need their own review/activation below.
+
+The [planned GitHub App flow](../../docs/GITHUB_APP_ONBOARDING_PLAN.md) eliminates
+customer workflow and Pages setup using an operator-hosted service. It is not
+implemented. Installing the registered App does not perform this CI setup.
+
+### One-time setup sequence for this Actions profile
+
+1. Verify the target is public and the owner authorizes public report excerpts.
+   Resolve an existing Pages-site conflict before configuring a new destination.
+2. Choose include/exclude paths and baseline policy. Scan an exact commit through
+   native onboarding; confirm components and explicitly accept known gaps. Export
+   a fresh confirmed context with authorized export permission.
+3. Verify the signed Linux package using the trusted bootstrap. Retain its exact
+   source, package, binary and attestation digests; do not build the PR's code.
+4. Record fresh owner-observed USD 0 Actions and Packages hard stops. Fill the
+   new repository's numeric ID, default branch, receipt signer, Pages origin/path,
+   scope/context/budget digests and operation switches in a reviewed config.
+5. Run the create-only installer below in a local branch. Review all files together.
+   The installer creates four files; policy, context and budget evidence must
+   already exist. Never reuse this project's signed deployment ledger.
+6. With separate activation approval, configure Actions/Pages and restrict the
+   github-pages environment to the default branch; merge the installation PR.
+   Scheduled processing can start immediately after merge. No customer App key
+   or release-build workflow is needed; the controller uses GITHUB_TOKEN.
+7. Dispatch the controller once, then open a scoped Rust-change PR. Verify the
+   exact-head Architecture check, summary link, Focus and HLD/LLD/source journey.
+   Missing evidence is a failure/incomplete result, never a clean no-change result.
 
 Prepare the following base-owned files in a **public canary** only after the
 owner authorizes that action:
@@ -83,7 +107,7 @@ execute code from that archive until verification succeeds. `gh --bundle` avoids
 implicit GitHub attestation discovery; bounded trust-root verification can still
 contact the Sigstore trust infrastructure.
 
-Once all live gates pass, the create-only local preparer is:
+After repository-specific prerequisites are reviewed, the create-only local preparer is:
 
 ```sh
 python3 /PATH/TO/VERIFIED/PACKAGE/templates/public-ci/install.py \
@@ -189,9 +213,8 @@ The final aggregate requires the plan, publisher and every assigned worker's
 counter proof exactly once. A failed worker that cannot return a snapshot makes
 that pass's evidence explicitly incomplete; it is never reported as zero calls.
 Local fake-provider integration exercised a cold three-worker pass (73 calls)
-and a second pass with retained receipts/check delivery (89 calls). These counts
-show the code path can complete under its tickets; they do not claim a live
-GitHub canary result.
+and a second pass with retained receipts/check delivery (89 calls). These synthetic counts do not establish live multi-worker capacity. The separate
+verified own-repository run above used 71/100 application REST calls.
 
 `begin-promotion`, `prepare-matrix` and publisher IPC clients perform no provider
 REST. Git public fetch, Pages file readback, five maximum release bootstrap
@@ -222,8 +245,8 @@ In [native compatibility probe run 39018952784](https://github.com/SSC-SDE/CodeS
 passed on 22.04, but the engine built on 24.04 failed to start: its runtime needed
 `GLIBC_2.39`, which the analyzer image did not provide. The corrected build image
 requires a new Linux build, release digest and attestation verification, followed
-by actual native execution inside the unchanged sandbox. The earlier compatible rebuild and startup subsequently passed; the new
-2917f1b release still requires its own native startup and full worker acceptance. Do not modify the verified archive or install a
+by actual native execution inside the unchanged sandbox. This historical incompatibility was resolved. The currently deployed release
+listed above subsequently passed native startup and the live review journey. Do not modify the verified archive or install a
 different libc to bypass this failure.
 
 The real hosted [sandbox probe run 39016540661](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/39016540661)
@@ -238,8 +261,8 @@ The template still requires a usable `/usr/bin/bwrap` and tests an actual empty
 `--unshare-all --clearenv` sandbox before invoking the engine. Missing packages,
 package-manager failures, blocked user namespaces or AppArmor denial stop the
 job. Do not disable AppArmor, relax kernel isolation or run reviewed code outside
-the sandbox to make this check pass. Native worker, provenance and public canary
-acceptance remain required live gates.
+the sandbox to make this check pass. Each new deployment must retain native worker, provenance and public canary
+acceptance; the upstream own-repository result does not waive those checks.
 
 ## Reviewer entry and current activation state
 
@@ -248,7 +271,8 @@ Direct dashboard entry opens Standard. Complete supported no-change analysis is
 green; detected changes or incomplete coverage require review. No-change is not
 a runtime equivalence guarantee. Studio is the default Focus HLD appearance.
 
-Only the manual engine-build and sandbox-preflight workflows are currently
-installed in the upstream project. The consumer nudge/controller templates remain
-inactive; do not advertise a working automatic PR check or hosted dashboard until
-installation, scope confirmation and end-to-end acceptance are complete.
+The upstream project has active nudge/controller workflows and a verified hosted
+review journey. This directory remains a template for other repositories.
+Their installation, scope confirmation and end-to-end acceptance are separate.
+Checks in this profile are owned by GitHub Actions; App-owned automatic checks
+remain planned. A neutral review-needed result is advisory, not merge approval.

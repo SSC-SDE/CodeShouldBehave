@@ -865,6 +865,7 @@ pub fn router(backend: Arc<dyn HttpBackend>) -> Router {
         .route("/v1/exports", post(create_export))
         .layer(DefaultBodyLimit::max(MAX_HTTP_BODY))
         .with_state(backend)
+        .merge(crate::github_app_setup::disabled_router())
 }
 
 async fn workspace() -> Html<&'static str> {

@@ -612,3 +612,50 @@ is claimed; deployed release still predates these fixes.
 - PR #24 stays open/unmerged; its description now includes the verified check
   entry and a three-minute presenter walkthrough. This completes the requested
   live demo checkpoint, not broader beta readiness or universal runtime proof.
+
+## 2026-11-06 IST — simplified App onboarding planned
+
+- PR #30 provider-confirmed merged at `c877af8ae2d25c2cf2773c70a0c6fa8499ba3d84`.
+  PR #24 remains the open live demo; no merge or migration is authorized here.
+- Added GITHUB_APP_ONBOARDING_PLAN.md: install/select/scope confirmation target,
+  proposed Rust/SQLite service and bounded workers, least-privilege permissions,
+  tenant/consent boundaries, exact check links, recovery and APP-0 through APP-6
+  checkpoints. Every App checkpoint is pending. Hosted USD 0 feasibility is not
+  assumed; no permissions, infrastructure or runtime behavior changed.
+- Updated public README, public usage and template/browser READMEs to distinguish
+  verified own-repository Actions/Pages delivery from planned App provisioning.
+  Replaced obsolete release/status claims and corrected the actual check-summary
+  entry instructions; historical activation evidence is explicitly labeled.
+- Planning was prepared locally before implementation approval; no publication or
+  deployment occurred at that checkpoint. The approved implementation continues
+  below on the required `phase-6` branch.
+
+
+## 2026-11-06 IST — App onboarding implementation started, activation off
+
+- Owner approved the plan and local implementation; explicitly retained an
+  activation approval gate and required demo PR #24 to stay unmerged.
+- Inspected public branch/PR state: `main` is PR #30 merge
+  `c877af8ae2d25c2cf2773c70a0c6fa8499ba3d84`; remote `phase-6` at
+  `7e09fc19477719b8d9fe2b9548bdc7e3514425fe` is an ancestor, with no unique
+  work or open integration PR. Resumed `phase-6` from current main. Private
+  working-tree changes are untouched.
+- APP-0 research: documented current free-host constraints. Owner has no existing
+  Linux host or Oracle account; no host is qualified, provisioned or activated.
+  Static Pages, Render Free, Workers and Vercel Hobby are not drop-in hosts for
+  this approved durable SQLite/native-worker profile. Oracle is only a candidate.
+- APP-1 local implementation: browser-bound single-use state and PKCE, secure
+  session cookies, fresh numeric GitHub identity/admin/installation validation,
+  bounded optional HTTPS adapter, same-origin writes, logout/expiry fencing and
+  unconfigured repository selection in migration 15. Existing workspace exposes
+  only disabled capability/login routes; no scope/worker/check activation exists.
+- New network dependencies are confined to the optional `github-app` feature.
+  CLI and existing `server` builds do not include its TLS client. Locked license
+  inventory validated for 108 packages and 200 original notice files.
+- Full APP-1 acceptance remains pending browser setup UX and real OAuth on an
+  approved host. APP-2 scope/consent, webhook jobs, App receipts/check publication
+  and second-repository end-to-end acceptance are not complete.
+- Test commands/results and deployment boundaries are recorded in
+  [APP-1 evidence](evidence/P6.app1/acceptance.md). No App setting, release pin,
+  workflow, live consent or hosted report changed. PR #24 verified OPEN at
+  `b312bbf3c3f01299d04745b73ca3b81d24582a40`.
