@@ -7,7 +7,7 @@ const root=path.resolve(__dirname,'..'),output=path.join(root,'target/app-setup-
 const origin='https://setup.example.test',checks=[],requests=[],unexpected=[];
 const repo={installation_id:20,repository_id:30,owner:'fixture',name:'review-rs',state:'installed_unconfigured'};
 const entries=[{path:'.env',kind:'file'},{path:'Cargo.toml',kind:'file'},{path:'README.md',kind:'file'},{path:'src',kind:'directory'},{path:'src/lib.rs',kind:'file'},{path:'src/<img src=x>.rs',kind:'file'},{path:'vendor',kind:'submodule'}].map(e=>({...e,oid:'c'.repeat(40)}));
-const state={enabled:false,authenticated:true,saved:null,preview:null,commit:'a'.repeat(40),conflict:false,denied:false,failed:false};
+const state={enabled:false,authenticated:true,saved:null,preview:null,commit:'a'.repeat(40),conflict:false,denied:false,failed:false,sourceAvailable:false,architecture:null};
 const inventory=()=>({repository_id:30,default_branch:'main',commit:state.commit,tree:'b'.repeat(40),entries});
 const includePath=(p,roots)=>roots.some(r=>r==='.'||p===r||p.startsWith(r+'/'));
 async function main(){
@@ -23,7 +23,7 @@ async function main(){
    const data=request.postDataJSON();requests.push({path:url.pathname,method:request.method(),data});
    const send=(value,status=200)=>route.fulfill({status,contentType:'application/json',body:JSON.stringify(value)});
    const key=url.pathname.replace('/v1/github-app/','');
-   if(key==='capability')return send({available:state.enabled,activation:'off',scope_confirmation_available:state.enabled,checks_available:false});
+   if(key==='capability')return send({available:state.enabled,activation:'off',scope_confirmation_available:state.enabled,checks_available:false,source_preview_available:state.sourceAvailable});
    if(!state.authenticated)return send({error:'github_authentication_required'},401);
    if(key==='repositories'&&request.method()==='GET')return send({repositories:[repo],activation:'off'});
    if(key==='logout'){state.authenticated=false;return route.fulfill({status:204});}
@@ -32,6 +32,15 @@ async function main(){
    if(state.failed)return send({error:'github_setup_unavailable'},503);
    if(key==='repositories')return send({repository:repo,scan_started:false,activation:'off'});
    if(key==='inventory')return send({inventory:inventory(),saved:state.saved,automatically_excluded:['.env','vendor'],activation:'off',source_scanned:false});
+   if(key==='architecture/status')return send({scope_revision:state.saved.revision,architecture_confirmed:!!state.architecture,activation:'off',publication_consent:false});
+   if(key==='architecture/preview'){
+     assert.equal(data.allow_selected_source_scan,true);assert.equal(data.scope_revision,state.saved.revision);
+     return send({preview_id:'e'.repeat(64),scope_revision:state.saved.revision,expires_at_s:Date.now()/1000+900,activation:'off',result:{version:'csb-app-preview-v1',components:[{id:'component-fixture',name:'Rust API',roots:['src'],role:'backend candidate',stack_candidates:['Rust','Axum · static import'],evidence:[{path:'src/lib.rs',blob:'c'.repeat(40),start_line:1,end_line:5}],contradictions:['Static import does not prove an active server']}],providers:[],gaps:['Runtime and hosting unverified']}});
+   }
+   if(key==='architecture/confirm'){
+     assert.equal(data.preview_id,'e'.repeat(64));assert.equal(data.accept_known_gaps,true);assert.equal(data.defer_integrations,true);assert.equal(data.components[0].decision,'corrected');assert.equal(data.components[0].name,'Checkout API');assert.ok(!('activate' in data));
+     state.architecture=data;return send({scope_revision:state.saved.revision,architecture_confirmed:true,activation:'off',publication_consent:false});
+   }
    if(key==='scope/preview'){
      assert.equal(data.commit,state.commit);assert.equal(data.expected_revision,state.saved?.revision||0);
      const files=entries.filter(e=>e.kind==='file'&&e.path!=='.env'&&includePath(e.path,data.include)&&!includePath(e.path,data.exclude)).map(e=>e.path);
@@ -61,6 +70,9 @@ async function main(){
  await page.setViewportSize({width:390,height:844});await page.locator('#preview').click();await page.locator('#confirmation').waitFor();assert.equal(await page.locator('#confirm-title').evaluate(e=>e===document.activeElement),true);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.screenshot({path:path.join(output,'scope-mobile.png'),fullPage:true});checks.push('narrow layout and keyboard focus');
  await page.locator('#acknowledge').check();state.denied=true;await page.locator('#confirm').click();await page.locator('#error').waitFor();assert.equal(await page.locator('#scope').isVisible(),false);assert.equal(await page.locator('#summary').innerText(),'');assert.equal(await page.locator('#selected-files').innerText(),'');checks.push('access revocation clears repository and scope UI');
  state.denied=false;await page.locator('#retry').click();await page.locator('#logout').click();await page.getByText('Signed out. Checks remain off.',{exact:true}).waitFor();assert.equal(await page.locator('#picker').isVisible(),false);assert.equal(await page.evaluate(()=>localStorage.length+sessionStorage.length),0);checks.push('logout clears state; no browser credential storage');
+ state.authenticated=true;state.sourceAvailable=true;await page.setViewportSize({width:1280,height:900});await page.locator('#retry').click();await page.getByRole('button',{name:'fixture/review-rs',exact:true}).click();await page.locator('#source-consent').waitFor();assert.equal(await page.locator('#scan-source').isDisabled(),true);assert.equal(requests.filter(r=>r.path.endsWith('/architecture/preview')).length,0);checks.push('saved scope reload never starts source scan implicitly');
+ await page.locator('#scan-consent').check();await page.locator('#scan-source').click();await page.locator('#architecture-review').waitFor();assert.equal(await page.locator('#accept-architecture').isDisabled(),true);await page.locator('[data-field="name"]').fill('Checkout API');await page.locator('#architecture-gaps-ack').check();assert.equal(await page.locator('#accept-architecture').isDisabled(),true);await page.locator('#architecture-defer').check();await page.screenshot({path:path.join(output,'architecture-review.png'),fullPage:true});await page.locator('#accept-architecture').click();await page.locator('#architecture-saved').waitFor();checks.push('explicit scan, component correction and gap acceptance remain inactive');
+ await page.reload();await page.getByRole('button',{name:'fixture/review-rs',exact:true}).click();await page.locator('#architecture-saved').waitFor();assert.equal(requests.filter(r=>r.path.endsWith('/architecture/preview')).length,1);await page.locator('#architecture-back').click();await page.locator('#revise').click();await page.locator('#scope').waitFor();assert.equal(await page.locator('#include').inputValue(),'src');checks.push('architecture receipt reloads and paths remain editable');
  assert.deepEqual(errors,[]);assert.deepEqual(unexpected,[]);fs.writeFileSync(path.join(output,'result.json'),JSON.stringify({status:'passed',profile:'synthetic UI contract only',checks,api_requests:requests.length,external_requests:unexpected.length,activation:'off'},null,2));console.log(JSON.stringify({status:'passed',checks:checks.length,output}));
  }finally{await browser.close();}
 }

@@ -114,7 +114,7 @@ pub struct SavedScope {
     pub activation: &'static str,
 }
 impl<P: GitHubSetupProvider> AppSetupHost<P> {
-    fn authorized_choice(
+    pub(super) fn authorized_choice(
         &self,
         token: &str,
         installation: i64,
@@ -364,19 +364,23 @@ impl<P: GitHubSetupProvider> AppSetupHost<P> {
         })
     }
 }
-fn fence<'a>(sessions: &'a BTreeMap<String, Session>, token: &str) -> Result<&'a Session> {
+pub(super) fn fence<'a>(
+    sessions: &'a BTreeMap<String, Session>,
+    token: &str,
+) -> Result<&'a Session> {
     let at = now()?;
     sessions
         .get(&digest(token))
         .filter(|s| s.expires_at_s > at)
         .ok_or(SetupError::Authentication)
 }
-fn latest(
+pub(super) fn latest(
     dbh: &rusqlite::Connection,
     app: i64,
     installation: i64,
     repository: i64,
 ) -> Result<Option<SavedScope>> {
+    unblocked(dbh, app, installation, repository)?;
     let row:Option<(i64,i64,i64,String)>=dbh.query_row("SELECT revision,actor_id,confirmed_at_s,document FROM app_setup_scopes WHERE app_id=?1 AND installation_id=?2 AND repository_id=?3 ORDER BY revision DESC LIMIT 1",params![app,installation,repository],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?))).optional().map_err(db)?;
     row.map(|(revision, actor_id, confirmed_at_s, json)| {
         Ok(SavedScope {
@@ -401,4 +405,18 @@ fn preview_document(
 ) -> Result<ScopeDocument> {
     let row:Option<String>=dbh.query_row("SELECT document FROM app_setup_scope_previews WHERE id=?1 AND app_id=?2 AND installation_id=?3 AND repository_id=?4 AND actor_id=?5 AND expected_revision=?6 AND expires_at_s>?7",params![preview,app,installation,repository,actor,revision,now()?],|r|r.get(0)).optional().map_err(db)?;
     serde_json::from_str(&row.ok_or(SetupError::Conflict)?).map_err(|_| SetupError::Unavailable)
+}
+
+pub(super) fn unblocked(
+    dbh: &rusqlite::Connection,
+    app: i64,
+    installation: i64,
+    repository: i64,
+) -> Result<()> {
+    let blocked:bool=dbh.query_row("SELECT EXISTS(SELECT 1 FROM app_installation_blocks WHERE app_id=?1 AND installation_id=?2) OR EXISTS(SELECT 1 FROM app_repository_blocks WHERE app_id=?1 AND installation_id=?2 AND repository_id=?3)",params![app,installation,repository],|r|r.get(0)).map_err(db)?;
+    if blocked {
+        Err(SetupError::Denied)
+    } else {
+        Ok(())
+    }
 }

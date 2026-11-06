@@ -300,3 +300,51 @@ fn truncated_wrong_tree_and_unrecognized_modes_never_appear_complete() {
         );
     }
 }
+
+#[test]
+fn explicit_scoped_fetch_reads_only_exact_blobs_and_bounds_decoding() {
+    use base64::Engine;
+    let entry = InventoryEntry {
+        path: "src/lib.rs".into(),
+        kind: "file".into(),
+        oid: "c".repeat(40),
+    };
+    let choice = RepositoryChoice {
+        installation_id: 20,
+        repository_id: 30,
+        owner: "owner".into(),
+        name: "repo".into(),
+        state: "installed_unconfigured",
+    };
+    let path = format!("/repos/owner/repo/git/blobs/{}", entry.oid);
+    let encoded = base64::engine::general_purpose::STANDARD.encode("pub fn f(){}\n");
+    let response = json!({"sha":entry.oid,"encoding":"base64","content":encoded,"size":13});
+    let p = provider(vec![(&path, Ok(response.clone()))]);
+    let files = p
+        .scoped_sources(&credential(), &choice, std::slice::from_ref(&entry))
+        .unwrap();
+    assert_eq!(files[0].content.as_deref(), Some("pub fn f(){}\n"));
+    for (key, value) in [
+        ("sha", json!("a".repeat(40))),
+        ("encoding", json!("utf-8")),
+        ("size", json!(999999)),
+        ("content", json!("!!!!")),
+    ] {
+        let mut bad = response.clone();
+        bad[key] = value;
+        let p = provider(vec![(&path, Ok(bad))]);
+        assert!(
+            p.scoped_sources(&credential(), &choice, std::slice::from_ref(&entry))
+                .is_err()
+        );
+    }
+    let p = provider(vec![]);
+    let mut denied = entry;
+    denied.path = "secrets.rs".into();
+    assert_eq!(
+        p.scoped_sources(&credential(), &choice, &[denied]).err(),
+        Some(SetupError::Invalid)
+    );
+    assert!(!blob_path("/repos/owner/repo/contents/src/lib.rs"));
+    assert!(!blob_path("/repos/owner/repo/git/blobs/../../else"));
+}

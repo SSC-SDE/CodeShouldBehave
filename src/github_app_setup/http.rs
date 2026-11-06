@@ -22,7 +22,7 @@ pub fn disabled_router() -> Router {
 }
 pub fn router<P: GitHubSetupProvider>(host: Arc<AppSetupHost<P>>) -> Router {
     page_routes()
-        .route("/v1/github-app/capability",get(||async{Json(json!({"profile":"github-app","available":true,"activation":"off","scope_confirmation_available":true,"checks_available":false}))}))
+        .route("/v1/github-app/capability",get(|State(host):State<Arc<AppSetupHost<P>>>|async move{Json(json!({"profile":"github-app","available":true,"activation":"off","scope_confirmation_available":true,"source_preview_available":host.scan_available(),"checks_available":false}))}))
         .route("/v1/github-app/login",get(login::<P>))
         .route("/v1/github-app/callback",get(callback::<P>))
         .route("/v1/github-app/repositories",get(repositories::<P>).post(select::<P>))
@@ -30,6 +30,9 @@ pub fn router<P: GitHubSetupProvider>(host: Arc<AppSetupHost<P>>) -> Router {
         .route("/v1/github-app/inventory",post(inventory::<P>))
         .route("/v1/github-app/scope/preview",post(preview::<P>))
         .route("/v1/github-app/scope/confirm",post(confirm::<P>))
+        .route("/v1/github-app/architecture/preview",post(architecture_preview::<P>))
+        .route("/v1/github-app/architecture/confirm",post(architecture_confirm::<P>))
+        .route("/v1/github-app/architecture/status",post(architecture_status::<P>))
         .layer(DefaultBodyLimit::max(16384))
         .layer(middleware::from_fn(security_headers))
         .with_state(host)
@@ -358,6 +361,65 @@ async fn confirm<P: GitHubSetupProvider>(
     .await
     {
         Ok(Ok(value)) => Json(value).into_response(),
+        Ok(Err(e)) => failure(e),
+        Err(_) => failure(SetupError::Unavailable),
+    }
+}
+
+async fn architecture_preview<P: GitHubSetupProvider>(
+    State(host): State<Arc<AppSetupHost<P>>>,
+    headers: HeaderMap,
+    Json(input): Json<ScanInput>,
+) -> Response {
+    if let Err(e) = origin(&headers, &host) {
+        return failure(e);
+    }
+    let token = match cookie(&headers, SESSION) {
+        Ok(t) => t,
+        Err(e) => return failure(e),
+    };
+    match tokio::task::spawn_blocking(move || host.preview_architecture(&token, input)).await {
+        Ok(Ok(v)) => Json(v).into_response(),
+        Ok(Err(e)) => failure(e),
+        Err(_) => failure(SetupError::Unavailable),
+    }
+}
+async fn architecture_confirm<P: GitHubSetupProvider>(
+    State(host): State<Arc<AppSetupHost<P>>>,
+    headers: HeaderMap,
+    Json(input): Json<ArchitectureConfirmation>,
+) -> Response {
+    if let Err(e) = origin(&headers, &host) {
+        return failure(e);
+    }
+    let token = match cookie(&headers, SESSION) {
+        Ok(t) => t,
+        Err(e) => return failure(e),
+    };
+    match tokio::task::spawn_blocking(move || host.confirm_architecture(&token, input)).await {
+        Ok(Ok(v)) => Json(v).into_response(),
+        Ok(Err(e)) => failure(e),
+        Err(_) => failure(SetupError::Unavailable),
+    }
+}
+async fn architecture_status<P: GitHubSetupProvider>(
+    State(host): State<Arc<AppSetupHost<P>>>,
+    headers: HeaderMap,
+    Json(input): Json<Selection>,
+) -> Response {
+    if let Err(e) = origin(&headers, &host) {
+        return failure(e);
+    }
+    let token = match cookie(&headers, SESSION) {
+        Ok(t) => t,
+        Err(e) => return failure(e),
+    };
+    match tokio::task::spawn_blocking(move || {
+        host.architecture_status(&token, input.installation_id, input.repository_id)
+    })
+    .await
+    {
+        Ok(Ok(v)) => Json(v).into_response(),
         Ok(Err(e)) => failure(e),
         Err(_) => failure(SetupError::Unavailable),
     }

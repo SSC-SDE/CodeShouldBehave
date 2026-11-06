@@ -233,8 +233,10 @@ Implementation runs on `phase-6`, based on provider-confirmed merged PR #30
 APP-1 has locally tested OAuth/PKCE, current-user installation/admin validation,
 repository selection and additive persistence. The browser picker and inactive
 APP-2 path-intent preview/confirmation are implemented and tested with fixtures.
-They use metadata only; source scanning and architecture/publication consent
-remain pending. Live OAuth and APP-3 through APP-6 are pending. No activation or phase acceptance is
+An additional local slice implements explicit scoped source preview, component/gap
+review and inactive architecture acceptance, plus authenticated durable webhook
+intake. Publication consent, active job/report delivery and live OAuth remain
+pending. APP-2 through APP-6 have not passed their full exit gates. No activation or phase acceptance is
 claimed; see the [progress tracker](implementation-progress.md).
 
 | Checkpoint | Deliverable | Exit evidence |
@@ -276,6 +278,8 @@ rewinds old consent or restores withdrawn bytes. PR #24 is not a migration targe
 Only the operator configures App keys, webhook/callback/setup URLs, HTTPS and
 capacity once. End users install/select/preview/confirm; organization permissions
 or rejected billing eligibility get a clear blocking state, not manual YAML steps.
-The next implementation step is explicit selected-path source-scan authorization
-and architecture/gap review, using the completed inactive path-intent boundary. Live OAuth/worker qualification and activation
-remain separate and require an approved host and operator configuration.
+The next implementation steps are installation-token/current-PR reconciliation,
+full PR worker scheduling and the App publication/check outbox. The source-preview
+and inactive architecture review are implemented; see [current checkpoint](APP_SOURCE_PREVIEW.md).
+Live OAuth/worker qualification and activation remain separate and require an
+approved host and operator configuration.

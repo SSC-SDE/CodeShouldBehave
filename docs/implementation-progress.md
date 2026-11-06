@@ -704,3 +704,27 @@ is claimed; deployed release still predates these fixes.
   state is open/non-draft, with no merge or activation performed. Committed source
   distribution scan: 355 files, zero secret-pattern findings; 27 local docs links
   verified. Dependency/license inventory is unchanged from APP-1.
+
+## 2026-11-06 IST — App source preview and architecture review
+
+- GitHub confirmed PR #31 merged at `c52b5527d8d480c5b9e62863fe3ff4e94cf4bab5`.
+  Continued the existing clean `phase-6` branch by fast-forward to merged main.
+- Starting explicit selected-source consent, isolated preview worker, architecture
+  review and durable inactive acceptance. Hosting/live OAuth and activation remain
+  gated; PR #24 is open/unmerged. No production settings changed.
+- Added opt-in exact-source preview, existing detector reuse through a new bounded
+  native worker protocol, and a digest-pinned Linux sandbox launcher. Browser users
+  review/correct component boundaries and explicitly accept gaps/defer connections;
+  accepted architecture remains inactive and non-exportable.
+- Added additive migrations 17/18, optional inactive loopback host composition,
+  authenticated durable webhook notifications and sticky removal/uninstall blocks.
+  Notification claiming does not enqueue analysis. Existing Actions/Pages ownership,
+  workflow settings, viewer, releases and PR #24 remain unchanged.
+- Local acceptance: 316 all-feature Rust tests, 119 core-only tests, 119 publication
+  regressions, four sandbox policy tests and 13 offline browser scenarios passed.
+  Native executable protocol passed synthetic success/hash-mismatch checks;
+  non-loopback host startup was refused. Strict Clippy in both configurations passed.
+- Evidence: [source preview](evidence/P6.app2/source-preview.md) and
+  [webhook inbox](evidence/P6.app3/inbox.md). Full APP-2/APP-3/APP-4 rollout remains
+  incomplete: no qualified host/live OAuth, installation-token reconciler, full PR
+  worker scheduler or App signed-publication/check writer. No activation claimed.

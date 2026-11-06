@@ -499,7 +499,7 @@ fn review_identity(repository_id: i64, event: &ProviderEvent) -> String {
     hex(hash.finalize().as_slice())
 }
 
-fn verify_signature(secret: &[u8], body: &[u8], supplied: &str) -> Result<(), String> {
+pub(crate) fn verify_signature(secret: &[u8], body: &[u8], supplied: &str) -> Result<(), String> {
     let expected = format!("sha256={}", hex(&hmac_sha256(secret, body)));
     if supplied.len() != expected.len() {
         return Err("Invalid webhook signature".into());
@@ -515,7 +515,7 @@ fn verify_signature(secret: &[u8], body: &[u8], supplied: &str) -> Result<(), St
     }
 }
 
-fn hmac_sha256(secret: &[u8], body: &[u8]) -> [u8; 32] {
+pub(crate) fn hmac_sha256(secret: &[u8], body: &[u8]) -> [u8; 32] {
     let mut key = [0_u8; 64];
     if secret.len() > 64 {
         key[..32].copy_from_slice(Sha256::digest(secret).as_slice());

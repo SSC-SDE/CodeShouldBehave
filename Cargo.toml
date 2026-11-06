@@ -15,7 +15,7 @@ panic = "abort"
 
 [features]
 default = []
-github-app = ["server", "dep:ureq"]
+github-app = ["server", "dep:ureq", "dep:base64"]
 server = ["dep:axum", "dep:serde", "dep:serde_json", "dep:tokio", "dep:toml"]
 
 [[example]]
@@ -28,6 +28,7 @@ path = "src/bin/csb_public_report.rs"
 required-features = ["server"]
 
 [dependencies]
+base64 = { version = "=0.23.1", optional = true }
 ureq = { version = "=3.5.0", default-features = false, features = ["rustls"], optional = true }
 sha2 = { version = "=0.11.0", default-features = false }
 rusqlite = { version = "=0.40.2", default-features = false, features = ["bundled", "backup"] }
@@ -47,3 +48,13 @@ tower = { version = "=0.5.3", default-features = false, features = ["util"] }
 name = "csb-onboarding"
 path = "src/bin/csb_onboarding.rs"
 required-features = ["server"]
+
+[[bin]]
+name = "csb-app-preview"
+path = "src/bin/csb_app_preview.rs"
+required-features = ["server"]
+
+[[bin]]
+name = "csb-app-host"
+path = "src/bin/csb_app_host.rs"
+required-features = ["github-app"]

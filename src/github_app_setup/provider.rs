@@ -1,4 +1,4 @@
-//! Hosted web OAuth adapter. Fixed GitHub endpoints only; no source fetching.
+//! Hosted web OAuth and explicit scoped-blob adapter. Fixed GitHub endpoints only.
 use super::*;
 use serde_json::Value;
 use std::{
@@ -64,6 +64,7 @@ impl Transport for Https {
                 && !r.path.starts_with("/user/installations?")
                 && !r.path.starts_with("/user/installations/")
                 && !metadata_path(r.path)
+                && !blob_path(r.path)
             {
                 return Err(SetupError::Invalid);
             }
@@ -278,6 +279,72 @@ impl GitHubSetupProvider for GitHubWebProvider {
         let credential = UserCredential::verified(token.into(), 1, expires)?;
         let user = pass.get("/user", credential.token())?;
         UserCredential::verified(token.into(), id(&user, "id")?, expires)
+    }
+    fn scoped_sources(
+        &self,
+        credential: &UserCredential,
+        repo: &RepositoryChoice,
+        files: &[InventoryEntry],
+    ) -> Result<Vec<PreviewFile>> {
+        use base64::Engine;
+        if credential.expires_at_s <= now()? || !slug(&repo.owner) || !slug(&repo.name) {
+            return Err(SetupError::Authentication);
+        }
+        if files.len() > scan_worker::MAX_SOURCE_FILES
+            || files.iter().any(|f| {
+                f.kind != "file"
+                    || !scope::oid(&f.oid)
+                    || crate::sensitive_path(&f.path)
+                    || !scan_worker::supported_source(&f.path)
+            })
+        {
+            return Err(SetupError::Invalid);
+        }
+        let _permit = self.permit()?;
+        let mut pass = Pass::new(self.transport.as_ref());
+        let mut result = Vec::new();
+        for file in files {
+            let data = pass.get(
+                &format!("/repos/{}/{}/git/blobs/{}", repo.owner, repo.name, file.oid),
+                credential.token(),
+            )?;
+            let size = data
+                .get("size")
+                .and_then(Value::as_u64)
+                .ok_or(SetupError::Unavailable)?;
+            if size > scan_worker::MAX_SOURCE_BYTES as u64 {
+                return Err(SetupError::Capacity);
+            }
+            if data.get("sha").and_then(Value::as_str) != Some(&file.oid)
+                || data.get("encoding").and_then(Value::as_str) != Some("base64")
+            {
+                return Err(SetupError::Unavailable);
+            }
+            let encoded = data
+                .get("content")
+                .and_then(Value::as_str)
+                .ok_or(SetupError::Unavailable)?;
+            if encoded.len() > 512 * 1024 {
+                return Err(SetupError::Capacity);
+            }
+            let compact = encoded
+                .bytes()
+                .filter(|c| !matches!(c, b'\r' | b'\n'))
+                .collect::<Vec<_>>();
+            let bytes = base64::engine::general_purpose::STANDARD
+                .decode(compact)
+                .map_err(|_| SetupError::Unavailable)?;
+            if bytes.len() as u64 != size || bytes.contains(&0) {
+                return Err(SetupError::Unavailable);
+            }
+            let content = String::from_utf8(bytes).map_err(|_| SetupError::Unavailable)?;
+            result.push(PreviewFile {
+                path: file.path.clone(),
+                oid: file.oid.clone(),
+                content: Some(content),
+            });
+        }
+        Ok(result)
     }
     fn scope_inventory(
         &self,
@@ -507,4 +574,9 @@ fn metadata_path(path: &str) -> bool {
         ["git", "trees", sha] => sha.strip_suffix("?recursive=1").is_some_and(scope::oid),
         _ => false,
     }
+}
+
+fn blob_path(path: &str) -> bool {
+    let p = path.split('/').collect::<Vec<_>>();
+    matches!(p.as_slice(),["","repos",owner,name,"git","blobs",oid] if slug(owner)&&slug(name)&&scope::oid(oid))
 }

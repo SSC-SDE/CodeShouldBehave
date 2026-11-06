@@ -158,6 +158,7 @@ name = "flowdiff"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "base64",
  "http-body-util",
  "rusqlite",
  "serde",
