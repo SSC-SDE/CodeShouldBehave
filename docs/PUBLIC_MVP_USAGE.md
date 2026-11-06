@@ -33,8 +33,9 @@ activate checks in another repository. The [App onboarding plan](GITHUB_APP_ONBO
 defines the simpler target and its hosted-service, scope, security and cost gates.
 The existing public CI profile needs no reviewer terminal, API key or local server.
 
-The first App implementation adds inactive OAuth/PKCE and authorized repository
-selection. It does not yet provide scope confirmation or automatic App checks.
+The App implementation includes OAuth/PKCE, a browser repository picker and
+versioned path-scope confirmation with checks off. Source scanning, architecture
+acceptance and automatic App checks are not yet connected or activated.
 See the [development checkpoint](APP_ONBOARDING_DEVELOPMENT.md) and
 [$0 hosting assessment](APP_HOSTING_OPTIONS.md) for current limits.
 

@@ -16,6 +16,8 @@ struct FakeProvider {
     exchanges: Arc<AtomicUsize>,
     fail_exchange: bool,
     hold: Arc<Mutex<Option<Arc<Hold>>>>,
+    inventory: Arc<Mutex<ScopeInventory>>,
+    inventory_calls: Arc<AtomicUsize>,
 }
 struct Hold {
     entered: std::sync::Barrier,
@@ -33,6 +35,10 @@ impl GitHubSetupProvider for FakeProvider {
             return Err(SetupError::Unavailable);
         }
         UserCredential::verified("synthetic_user_token_only".into(), 101, now()? + 7200)
+    }
+    fn scope_inventory(&self, _: &UserCredential, _: &RepositoryChoice) -> Result<ScopeInventory> {
+        self.inventory_calls.fetch_add(1, Ordering::SeqCst);
+        Ok(self.inventory.lock().unwrap().clone())
     }
     fn current_access(&self, _: &UserCredential) -> Result<AccessSnapshot> {
         let hold = self.hold.lock().unwrap().take();
@@ -62,6 +68,8 @@ impl Fixture {
             exchanges: Arc::new(AtomicUsize::new(0)),
             fail_exchange,
             hold: Arc::new(Mutex::new(None)),
+            inventory: Arc::new(Mutex::new(sample_inventory())),
+            inventory_calls: Arc::new(AtomicUsize::new(0)),
         };
         let host = Arc::new(AppSetupHost::new(
             Storage::open(&root.join("state.db"), &root.join("artifacts")).unwrap(),
@@ -476,7 +484,11 @@ async fn http_login_callback_and_logout_keep_tokens_out_of_json() {
         )
         .await
         .unwrap();
-    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(response.status(), StatusCode::SEE_OTHER);
+    assert_eq!(
+        response.headers()["location"],
+        "/github-app/setup?installation_id=20"
+    );
     assert_eq!(response.headers()["referrer-policy"], "no-referrer");
     let session = response
         .headers()
@@ -574,4 +586,404 @@ fn logout_during_provider_lookup_fences_selection_commit() {
         Some(SetupError::Authentication)
     );
     assert_eq!(count(&f), 0);
+}
+
+fn sample_inventory() -> ScopeInventory {
+    ScopeInventory {
+        repository_id: 30,
+        default_branch: "main".into(),
+        commit: "a".repeat(40),
+        tree: "b".repeat(40),
+        entries: [
+            ("src", "directory"),
+            ("src/lib.rs", "file"),
+            ("Cargo.toml", "file"),
+            ("README.md", "file"),
+            (".env", "file"),
+            ("linked.rs", "symlink"),
+            ("vendor", "submodule"),
+        ]
+        .into_iter()
+        .map(|(path, kind)| InventoryEntry {
+            path: path.into(),
+            kind: kind.into(),
+            oid: "c".repeat(40),
+        })
+        .collect(),
+    }
+}
+fn input(revision: i64) -> ScopeInput {
+    ScopeInput {
+        installation_id: 20,
+        repository_id: 30,
+        commit: "a".repeat(40),
+        expected_revision: revision,
+        include: vec![".".into()],
+        exclude: vec![],
+    }
+}
+fn selected(f: &Fixture) -> String {
+    let token = f.login();
+    f.host.select_repository(&token, 20, 30).unwrap();
+    token
+}
+fn saved_count(f: &Fixture) -> i64 {
+    f.host
+        .storage
+        .lock()
+        .unwrap()
+        .connection
+        .query_row("SELECT count(*) FROM app_setup_scopes", [], |r| r.get(0))
+        .unwrap()
+}
+#[test]
+fn scope_saves_exact_metadata_boundary_without_activation_and_survives_restart() {
+    let f = Fixture::new();
+    let token = selected(&f);
+    assert_eq!(f.provider.inventory_calls.load(Ordering::SeqCst), 0);
+    let preview = f.host.preview_scope(&token, input(0)).unwrap();
+    assert_eq!(
+        preview.document.files,
+        vec!["Cargo.toml", "README.md", "src/lib.rs"]
+    );
+    assert_eq!(preview.document.rust_candidates, 1);
+    assert_eq!(preview.document.unsupported_files, 1);
+    assert_eq!(preview.document.automatically_excluded, 3);
+    assert_eq!(preview.activation, "off");
+    let saved = f
+        .host
+        .confirm_scope(&token, 20, 30, &preview.preview_id, 0, true)
+        .unwrap();
+    assert_eq!(saved.revision, 1);
+    assert_eq!(saved.document, preview.document);
+    assert!(!saved.document.source_scanned);
+    assert!(!saved.document.architecture_confirmed);
+    assert!(!saved.document.publication_consent);
+    assert_eq!(
+        f.host
+            .saved_scope(&token, 20, 30)
+            .unwrap()
+            .unwrap()
+            .revision,
+        1
+    );
+    let restarted = AppSetupHost::new(
+        Storage::open(&f.root.join("state.db"), &f.root.join("artifacts")).unwrap(),
+        f.provider.clone(),
+        config(),
+    );
+    let start = restarted.begin_login(None).unwrap();
+    let session = restarted
+        .finish_login(state(&start), &start.browser_cookie, "code")
+        .unwrap();
+    assert_eq!(
+        restarted
+            .saved_scope(&session.session_cookie, 20, 30)
+            .unwrap()
+            .unwrap()
+            .document,
+        preview.document
+    );
+    let storage = f.host.storage.lock().unwrap();
+    assert!(
+        storage
+            .connection
+            .execute("UPDATE app_setup_scopes SET activation='on'", [])
+            .is_err()
+    );
+    let repo_state: String = storage
+        .connection
+        .query_row("SELECT state FROM app_setup_repositories", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(repo_state, "installed_unconfigured");
+}
+#[test]
+fn preview_requires_known_paths_and_nonempty_allowed_files() {
+    let f = Fixture::new();
+    let token = selected(&f);
+    for root in [
+        "../secret",
+        "src/./lib.rs",
+        "/src",
+        ".git/config",
+        "missing",
+        ".env",
+        "linked.rs",
+        "vendor",
+    ] {
+        let mut q = input(0);
+        q.include = vec![root.into()];
+        assert_eq!(
+            f.host.preview_scope(&token, q).err(),
+            Some(SetupError::Invalid),
+            "{root}"
+        );
+    }
+    let mut q = input(0);
+    q.exclude = vec![".".into()];
+    assert_eq!(
+        f.host.preview_scope(&token, q).err(),
+        Some(SetupError::Invalid)
+    );
+    let mut q = input(0);
+    q.exclude = vec!["src".into()];
+    let p = f.host.preview_scope(&token, q).unwrap();
+    assert!(!p.document.files.iter().any(|p| p.starts_with("src/")));
+    assert_eq!(saved_count(&f), 0);
+}
+#[test]
+fn stale_commit_tree_preview_and_replayed_confirmation_are_rejected() {
+    let f = Fixture::new();
+    let token = selected(&f);
+    let old = f.host.preview_scope(&token, input(0)).unwrap();
+    f.provider.inventory.lock().unwrap().commit = "d".repeat(40);
+    assert_eq!(
+        f.host
+            .confirm_scope(&token, 20, 30, &old.preview_id, 0, true)
+            .err(),
+        Some(SetupError::Conflict)
+    );
+    assert_eq!(
+        f.host.preview_scope(&token, input(0)).err(),
+        Some(SetupError::Conflict)
+    );
+    f.provider.inventory.lock().unwrap().commit = "a".repeat(40);
+    let fresh = f.host.preview_scope(&token, input(0)).unwrap();
+    assert_eq!(
+        f.host
+            .confirm_scope(&token, 20, 30, &old.preview_id, 0, true)
+            .err(),
+        Some(SetupError::Conflict)
+    );
+    assert_eq!(
+        f.host
+            .confirm_scope(&token, 20, 30, &fresh.preview_id, 0, false)
+            .err(),
+        Some(SetupError::Invalid)
+    );
+    f.host
+        .confirm_scope(&token, 20, 30, &fresh.preview_id, 0, true)
+        .unwrap();
+    assert_eq!(
+        f.host
+            .confirm_scope(&token, 20, 30, &fresh.preview_id, 0, true)
+            .err(),
+        Some(SetupError::Conflict)
+    );
+    assert_eq!(
+        f.host.preview_scope(&token, input(0)).err(),
+        Some(SetupError::Conflict)
+    );
+    assert_eq!(saved_count(&f), 1);
+}
+#[test]
+fn permission_revocation_blocks_preview_confirmation_and_saved_scope_reads() {
+    let f = Fixture::new();
+    let token = selected(&f);
+    let p = f.host.preview_scope(&token, input(0)).unwrap();
+    f.provider.access.lock().unwrap().repositories.clear();
+    assert_eq!(
+        f.host
+            .confirm_scope(&token, 20, 30, &p.preview_id, 0, true)
+            .err(),
+        Some(SetupError::Denied)
+    );
+    assert_eq!(
+        f.host.saved_scope(&token, 20, 30).err(),
+        Some(SetupError::Denied)
+    );
+    assert_eq!(
+        f.host.scope_inventory(&token, 20, 30).err(),
+        Some(SetupError::Denied)
+    );
+    assert_eq!(saved_count(&f), 0);
+}
+#[test]
+fn previews_cannot_cross_repository_user_or_expiry_boundary() {
+    let f = Fixture::new();
+    let token = selected(&f);
+    let p = f.host.preview_scope(&token, input(0)).unwrap();
+    assert_eq!(
+        f.host
+            .confirm_scope(&token, 21, 30, &p.preview_id, 0, true)
+            .err(),
+        Some(SetupError::Conflict)
+    );
+    let other = secret().unwrap();
+    f.host.sessions.lock().unwrap().insert(
+        digest(&other),
+        Session {
+            credential: UserCredential::verified(
+                "synthetic_second_user".into(),
+                102,
+                now().unwrap() + 3600,
+            )
+            .unwrap(),
+            expires_at_s: now().unwrap() + 3600,
+        },
+    );
+    assert_eq!(
+        f.host
+            .confirm_scope(&other, 20, 30, &p.preview_id, 0, true)
+            .err(),
+        Some(SetupError::Conflict)
+    );
+    f.host
+        .storage
+        .lock()
+        .unwrap()
+        .connection
+        .execute("UPDATE app_setup_scope_previews SET expires_at_s=0", [])
+        .unwrap();
+    assert_eq!(
+        f.host
+            .confirm_scope(&token, 20, 30, &p.preview_id, 0, true)
+            .err(),
+        Some(SetupError::Conflict)
+    );
+    assert_eq!(saved_count(&f), 0);
+}
+#[test]
+fn concurrent_admin_confirmation_requires_reload_instead_of_overwrite() {
+    let f = Fixture::new();
+    let a = selected(&f);
+    let p = f.host.preview_scope(&a, input(0)).unwrap();
+    let b = secret().unwrap();
+    f.host.sessions.lock().unwrap().insert(
+        digest(&b),
+        Session {
+            credential: UserCredential::verified(
+                "synthetic_second_user".into(),
+                102,
+                now().unwrap() + 3600,
+            )
+            .unwrap(),
+            expires_at_s: now().unwrap() + 3600,
+        },
+    );
+    f.provider.access.lock().unwrap().user_id = 102;
+    let second = f.host.preview_scope(&b, input(0)).unwrap();
+    f.provider.access.lock().unwrap().user_id = 101;
+    f.host
+        .confirm_scope(&a, 20, 30, &p.preview_id, 0, true)
+        .unwrap();
+    f.provider.access.lock().unwrap().user_id = 102;
+    assert_eq!(
+        f.host
+            .confirm_scope(&b, 20, 30, &second.preview_id, 0, true)
+            .err(),
+        Some(SetupError::Conflict)
+    );
+    assert_eq!(saved_count(&f), 1);
+}
+#[test]
+fn incomplete_or_duplicate_metadata_cannot_form_a_scope() {
+    let f = Fixture::new();
+    let token = selected(&f);
+    let duplicate = f.provider.inventory.lock().unwrap().entries[0].clone();
+    f.provider.inventory.lock().unwrap().entries.push(duplicate);
+    assert_eq!(
+        f.host.scope_inventory(&token, 20, 30).err(),
+        Some(SetupError::Unavailable)
+    );
+    f.provider.inventory.lock().unwrap().entries = vec![
+        InventoryEntry {
+            path: "src".into(),
+            kind: "directory".into(),
+            oid: "b".repeat(40)
+        };
+        2001
+    ];
+    assert_eq!(
+        f.host.scope_inventory(&token, 20, 30).err(),
+        Some(SetupError::Capacity)
+    );
+}
+#[tokio::test]
+async fn setup_page_and_scope_http_journey_preserve_off_boundary() {
+    let f = Fixture::new();
+    let token = selected(&f);
+    let app = router(f.host.clone());
+    let page = app
+        .clone()
+        .oneshot(request("GET", "/github-app/setup", &token, None, ""))
+        .await
+        .unwrap();
+    assert_eq!(page.status(), StatusCode::OK);
+    assert!(
+        page.headers()["content-security-policy"]
+            .to_str()
+            .unwrap()
+            .contains("script-src 'self'")
+    );
+    let text = body(page).await;
+    assert!(text.contains("Confirm scope · keep checks off"));
+    let response = app
+        .clone()
+        .oneshot(request(
+            "POST",
+            "/v1/github-app/inventory",
+            &token,
+            Some("https://setup.example.test"),
+            r#"{"installation_id":20,"repository_id":30}"#,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let value: serde_json::Value = serde_json::from_str(&body(response).await).unwrap();
+    assert_eq!(value["source_scanned"], false);
+    assert_eq!(value["activation"], "off");
+    let payload=serde_json::json!({"installation_id":20,"repository_id":30,"commit":"a".repeat(40),"expected_revision":0,"include":["src"],"exclude":[]}).to_string();
+    let denied = app
+        .clone()
+        .oneshot(request(
+            "POST",
+            "/v1/github-app/scope/preview",
+            &token,
+            Some("https://evil.test"),
+            &payload,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(denied.status(), StatusCode::FORBIDDEN);
+    let response = app
+        .clone()
+        .oneshot(request(
+            "POST",
+            "/v1/github-app/scope/preview",
+            &token,
+            Some("https://setup.example.test"),
+            &payload,
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let preview: serde_json::Value = serde_json::from_str(&body(response).await).unwrap();
+    let payload = serde_json::json!({"installation_id":20,"repository_id":30,"preview_id":preview["preview_id"],"expected_revision":0,"acknowledge_limits":true});
+    let mut tampered = payload.clone();
+    tampered["activate"] = serde_json::json!(true);
+    let rejected = app
+        .clone()
+        .oneshot(request(
+            "POST",
+            "/v1/github-app/scope/confirm",
+            &token,
+            Some("https://setup.example.test"),
+            &tampered.to_string(),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(rejected.status(), StatusCode::UNPROCESSABLE_ENTITY);
+    let saved = app
+        .oneshot(request(
+            "POST",
+            "/v1/github-app/scope/confirm",
+            &token,
+            Some("https://setup.example.test"),
+            &payload.to_string(),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(saved.status(), StatusCode::OK);
+    assert!(body(saved).await.contains("\"activation\":\"off\""));
 }

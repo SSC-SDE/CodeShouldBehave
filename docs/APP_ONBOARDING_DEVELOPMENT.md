@@ -1,6 +1,6 @@
 # App onboarding development checkpoint
 
-Phase 6 / APP-1, November 6, 2026. **Local implementation, activation off.**
+Phase 6 / APP-1 and inactive APP-2 scope setup, November 6, 2026. **Local implementation, activation off.**
 The install/select/confirm/automatic-check experience is still in development.
 Installing the registered App today does not enable this hosted profile.
 
@@ -28,8 +28,9 @@ Installing the registered App today does not enable this hosted profile.
   Client secrets/access tokens stay server-side; Authorization headers are marked
   sensitive. Provider error bodies never appear in HTTP responses.
 - Migration 15 adds OAuth state digests and unconfigured repository metadata.
+  Migration 16 adds expiring scope previews and immutable inactive scope revisions.
   It preserves existing review/preference tables. The schema cannot persist an
-  enabled state; selecting a repository neither fetches source nor creates jobs.
+  enabled state; selecting a repository neither fetches file contents nor creates jobs.
 
 No live GitHub OAuth request has been made for this implementation. Provider
 responses in acceptance tests are synthetic. See [evidence](evidence/P6.app1/acceptance.md).
@@ -53,36 +54,75 @@ than removing a production check. These commands do not deploy or enroll a repo.
 factory workspace deliberately mounts only `disabled_router()` even with that
 feature. Tests construct `router(Arc<AppSetupHost<P>>)` explicitly. There is no
 production launcher or configuration switch that silently mounts active routes.
-Host composition and browser setup are the next implementation work.
+The browser screen is available at `/github-app/setup`; the factory host shows
+setup unavailable and makes no account-service calls beyond its capability check.
+The explicitly mounted router supports the picker and scope review after login.
+Production host composition and live OAuth qualification remain pending.
 
-## Setup API contract for the next UI step
+## Browser setup and scope review
+
+1. Open `/github-app/setup` on the optional Rust service. On the factory host,
+   expect **Setup unavailable · checks off**. This page is not deployed to Pages.
+2. On an explicitly configured test/setup host, **Continue with GitHub** returns
+   to the picker. Only installed public repositories with current admin access
+   appear. A setup `installation_id` hint affects ordering, never authorization.
+3. Select a repository. This reads GitHub repository/ref/commit/tree **metadata**
+   for the exact default-branch commit. The ordinary commits endpoint (which can
+   return patches), Contents API and blob API are not used. No source scan occurs.
+4. Select file or directory roots and optional exclusions. A directory includes
+   its eligible descendants. Sensitive paths, symlinks and submodules cannot be
+   included. Use **Review scope** to inspect the exact file list and coverage limits.
+5. Acknowledge the displayed boundary, then **Confirm scope · keep checks off**.
+   This saves an immutable inactive intent with numeric actor, commit, tree, path
+   policy and inventory fingerprint. It is not architecture acceptance, an analysis
+   grant, publication consent or review-default activation.
+6. Reload to retrieve the saved revision; use **Revise scope** for a new preview.
+   Edited paths invalidate confirmation. Expired previews, changed commits or
+   competing saves return 409 and require reload/review. No silent overwrite.
+
+Inventory is capped at 2,000 entries and 256-byte paths. Truncated/oversized or
+malformed trees fail closed. Each scope has at most 32 included and 32 excluded
+roots and a 512 KiB stored document. Previews expire after 15 minutes (256 global);
+confirmation history is capped at 100 revisions per repo and 1,024 global rows.
+Capacity errors do not erase accepted history or enable work. These are defensive
+limits; final host quotas and retention still need qualification.
+
+The UI has one active step, labeled controls, keyboard focus recovery, small-screen
+stacking and reduced-motion support. It stores no setup data in browser storage.
+Logout or access denial clears repository/scope UI. Network errors preserve an
+explicit uncertain state; reload checks the server revision before retrying.
+
+## Setup API contract
 
 The following routes exist only on the explicitly constructed setup router:
 
 | Method / route | Input and result |
 | --- | --- |
 | GET `/v1/github-app/login` | Optional positive `installation_id` hint; redirect to GitHub with state/PKCE and a secure browser-binding cookie |
-| GET `/v1/github-app/callback` | `state`, `code` and matching cookie; consumes state before exchange; sets a fresh session cookie; returns authenticated capability JSON |
+| GET `/v1/github-app/callback` | `state`, `code` and matching cookie; consumes state before exchange; sets a fresh session cookie; redirects to the same-origin setup screen |
 | GET `/v1/github-app/repositories` | Session cookie; fresh provider-verified choices; no GitHub tokens, source or context |
 | POST `/v1/github-app/repositories` | Exact service Origin and session; only `installation_id`, `repository_id`; revalidates access and records `installed_unconfigured`; `scan_started: false` |
+| POST `/v1/github-app/inventory` | Repository identity, Origin/session; bounded metadata and latest inactive scope |
+| POST `/v1/github-app/scope/preview` | Identity, exact commit, expected revision, includes/excludes; expiring actor-bound preview |
+| POST `/v1/github-app/scope/confirm` | Identity, preview ID, expected revision and explicit acknowledgement; rechecks current inventory/access and atomically saves an inactive revision |
 | POST `/v1/github-app/logout` | Exact service Origin/session; revokes session and clears cookie |
 
 All routes send `Cache-Control: no-store`, `Referrer-Policy: no-referrer`,
-`X-Content-Type-Options: nosniff` and restrictive CSP. Cookies use the `__Host-`
+`X-Content-Type-Options: nosniff` and restrictive CSP (the setup HTML permits only same-origin scripts, styles and
+API requests). Cookies use the `__Host-`
 prefix, Secure, HttpOnly, SameSite=Lax and Path=/. Duplicate session cookies,
 caller-supplied user identities and mismatched Origin are rejected. Request
-bodies are limited to 4 KiB. Setup error codes distinguish 400 invalid, 401
-login required, 403 access denied, 429 capacity and 503 provider unavailable.
+bodies are limited to 16 KiB. Setup error codes distinguish 400 invalid, 401
+login required, 403 access denied, 409 stale preview/revision, 429 capacity and 503 provider unavailable.
 No unauthorized repository names are returned.
 
 ## Remaining work, in order
 
-1. Repository picker, post-install setup return and browser login/error handling.
-   Preserve explicit unavailable state while the host is unconfigured.
-2. Path metadata, explicit **Preview selected paths** authorization, exact-commit
-   scan, component/gap editing and atomic scope/architecture/publication consent.
-   Connect to the existing onboarding and scope model; do not create competing
-   analysis identities or silently scan an entire repository.
+1. Connect explicit **Preview selected paths** source-scan authorization to the
+   existing onboarding model and its isolated, bounded fetch/scan implementation.
+   The completed path-metadata review must not be presented as a source scan.
+2. Component/gap editing and exact architecture/publication consent. Preserve
+   saved path intent while requiring fresh evidence and an explicit later grant.
 3. Verified webhook inbox, durable jobs, revocation, isolated workers and resource
    limits measured on an approved Linux host.
 4. App-specific signed publication receipts, safe recovery and App-owned checks
@@ -99,3 +139,22 @@ host/permission/deployment diff. No customer should need an API key or terminal.
 Protocol references: [GitHub web authorization and PKCE](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-user-access-token-for-a-github-app),
 [installation/user repository APIs](https://docs.github.com/en/rest/apps/installations),
 [HTTP client configuration](https://docs.rs/ureq/3.5.0/ureq/config/struct.ConfigBuilder.html).
+
+
+## Offline browser verification
+
+The optional browser test uses installed Playwright and Chrome. It intercepts
+all requests with synthetic responses; it does not authenticate or access GitHub.
+It is separate from the Rust tests of the real router/storage/provider adapter.
+
+```sh
+PLAYWRIGHT_MODULE=/absolute/path/to/playwright \
+CSB_CHROMIUM_EXECUTABLE=/absolute/path/to/chrome \
+node scripts/app_setup_browser.cjs
+```
+
+Expect ten passing UI scenarios and screenshots/result JSON in
+`target/app-setup-browser/`. Covers unavailable host, picker/path selection,
+confirmation invalidation, inactive save, reload, conflict, provider failure,
+mobile/focus, access revocation and logout. See
+[scope setup evidence](evidence/P6.app2/acceptance.md).

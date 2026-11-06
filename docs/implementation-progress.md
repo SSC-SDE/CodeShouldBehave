@@ -667,3 +667,35 @@ is claimed; deployed release still predates these fixes.
   no-default-feature Rust tests, 119 publication tests, strict Clippy in both
   configurations, 30 documentation links, and a 349-file committed distribution
   boundary/secret-pattern scan. No live OAuth or browser setup acceptance claimed.
+
+
+## 2026-11-06 IST — browser picker and inactive scope confirmation
+
+- Continued PR #31 on `phase-6` from `36100505837e2eafceb7779db849d7226ed068ca`.
+  Provider check confirmed it is open and now non-draft; no state change or merge
+  was performed. PR #24 remains open/unmerged.
+- Added `/github-app/setup` with OAuth return/error handling, searchable installed
+  repository picker, exact-commit path inventory and a step-by-step scope review.
+  Factory host remains unavailable; no source scan or automatic check can start.
+- Metadata uses repository, Git ref, Git commit and Git tree endpoints only.
+  Blob/Contents/patch endpoints remain blocked. Reuses `PathScope` and the existing
+  sensitive-path policy; symlinks/submodules are excluded. Unsupported files and
+  absence of source/architecture analysis remain explicit.
+- Migration 16 records expiring actor-bound previews and immutable inactive scope
+  revisions. Fresh authorization, exact inventory fingerprint and transactional
+  revision comparison reject stale commits, expired/replaced previews, access
+  revocation, cross-user confirmation and conflicting administrator edits.
+- Browser setup shows one active step; editing invalidates confirmation, reload
+  restores the saved revision, and logout/denial clears displayed context.
+  No credentials or setup state enter browser storage. Publication consent and
+  architecture acceptance remain false in every saved intent.
+- Tests and resource limits are recorded in
+  [APP-2 local evidence](evidence/P6.app2/acceptance.md). This completes the requested
+  browser picker/inactive path confirmation slice, not APP-2 source/architecture
+  acceptance or live GitHub onboarding. No host, account, App setting, workflow,
+  release, deployment or activation changed.
+
+- Final local checks: 302 all-feature Rust tests, 119 core-only tests, 119 public
+  pipeline tests and ten offline browser scenarios passed. Strict Clippy in both
+  configurations, formatting and whitespace checks passed. The legacy private-plan
+  checker is unavailable in the public snapshot; see APP-2 evidence for that limit.

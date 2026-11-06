@@ -232,3 +232,71 @@ fn response_status_size_and_malformed_body_fail_without_provider_text() {
         assert_eq!(decode(response).err(), Some(SetupError::Unavailable));
     }
 }
+
+fn metadata_provider(tree_data: Value) -> GitHubWebProvider {
+    let commit = "a".repeat(40);
+    let tree = "b".repeat(40);
+    let paths = [
+        "/repos/owner/repo".to_string(),
+        "/repos/owner/repo/git/ref/heads/main".into(),
+        format!("/repos/owner/repo/git/commits/{commit}"),
+        format!("/repos/owner/repo/git/trees/{tree}?recursive=1"),
+    ];
+    provider(vec![
+        (
+            &paths[0],
+            Ok(
+                json!({"id":30,"private":false,"permissions":{"admin":true},"default_branch":"main"}),
+            ),
+        ),
+        (
+            &paths[1],
+            Ok(json!({"object":{"type":"commit","sha":commit}})),
+        ),
+        (&paths[2], Ok(json!({"sha":commit,"tree":{"sha":tree}}))),
+        (&paths[3], Ok(tree_data)),
+    ])
+}
+fn choice() -> RepositoryChoice {
+    RepositoryChoice {
+        installation_id: 20,
+        repository_id: 30,
+        owner: "owner".into(),
+        name: "repo".into(),
+        state: "installed_unconfigured",
+    }
+}
+#[test]
+fn metadata_inventory_pins_commit_tree_and_never_fetches_patches_or_blobs() {
+    let p = metadata_provider(
+        json!({"sha":"b".repeat(40),"truncated":false,"tree":[{"path":"src/lib.rs","type":"blob","mode":"100644","sha":"c".repeat(40)},{"path":"link","type":"blob","mode":"120000","sha":"d".repeat(40)}]}),
+    );
+    let inventory = p.scope_inventory(&credential(), &choice()).unwrap();
+    assert_eq!(inventory.commit, "a".repeat(40));
+    assert_eq!(inventory.entries.len(), 2);
+    assert_eq!(inventory.entries[0].kind, "symlink");
+    for path in [
+        "/repos/owner/repo/commits/main",
+        "/repos/owner/repo/contents/src/lib.rs",
+        "/repos/owner/repo/git/blobs/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "/repos/owner/repo/git/trees/main?recursive=1",
+        "/repos/owner/repo/git/ref/heads/main?redirect=https://evil.test",
+    ] {
+        assert!(!metadata_path(path), "{path}");
+    }
+}
+#[test]
+fn truncated_wrong_tree_and_unrecognized_modes_never_appear_complete() {
+    for tree in [
+        json!({"sha":"b".repeat(40),"truncated":true,"tree":[]}),
+        json!({"sha":"c".repeat(40),"truncated":false,"tree":[]}),
+        json!({"sha":"b".repeat(40),"truncated":false,"tree":[{"path":"src/lib.rs","type":"blob","mode":"unknown","sha":"c".repeat(40)}]}),
+    ] {
+        assert_eq!(
+            metadata_provider(tree)
+                .scope_inventory(&credential(), &choice())
+                .err(),
+            Some(SetupError::Unavailable)
+        );
+    }
+}

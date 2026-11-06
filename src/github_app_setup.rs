@@ -1,6 +1,7 @@
 //! Inactive-by-default App onboarding identity boundary.
 //!
-//! This module does not fetch source, confirm scope, schedule jobs or publish.
+//! This module saves inactive scope intent; it does not fetch file content,
+//! grant analysis access, schedule jobs or publish.
 //! A host must explicitly supply a trusted GitHub web-auth provider to mount it.
 //! The existing local device-login broker is not a hosted identity authority.
 use crate::Storage;
@@ -15,6 +16,10 @@ use std::{
 };
 
 mod http;
+mod scope;
+pub use scope::{
+    InventoryEntry, SavedScope, ScopeDocument, ScopeInput, ScopeInventory, ScopePreview,
+};
 #[cfg(feature = "github-app")]
 mod provider;
 pub use http::{disabled_router, router};
@@ -34,6 +39,7 @@ pub enum SetupError {
     Denied,
     Unavailable,
     Capacity,
+    Conflict,
 }
 type Result<T> = std::result::Result<T, SetupError>;
 
@@ -133,6 +139,15 @@ pub trait GitHubSetupProvider: Send + Sync + 'static {
     /// App ID and suspension, and obtain current admin permission from GitHub.
     /// Bounded pagination must fail if incomplete, never treat a partial page as complete.
     fn current_access(&self, credential: &UserCredential) -> Result<AccessSnapshot>;
+    /// Metadata only: exact default-branch commit/tree and a complete bounded
+    /// path inventory. Never fetch blob content or execute repository code.
+    fn scope_inventory(
+        &self,
+        _credential: &UserCredential,
+        _repository: &RepositoryChoice,
+    ) -> Result<ScopeInventory> {
+        Err(SetupError::Unavailable)
+    }
 }
 
 #[derive(Clone)]
@@ -155,6 +170,7 @@ pub struct LoginStart {
 }
 pub struct LoginComplete {
     pub session_cookie: String,
+    pub installation_hint: Option<i64>,
 }
 
 pub struct AppSetupHost<P> {
@@ -294,6 +310,7 @@ impl<P: GitHubSetupProvider> AppSetupHost<P> {
         );
         Ok(LoginComplete {
             session_cookie: token,
+            installation_hint: hint,
         })
     }
     fn session(&self, token: &str, at: i64) -> Result<Session> {

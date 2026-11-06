@@ -63,6 +63,7 @@ impl Transport for Https {
             if r.path != "/user"
                 && !r.path.starts_with("/user/installations?")
                 && !r.path.starts_with("/user/installations/")
+                && !metadata_path(r.path)
             {
                 return Err(SetupError::Invalid);
             }
@@ -278,6 +279,110 @@ impl GitHubSetupProvider for GitHubWebProvider {
         let user = pass.get("/user", credential.token())?;
         UserCredential::verified(token.into(), id(&user, "id")?, expires)
     }
+    fn scope_inventory(
+        &self,
+        credential: &UserCredential,
+        repository: &RepositoryChoice,
+    ) -> Result<ScopeInventory> {
+        if credential.expires_at_s <= now()? || !slug(&repository.owner) || !slug(&repository.name)
+        {
+            return Err(SetupError::Authentication);
+        }
+        let _permit = self.permit()?;
+        let mut pass = Pass::new(self.transport.as_ref());
+        let root = format!("/repos/{}/{}", repository.owner, repository.name);
+        let metadata = pass.get(&root, credential.token())?;
+        if id(&metadata, "id")? != repository.repository_id
+            || metadata.get("private").and_then(Value::as_bool) != Some(false)
+            || metadata
+                .pointer("/permissions/admin")
+                .and_then(Value::as_bool)
+                != Some(true)
+        {
+            return Err(SetupError::Denied);
+        }
+        let branch = metadata
+            .get("default_branch")
+            .and_then(Value::as_str)
+            .filter(|s| !s.is_empty() && s.len() <= 256 && !s.chars().any(char::is_control))
+            .ok_or(SetupError::Unavailable)?;
+        // Git reference and Git commit APIs return metadata, unlike the ordinary
+        // commits endpoint which can include file patches. Never request blobs.
+        let reference = pass.get(
+            &format!("{root}/git/ref/heads/{}", encode(branch)),
+            credential.token(),
+        )?;
+        if reference.pointer("/object/type").and_then(Value::as_str) != Some("commit") {
+            return Err(SetupError::Unavailable);
+        }
+        let commit = reference
+            .pointer("/object/sha")
+            .and_then(Value::as_str)
+            .filter(|s| scope::oid(s))
+            .ok_or(SetupError::Unavailable)?;
+        let commit_data = pass.get(&format!("{root}/git/commits/{commit}"), credential.token())?;
+        if commit_data.get("sha").and_then(Value::as_str) != Some(commit) {
+            return Err(SetupError::Unavailable);
+        }
+        let tree = commit_data
+            .pointer("/tree/sha")
+            .and_then(Value::as_str)
+            .filter(|s| scope::oid(s))
+            .ok_or(SetupError::Unavailable)?;
+        let tree_data = pass.get(
+            &format!("{root}/git/trees/{tree}?recursive=1"),
+            credential.token(),
+        )?;
+        if tree_data.get("sha").and_then(Value::as_str) != Some(tree)
+            || tree_data.get("truncated").and_then(Value::as_bool) != Some(false)
+        {
+            return Err(SetupError::Unavailable);
+        }
+        let entries = tree_data
+            .get("tree")
+            .and_then(Value::as_array)
+            .ok_or(SetupError::Unavailable)?;
+        if entries.len() > 2000 {
+            return Err(SetupError::Capacity);
+        }
+        let entries = entries
+            .iter()
+            .map(|entry| {
+                let kind = match (
+                    entry.get("type").and_then(Value::as_str),
+                    entry.get("mode").and_then(Value::as_str),
+                ) {
+                    (Some("blob"), Some("100644" | "100755")) => "file",
+                    (Some("blob"), Some("120000")) => "symlink",
+                    (Some("tree"), Some("040000")) => "directory",
+                    (Some("commit"), Some("160000")) => "submodule",
+                    _ => return Err(SetupError::Unavailable),
+                };
+                Ok(InventoryEntry {
+                    path: entry
+                        .get("path")
+                        .and_then(Value::as_str)
+                        .ok_or(SetupError::Unavailable)?
+                        .into(),
+                    kind: kind.into(),
+                    oid: entry
+                        .get("sha")
+                        .and_then(Value::as_str)
+                        .ok_or(SetupError::Unavailable)?
+                        .into(),
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let mut inventory = ScopeInventory {
+            repository_id: repository.repository_id,
+            default_branch: branch.into(),
+            commit: commit.into(),
+            tree: tree.into(),
+            entries,
+        };
+        inventory.validate(repository.repository_id)?;
+        Ok(inventory)
+    }
     fn current_access(&self, credential: &UserCredential) -> Result<AccessSnapshot> {
         if credential.expires_at_s <= now()? {
             return Err(SetupError::Authentication);
@@ -382,3 +487,24 @@ fn id(value: &Value, key: &str) -> Result<i64> {
 
 #[cfg(test)]
 mod tests;
+
+fn metadata_path(path: &str) -> bool {
+    let parts = path.split('/').collect::<Vec<_>>();
+    if parts.len() < 4
+        || !parts[0].is_empty()
+        || parts[1] != "repos"
+        || !slug(parts[2])
+        || !slug(parts[3])
+    {
+        return false;
+    }
+    match &parts[4..] {
+        [] => true,
+        ["git", "ref", "heads", branch] => {
+            !branch.is_empty() && !branch.contains(['?', '#']) && branch.len() <= 768
+        }
+        ["git", "commits", sha] => scope::oid(sha),
+        ["git", "trees", sha] => sha.strip_suffix("?recursive=1").is_some_and(scope::oid),
+        _ => false,
+    }
+}
