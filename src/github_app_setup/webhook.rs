@@ -175,6 +175,7 @@ impl AppWebhookInbox {
         // Do not reactivate on 'added', 'unsuspend' or delayed 'created' notifications.
         // Fresh consent/reconciliation will be required by the later activation path.
         tx.execute("UPDATE app_webhook_inbox SET state='blocked',lease_id=NULL,lease_expires_at_s=NULL WHERE app_id=?1 AND (EXISTS(SELECT 1 FROM app_installation_blocks b WHERE b.app_id=app_webhook_inbox.app_id AND b.installation_id=app_webhook_inbox.installation_id) OR EXISTS(SELECT 1 FROM app_repository_blocks b WHERE b.app_id=app_webhook_inbox.app_id AND b.installation_id=app_webhook_inbox.installation_id AND b.repository_id=app_webhook_inbox.repository_id)) AND state IN ('pending','leased')",[self.app_id]).map_err(db)?;
+        tx.execute("UPDATE app_analysis_jobs SET state='cancelled',lease=NULL,lease_until=NULL WHERE app_id=?1 AND state IN ('pending','leased','staged','published') AND (EXISTS(SELECT 1 FROM app_installation_blocks b WHERE b.app_id=app_analysis_jobs.app_id AND b.installation_id=app_analysis_jobs.installation_id) OR EXISTS(SELECT 1 FROM app_repository_blocks b WHERE b.app_id=app_analysis_jobs.app_id AND b.installation_id=app_analysis_jobs.installation_id AND b.repository_id=app_analysis_jobs.repository_id))",[self.app_id]).map_err(db)?;
         let count: i64 = tx
             .query_row(
                 "SELECT count(*) FROM app_webhook_inbox WHERE app_id=?1",

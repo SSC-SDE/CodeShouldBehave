@@ -1,8 +1,9 @@
 //! Inactive-by-default App onboarding identity boundary.
 //!
 //! This module saves inactive scope/context and supports explicit bounded source
-//! preview with an operator-configured isolated worker. It does not schedule PR
-//! analysis or publish.
+//! preview with an operator-configured isolated worker. The optional execution
+//! library provides inactive scheduling/delivery primitives; no host drain loop,
+//! active grant or report publisher is mounted.
 //! A host must explicitly supply a trusted GitHub web-auth provider to mount it.
 //! The existing local device-login broker is not a hosted identity authority.
 use crate::Storage;
@@ -32,8 +33,21 @@ pub use scope::{
 };
 pub use webhook::{AppWebhookInbox, WebhookNotification, WebhookReceipt, webhook_router};
 #[cfg(feature = "github-app")]
+mod execution;
+#[cfg(feature = "github-app")]
+mod installation;
+#[cfg(feature = "github-app")]
 mod provider;
+#[cfg(feature = "github-app")]
+pub use execution::{
+    AnalysisInput, AnalysisLease, AppCheckDelivery, AppExecutionProvider, AppExecutionQueue,
+    AppReceiptSigner, SignedAppReceipt,
+};
 pub use http::{disabled_router, router};
+#[cfg(feature = "github-app")]
+pub use installation::{
+    CurrentPullRequest, GitHubInstallationBroker, InstallationCredential, InstallationSession,
+};
 #[cfg(feature = "github-app")]
 pub use provider::GitHubWebProvider;
 

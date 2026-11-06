@@ -15,7 +15,7 @@ panic = "abort"
 
 [features]
 default = []
-github-app = ["server", "dep:ureq", "dep:base64"]
+github-app = ["server", "dep:ureq", "dep:base64", "dep:ring"]
 server = ["dep:axum", "dep:serde", "dep:serde_json", "dep:tokio", "dep:toml"]
 
 [[example]]
@@ -28,6 +28,7 @@ path = "src/bin/csb_public_report.rs"
 required-features = ["server"]
 
 [dependencies]
+ring = { version = "=0.17.14", optional = true }
 base64 = { version = "=0.23.1", optional = true }
 ureq = { version = "=3.5.0", default-features = false, features = ["rustls"], optional = true }
 sha2 = { version = "=0.11.0", default-features = false }

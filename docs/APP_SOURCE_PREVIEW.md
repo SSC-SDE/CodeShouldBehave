@@ -124,10 +124,12 @@ pending leases and fence cached scope/architecture reads. Safety blocks persist
 even if intake capacity is exhausted. A later added/unsuspended event cannot
 restore old consent. Reconciliation/explicit restoration is still required.
 
-**Claiming a notification does not enqueue analysis.** The fresh-provider
-reconciler, fair analysis scheduler binding and App installation-token broker are
-not implemented by this inbox. It is unmounted in the factory workspace.
-Existing public Actions workflow/check ownership is unchanged.
+**Claiming a notification does not enqueue analysis.** The optional execution
+library now provides an explicit fresh-provider reconciliation/queue transaction,
+installation-token broker and signed delivery primitives; see
+[execution checkpoint](APP_EXECUTION_DEVELOPMENT.md). No host drain loop or active
+grant is configured. The factory workspace and existing public Actions/check
+ownership are unchanged.
 
 ## Validation and remaining work
 
@@ -143,9 +145,9 @@ python3 -m unittest discover -s tests -p 'app_preview_sandbox_test.py'
 ```
 
 Still required before automatic hosted PR checks: a qualified USD 0 host and
-signed worker release; live OAuth; installation-token issuance and current-PR
-reconciliation; isolated PR worker scheduling; publication consent; the App-specific
-signed report receipt/promotion/outbox and check writer; withdrawal/restore and
+signed worker release; live OAuth; the isolated full PR worker and host dispatch
+loop; explicit publication consent; actual public report publication/readback;
+withdrawal/restore and
 real second-repository HLD/LLD/source acceptance. Activation remains a separate
 owner approval. This checkpoint does not complete the one-click App rollout.
 

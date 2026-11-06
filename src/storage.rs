@@ -100,6 +100,11 @@ const MIGRATIONS: &[(i64, &str, &str)] = &[
         "0018_app_webhook_inbox",
         include_str!("../migrations/0018_app_webhook_inbox.sql"),
     ),
+    (
+        19,
+        "0019_app_execution",
+        include_str!("../migrations/0019_app_execution.sql"),
+    ),
 ];
 const MIN_SQLITE: (u32, u32, u32) = (3, 51, 3);
 const MAX_ARTIFACT_BYTES: usize = 64 * 1024 * 1024;
@@ -2255,7 +2260,7 @@ mod tests {
         let storage = Storage::open(&database, &artifacts).unwrap();
         println!("bundled SQLite runtime: {}", storage.sqlite_version());
         assert!(parse_version(storage.sqlite_version()).unwrap() >= MIN_SQLITE);
-        assert_eq!(storage.schema_version().unwrap(), 18);
+        assert_eq!(storage.schema_version().unwrap(), 19);
         drop(storage);
         fs::remove_dir_all(root).unwrap();
     }
@@ -2704,7 +2709,7 @@ mod tests {
             .unwrap();
         drop(connection);
         let storage = Storage::open(&database, &artifacts).unwrap();
-        assert_eq!(storage.schema_version().unwrap(), 18);
+        assert_eq!(storage.schema_version().unwrap(), 19);
         let preference: (i64, String) = storage
             .connection
             .query_row(
@@ -2743,7 +2748,7 @@ mod tests {
         assert_eq!(review_schema, schema_after);
         drop(storage);
         let reopened = Storage::open(&database, &artifacts).unwrap();
-        assert_eq!(reopened.schema_version().unwrap(), 18);
+        assert_eq!(reopened.schema_version().unwrap(), 19);
         drop(reopened);
         fs::remove_dir_all(root).unwrap();
     }
@@ -2772,7 +2777,7 @@ mod tests {
         connection.pragma_update(None, "user_version", 1).unwrap();
         drop(connection);
         let storage = Storage::open(&database, &artifacts).unwrap();
-        assert_eq!(storage.schema_version().unwrap(), 18);
+        assert_eq!(storage.schema_version().unwrap(), 19);
         let index_exists: i64 = storage
             .connection
             .query_row(

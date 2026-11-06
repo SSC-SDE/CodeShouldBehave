@@ -733,3 +733,26 @@ is claimed; deployed release still predates these fixes.
   `main`; full automatic App check delivery remains pending. Committed distribution
   boundary scan passed for 364 files with zero secret-pattern findings. No release
   package was uploaded and no deployment/activation occurred.
+
+
+## 2026-11-06 IST — PR #32 execution and signed delivery primitives
+
+- Resumed existing draft [PR #32](https://github.com/SSC-SDE/CodeShouldBehave/pull/32)
+  on `phase-6` at `6349fb5479200e7b562d61d82fe41f4e8e3d1bb1`. PR #24 remains
+  open/unmerged; activation, App settings and existing deployments are unchanged.
+- Added repository-limited installation tokens with RS256 JWTs, fresh public
+  same-repository PR/merge-base resolution, durable notification-to-job transactions,
+  revision/consent/lease fencing, bounded claims and delayed retry limits.
+- Added migration 19 with no enabled grants, distinct Ed25519 App signed intents,
+  exact readback validation and completed-check outbox delivery. Unknown create
+  outcomes reconcile rather than duplicating checks. No production consent writer,
+  PR analyzer adapter, host drain loop or report publisher is mounted.
+- Contract, local commands and remaining APP-3/APP-4 gates:
+  [App execution development](APP_EXECUTION_DEVELOPMENT.md). Live host qualification,
+  activation and hosted onboarding acceptance remain incomplete.
+- Validation: 329 all-feature Rust tests, 119 core-only tests and 119 publication
+  regression tests passed. Strict Clippy passed for all targets with all features
+  and with default features disabled; formatting/whitespace and 18 local docs links
+  passed. The real HLD/LLD fixture retained exact baseline/proposal source bytes
+  through signed intent, readback and a captured check payload. No live GitHub
+  installation token, check write, public upload or browser E2E run is claimed.

@@ -125,10 +125,12 @@ see [current boundaries and operator notes](APP_SOURCE_PREVIEW.md). Remaining:
 
 1. Qualified USD 0 Linux host, independently verified signed preview worker and
    live OAuth/permission acceptance.
-2. Installation-token broker, current-PR reconciliation, fair analysis scheduling
-   and full isolated PR worker binding. The durable webhook inbox is implemented.
-3. Explicit publication consent, App-specific signed report receipts/promotion,
-   safe recovery, outbox and App-owned exact Focus check delivery.
+2. Scoped PR fetcher, full isolated analysis worker binding and host dispatch/fair
+   scheduling. The token broker, fresh-PR queue and durable inbox now have local
+   coverage; see [execution checkpoint](APP_EXECUTION_DEVELOPMENT.md).
+3. Explicit publication consent, real public report hosting/readback and recovery
+   operations. Signed-intent and completed-check outbox primitives are implemented,
+   but are not mounted or activated.
 4. Real fresh-repository browser acceptance, HLD/LLD/source traversal, withdrawal,
    backup/restore and explicit activation approval.
 
