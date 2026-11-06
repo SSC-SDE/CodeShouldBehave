@@ -475,21 +475,136 @@ class PublicationTests(unittest.TestCase):
             with patch.object(ci, "restore_public_site", return_value=None), self.assertRaisesRegex(ci.Refusal, "scope differs"):
                 ci.stage_publication(self.config, self.plan, root / "handoffs", root / "staged", provider=self.provider, project_root=root, trusted_root=root, verifier=root / "trusted")
 
-    def test_scope_change_withdraws_prior_reports_before_site_copy(self):
+    def previous_report_site(self, root, *, old_scope=False, already_retired=False):
+        policy_hash = self.policy(root)
+        spec = importlib.util.spec_from_file_location("retirement_site", ROOT / "scripts/public_site.py")
+        site = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(site)
+        sources, identities = [], []
+        for name, proposal in (("old", "b" * 40), ("kept", "c" * 40)):
+            source = root / name
+            manifest = bundle(source)
+            manifest["proposal"] = proposal
+            manifest["policy_digest"] = "e" * 64 if name == "old" and old_scope else policy_hash
+            identity = {key: value for key, value in manifest.items() if key not in ("review_id", "public_report_id")}
+            manifest["review_id"] = manifest["public_report_id"] = ci.digest(ci.canonical(identity))
+            (source / "manifest.json").write_bytes(ci.canonical(manifest))
+            sources.append(source)
+            identities.append(manifest["public_report_id"])
+        previous = root / "previous"
+        with patch.object(site, "verify_producer", side_effect=lambda path, *_: site.bundle(path)[0]):
+            metadata = site.assemble_site(sources, previous, "2026-10-17T06:00:00Z",
+                                          project_root=ROOT, withdrawn=identities[:1] if already_retired else [])
+        fields = {"site_generation": 1, "site_manifest_sha256": metadata["site_sha256"],
+                  "pages_deployment_id": "pages-existing", "withdrawn": identities[:1] if already_retired else [],
+                  "consent_epoch": 2 if already_retired else 1,
+                  "budget_activation": {"schema_version": "csb-public-budget-activation-v1",
+                                        "account": "SSC-SDE", "evidence_sha256": "e" * 64,
+                                        "budget_policy_sha256": "f" * 64,
+                                        "activated_at": "2026-10-17T06:00:00Z"}}
+        self.previous.update(copy.deepcopy(fields))
+        self.plan["state"].update(copy.deepcopy(fields))
+        self.plan["state"]["previous_receipt_sha256"] = ci.digest(ci.canonical(self.previous))
+        self.plan["requests"] = []
+        self.plan["state"]["pending"] = []
+        return site, previous, identities
+
+    def retirement_authorization(self, root, identities):
+        path = root / ".codeshouldbehave/report-retirements.json"
+        path.write_bytes(ci.canonical({"schema_version": "csb-public-report-retirements-v1",
+                                      "repository_id": self.config["repository"]["id"],
+                                      "public_report_ids": identities}))
+        return path
+
+    def stage_report_site(self, root, site, previous, name="staged"):
+        with patch.object(ci, "restore_public_site", return_value=previous), \
+             patch.object(site, "verify_producer", side_effect=lambda path, *_: site.bundle(path)[0]), \
+             patch.dict(sys.modules, public_site=site):
+            return ci.stage_publication(self.config, self.plan, root / "handoffs", root / name,
+                                        provider=self.provider, project_root=ROOT,
+                                        trusted_root=root, verifier=root / "trusted")
+
+    def test_scope_change_withdraws_only_obsolete_public_bytes(self):
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory); self.policy(root)
-            previous = root / "previous"; original = previous / "reviews"; original.mkdir(parents=True)
-            manifest = bundle(original / ("f" * 64))
-            (previous / "index.json").write_bytes(ci.canonical({"reports": [{"public_report_id": "f" * 64}]}))
-            self.plan["requests"] = []
-            self.plan["state"]["pending"] = []
-            captured = {}
-            def assemble(*args, **kwargs):
-                captured.update(kwargs); return {"site_sha256": "a" * 64}
-            with patch.object(ci, "restore_public_site", return_value=previous), patch.dict(sys.modules, public_site=SimpleNamespace(assemble_site=assemble)):
-                result = ci.stage_publication(self.config, self.plan, root / "handoffs", root / "staged", provider=self.provider, project_root=root, trusted_root=root, verifier=root / "trusted")
-            self.assertEqual(captured["withdrawn"], ["f" * 64])
+            root = Path(directory)
+            site, previous, (old, kept) = self.previous_report_site(root, old_scope=True)
+            result = self.stage_report_site(root, site, previous)
+            self.assertFalse((root / "staged/site/reviews" / old).exists())
+            self.assertEqual((root / "staged/site/reviews" / kept / "manifest.json").read_bytes(),
+                             (previous / "reviews" / kept / "manifest.json").read_bytes())
+            self.assertEqual(result["state"]["withdrawn"], [old])
             self.assertEqual(result["state"]["consent_epoch"], 2)
+
+    def test_explicit_retirement_removes_only_named_version_and_signs_its_tombstone(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            site, previous, (old, kept) = self.previous_report_site(root)
+            self.retirement_authorization(root, [old])
+            result = self.stage_report_site(root, site, previous)
+            self.assertFalse((root / "staged/site/reviews" / old).exists())
+            self.assertEqual((root / "staged/site/reviews" / kept / "manifest.json").read_bytes(),
+                             (previous / "reviews" / kept / "manifest.json").read_bytes())
+            tombstone = json.loads((root / "staged/site/expired" / (old + ".json")).read_bytes())
+            self.assertEqual(tombstone["reason"], "withdrawn")
+            subject = ci.begin_promotion(self.config, result, 123, now="2026-10-17T06:00:00Z")
+            self.assertEqual(subject["state"]["withdrawn"], [old])
+            self.assertEqual(subject["state"]["consent_epoch"], 2)
+
+    def test_repeated_retirement_keeps_withdrawal_without_advancing_epoch_or_republishing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            site, previous, (old, kept) = self.previous_report_site(root, already_retired=True)
+            self.retirement_authorization(root, [old])
+            result = self.stage_report_site(root, site, previous)
+            self.assertIsNone(result["site"])
+            self.assertEqual(result["state"]["withdrawn"], [old])
+            self.assertEqual(result["state"]["consent_epoch"], 2)
+            self.assertTrue((previous / "reviews" / kept / "manifest.json").is_file())
+
+    def test_rerequest_of_retired_bundle_cannot_publish_a_dead_check_link(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            site, previous, (old, kept) = self.previous_report_site(root)
+            self.retirement_authorization(root, [old])
+            self.plan["requests"] = [self.request]
+            self.plan["state"]["pending"] = copy.deepcopy(self.plan["admitted"])
+            for pending in self.plan["state"]["pending"]:
+                pending["comparison_key"] = ci.comparison_key(self.config, pending)
+            handoff = root / "handoffs" / ("csb-public-handoff-" + self.request["request_id"])
+            handoff.mkdir(parents=True)
+            ci.write_new_json(handoff / "result.json", {"schema_version": "csb-public-analysis-result-v1",
+                              "request": self.request, "public_report_id": old,
+                              "archive_sha256": "a" * 64, "conclusion": "neutral", "reason": ""})
+            result = self.stage_report_site(root, site, previous)
+            self.assertIsNone(result["results"][0]["public_report_id"])
+            self.assertEqual(result["state"]["check_updates"][0]["conclusion"], "cancelled")
+            self.assertEqual(result["state"]["check_updates"][0]["reason"], "withdrawn")
+            self.assertFalse((root / "staged/site/reviews" / old).exists())
+            self.assertTrue((root / "staged/site/reviews" / kept / "manifest.json").is_file())
+
+    def test_invalid_retirement_authority_leaves_current_site_and_receipt_untouched(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            site, previous, (old, kept) = self.previous_report_site(root)
+            original = copy.deepcopy(self.previous)
+            kept_bytes = (previous / "reviews" / kept / "manifest.json").read_bytes()
+            for index, identities in enumerate(([old, old], ["f" * 64], ["not-a-report"])):
+                self.retirement_authorization(root, identities)
+                with self.subTest(identities=identities), self.assertRaises(ci.Refusal):
+                    self.stage_report_site(root, site, previous, str(index))
+            path = self.retirement_authorization(root, [old])
+            value = json.loads(path.read_bytes())
+            value["repository_id"] += 1
+            path.write_bytes(ci.canonical(value))
+            with self.assertRaises(ci.Refusal):
+                self.stage_report_site(root, site, previous, "foreign")
+            path.unlink()
+            path.symlink_to(previous / "index.json")
+            with self.assertRaises(ci.Refusal):
+                self.stage_report_site(root, site, previous, "linked")
+            self.assertEqual(self.previous, original)
+            self.assertEqual((previous / "reviews" / kept / "manifest.json").read_bytes(), kept_bytes)
+            self.assertFalse(self.calls)
 
     def test_signed_intent_is_required_before_pages_and_string_id_is_retained(self):
         activation = {"schema_version": "csb-public-budget-activation-v1", "account": "SSC-SDE", "evidence_sha256": "e" * 64,
