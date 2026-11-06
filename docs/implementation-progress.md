@@ -728,3 +728,8 @@ is claimed; deployed release still predates these fixes.
   [webhook inbox](evidence/P6.app3/inbox.md). Full APP-2/APP-3/APP-4 rollout remains
   incomplete: no qualified host/live OAuth, installation-token reconciler, full PR
   worker scheduler or App signed-publication/check writer. No activation claimed.
+- Implementation commit: `7373248ea3120861431aa86539a61021124edcdf`. Opened draft continuation
+  [PR #32](https://github.com/SSC-SDE/CodeShouldBehave/pull/32) from `phase-6` to
+  `main`; full automatic App check delivery remains pending. Committed distribution
+  boundary scan passed for 364 files with zero secret-pattern findings. No release
+  package was uploaded and no deployment/activation occurred.

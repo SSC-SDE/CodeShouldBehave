@@ -36,3 +36,8 @@ credential, installation, webhook endpoint or signed-release setting changed.
 No deployment or activation is claimed. No PR analysis/check writer is connected.
 
 See [operator/use notes](../../APP_SOURCE_PREVIEW.md) for limits and remaining gates.
+
+Implementation commit: `7373248ea3120861431aa86539a61021124edcdf`.
+Draft [PR #32](https://github.com/SSC-SDE/CodeShouldBehave/pull/32).
+Committed distribution boundary scan: 364 files, zero secret-pattern findings.
+No package uploaded; activation off; PR #24 remains unmerged.
