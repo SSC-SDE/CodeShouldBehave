@@ -1604,3 +1604,176 @@ async fn webhook_http_validates_raw_signature_and_duplicate_headers() {
         StatusCode::ACCEPTED
     );
 }
+
+#[cfg(feature = "github-app")]
+fn consent_fixture() -> (Fixture, String) {
+    let (mut f, token) = scanning_fixture();
+    Arc::get_mut(&mut f.host).unwrap().publication_policy = Some(
+        PublicationOperatorPolicy::new(
+            "https://reports.example.test".into(),
+            "a".repeat(64),
+            "b".repeat(64),
+        )
+        .unwrap(),
+    );
+    let preview = f.host.preview_architecture(&token, scan_input()).unwrap();
+    f.host
+        .confirm_architecture(&token, architecture_input(&preview))
+        .unwrap();
+    (f, token)
+}
+#[cfg(feature = "github-app")]
+fn publication_input(p: &serde_json::Value) -> PublicationConsentInput {
+    PublicationConsentInput {
+        installation_id: 20,
+        repository_id: 30,
+        expected_revision: p["document"]["expected_revision"].as_i64().unwrap(),
+        expires_at: p["document"]["expires_at"].as_i64().unwrap(),
+        document_digest: p["document_digest"].as_str().unwrap().into(),
+        allow_automatic_analysis: true,
+        allow_public_source: true,
+        allow_checks: true,
+    }
+}
+#[cfg(feature = "github-app")]
+#[test]
+fn final_consent_is_explicit_revision_bound_inactive_and_irreversibly_revocable() {
+    let (f, t) = consent_fixture();
+    let p = f.host.preview_publication_consent(&t, 20, 30).unwrap();
+    let mut bad = publication_input(&p);
+    bad.allow_public_source = false;
+    assert_eq!(
+        f.host.confirm_publication_consent(&t, bad).unwrap_err(),
+        SetupError::Invalid
+    );
+    let mut bad = publication_input(&p);
+    bad.document_digest = "f".repeat(64);
+    assert_eq!(
+        f.host.confirm_publication_consent(&t, bad).unwrap_err(),
+        SetupError::Conflict
+    );
+    let saved = f
+        .host
+        .confirm_publication_consent(&t, publication_input(&p))
+        .unwrap();
+    assert_eq!(saved["activation"], "off");
+    assert_eq!(saved["consent_revision"], 1);
+    assert_eq!(
+        f.host
+            .confirm_publication_consent(&t, publication_input(&p))
+            .unwrap_err(),
+        SetupError::Conflict
+    );
+    {
+        let s = f.host.storage.lock().unwrap();
+        assert_eq!(
+            s.connection
+                .query_row("SELECT count(*) FROM app_execution_grants", [], |r| r
+                    .get::<_, i64>(0))
+                .unwrap(),
+            0
+        );
+    }
+    assert_eq!(
+        f.host.publication_consent_status(&t, 20, 30).unwrap()["publication_consent"],
+        true
+    );
+    f.host.revoke_publication_consent(&t, 20, 30).unwrap();
+    assert_eq!(
+        f.host.publication_consent_status(&t, 20, 30).unwrap()["publication_consent"],
+        false
+    );
+    {
+        let s = f.host.storage.lock().unwrap();
+        assert!(
+            s.connection
+                .execute("UPDATE app_publication_consents SET revoked=0", [])
+                .is_err()
+        );
+    }
+    let next = f.host.preview_publication_consent(&t, 20, 30).unwrap();
+    assert_eq!(next["document"]["expected_revision"], 1);
+    f.host.logout(&t).unwrap();
+    assert!(
+        f.host
+            .confirm_publication_consent(&t, publication_input(&next))
+            .is_err()
+    );
+}
+#[cfg(feature = "github-app")]
+#[test]
+fn final_consent_rechecks_expiry_scope_provider_and_operator_pins() {
+    let (mut f, t) = consent_fixture();
+    let p = f.host.preview_publication_consent(&t, 20, 30).unwrap();
+    let mut bad = publication_input(&p);
+    bad.expires_at = 1;
+    assert_eq!(
+        f.host.confirm_publication_consent(&t, bad).unwrap_err(),
+        SetupError::Invalid
+    );
+    Arc::get_mut(&mut f.host)
+        .unwrap()
+        .publication_policy
+        .as_mut()
+        .unwrap()
+        .engine_digest = "c".repeat(64);
+    assert_eq!(
+        f.host
+            .confirm_publication_consent(&t, publication_input(&p))
+            .unwrap_err(),
+        SetupError::Conflict
+    );
+    f.provider.access.lock().unwrap().repositories[0].administrator = false;
+    assert!(
+        f.host
+            .confirm_publication_consent(&t, publication_input(&p))
+            .is_err()
+    );
+    f.provider.access.lock().unwrap().repositories[0].administrator = true;
+    f.provider.inventory.lock().unwrap().commit = "f".repeat(40);
+    assert_eq!(
+        f.host.preview_publication_consent(&t, 20, 30).unwrap_err(),
+        SetupError::Conflict
+    );
+}
+#[cfg(feature = "github-app")]
+#[tokio::test]
+async fn final_consent_routes_require_exact_origin_and_session() {
+    let (f, t) = consent_fixture();
+    let app = router(f.host.clone());
+    for origin in [None, Some("https://evil.example.test")] {
+        let mut request = Request::builder()
+            .method("POST")
+            .uri("/v1/github-app/publication/preview")
+            .header("cookie", format!("__Host-csb-app-session={t}"))
+            .header("content-type", "application/json");
+        if let Some(origin) = origin {
+            request = request.header("origin", origin);
+        }
+        assert_eq!(
+            app.clone()
+                .oneshot(
+                    request
+                        .body(Body::from(r#"{"installation_id":20,"repository_id":30}"#))
+                        .unwrap()
+                )
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::FORBIDDEN
+        );
+    }
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/github-app/publication/preview")
+                .header("origin", "https://setup.example.test")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"installation_id":20,"repository_id":30}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}

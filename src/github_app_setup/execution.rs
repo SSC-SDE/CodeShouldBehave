@@ -1,4 +1,4 @@
-//! Inactive-by-default execution primitives. No host drain loop or activation route.
+//! Consent-fenced execution; activation requires separate operator authorization.
 use super::installation::CurrentPullRequest;
 use super::*;
 use crate::public_report::{PublicBundle, PublicPolicy, canonical_json, sha256};
@@ -215,7 +215,7 @@ impl AppExecutionQueue {
             return Ok(None);
         }
         let candidates = {
-            let mut q=tx.prepare("SELECT id,input FROM app_analysis_jobs j WHERE app_id=?1 AND state='pending' AND available_at<=?2 AND NOT EXISTS(SELECT 1 FROM app_analysis_jobs a WHERE a.app_id=j.app_id AND a.installation_id=j.installation_id AND a.repository_id=j.repository_id AND a.state='leased') ORDER BY created_at,id LIMIT 100").map_err(db)?;
+            let mut q=tx.prepare("SELECT id,input FROM app_analysis_jobs j WHERE app_id=?1 AND state='pending' AND available_at<=?2 AND NOT EXISTS(SELECT 1 FROM app_analysis_jobs a WHERE a.app_id=j.app_id AND a.installation_id=j.installation_id AND a.repository_id=j.repository_id AND a.state='leased') ORDER BY coalesce((SELECT turn FROM app_dispatch_turns t WHERE t.app_id=j.app_id AND t.installation_id=j.installation_id),0),created_at,id LIMIT 100").map_err(db)?;
             q.query_map(params![self.app_id, at], |r| {
                 Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))
             })
@@ -237,6 +237,7 @@ impl AppExecutionQueue {
                 .map_err(db)?;
                 continue;
             }
+            advance_turn(&tx, self.app_id, input.installation_id)?;
             let lease = secret()?;
             tx.execute("UPDATE app_analysis_jobs SET state='leased',attempts=attempts+1,lease=?2,lease_until=?3 WHERE id=?1",params![id,lease,at+900]).map_err(db)?;
             tx.commit().map_err(db)?;
@@ -309,17 +310,80 @@ impl AppExecutionQueue {
         recheck(&receipt.receipt.job, provider)?;
         Ok(receipt)
     }
+    /// Only a check already delivered by this App can map a rerequest to a PR.
+    pub fn tracked_check(&self, n: &WebhookNotification) -> Result<Option<i64>> {
+        if n.event != "check_run" || n.action != "rerequested" {
+            return Ok(None);
+        }
+        let s = self.storage.lock().map_err(|_| SetupError::Unavailable)?;
+        s.connection.query_row("SELECT pr_number FROM app_analysis_jobs WHERE app_id=?1 AND installation_id=?2 AND repository_id=?3 AND check_id=?4",params![self.app_id,n.installation_id,n.repository_id,n.check_id],|r|r.get(0)).optional().map_err(db)
+    }
+    /// Repair tracked comparisons after a missed head/base event. The checkpoint
+    /// is persisted before IO, so failures/restarts cannot spin provider requests.
+    pub fn claim_reconciliation(&self) -> Result<Option<(i64, i64, i64)>> {
+        let mut s = self.storage.lock().map_err(|_| SetupError::Unavailable)?;
+        let tx = s
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(db)?;
+        let row:Option<(i64,i64,i64)>=tx.query_row("SELECT j.installation_id,j.repository_id,j.pr_number FROM app_analysis_jobs j LEFT JOIN app_reconcile_schedule r ON r.app_id=j.app_id AND r.installation_id=j.installation_id AND r.repository_id=j.repository_id AND r.pr_number=j.pr_number WHERE j.app_id=?1 AND coalesce(r.next_at,0)<=?2 GROUP BY j.installation_id,j.repository_id,j.pr_number ORDER BY coalesce(r.next_at,0),min(j.created_at),j.installation_id,j.repository_id,j.pr_number LIMIT 1",params![self.app_id,now()?],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?))).optional().map_err(db)?;
+        if let Some((i, r, p)) = row {
+            tx.execute("INSERT INTO app_reconcile_schedule VALUES(?1,?2,?3,?4,?5) ON CONFLICT(app_id,installation_id,repository_id,pr_number) DO UPDATE SET next_at=excluded.next_at",params![self.app_id,i,r,p,now()?+600]).map_err(db)?;
+        }
+        tx.commit().map_err(db)?;
+        Ok(row)
+    }
+    pub fn analysis_turn(&self) -> Result<bool> {
+        let mut s = self.storage.lock().map_err(|_| SetupError::Unavailable)?;
+        let tx = s
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(db)?;
+        let next: bool = tx
+            .query_row(
+                "SELECT analysis_next FROM app_dispatch_mode WHERE app_id=?1",
+                [self.app_id],
+                |r| r.get(0),
+            )
+            .optional()
+            .map_err(db)?
+            .unwrap_or(true);
+        tx.execute("INSERT INTO app_dispatch_mode VALUES(?1,?2) ON CONFLICT(app_id) DO UPDATE SET analysis_next=excluded.analysis_next",params![self.app_id,!next]).map_err(db)?;
+        tx.commit().map_err(db)?;
+        Ok(next)
+    }
     pub fn pending_delivery(&self) -> Result<Vec<String>> {
         let s = self.storage.lock().map_err(|_| SetupError::Unavailable)?;
-        let mut q=s.connection.prepare("SELECT id FROM app_analysis_jobs WHERE app_id=?1 AND state IN ('staged','published') AND available_at<=?2 ORDER BY available_at,created_at,id LIMIT 100").map_err(db)?;
+        s.connection.execute("UPDATE app_analysis_jobs SET state='failed' WHERE app_id=?1 AND state IN ('staged','published') AND delivery_attempts>=3 AND available_at<=?2",params![self.app_id,now()?]).map_err(db)?;
+        let mut q=s.connection.prepare("SELECT id FROM app_analysis_jobs j WHERE app_id=?1 AND state IN ('staged','published') AND delivery_attempts<3 AND available_at<=?2 ORDER BY coalesce((SELECT turn FROM app_dispatch_turns t WHERE t.app_id=j.app_id AND t.installation_id=j.installation_id),0),available_at,created_at,id LIMIT 100").map_err(db)?;
         q.query_map(params![self.app_id, now()?], |r| r.get(0))
             .map_err(db)?
             .collect::<std::result::Result<Vec<_>, _>>()
             .map_err(db)
     }
+    pub fn begin_delivery(&self, id: &str) -> Result<()> {
+        let mut s = self.storage.lock().map_err(|_| SetupError::Unavailable)?;
+        let tx = s
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(db)?;
+        let n=tx.execute("UPDATE app_analysis_jobs SET delivery_attempts=delivery_attempts+1,available_at=?3+900 WHERE app_id=?1 AND id=?2 AND state IN ('staged','published') AND delivery_attempts<3 AND available_at<=?3",params![self.app_id,id,now()?]).map_err(db)?;
+        if n != 1 {
+            return Err(SetupError::Conflict);
+        }
+        let installation = tx
+            .query_row(
+                "SELECT installation_id FROM app_analysis_jobs WHERE id=?1",
+                [id],
+                |r| r.get(0),
+            )
+            .map_err(db)?;
+        advance_turn(&tx, self.app_id, installation)?;
+        tx.commit().map_err(db)
+    }
     pub fn defer_delivery(&self, id: &str) -> Result<()> {
         let s = self.storage.lock().map_err(|_| SetupError::Unavailable)?;
-        s.connection.execute("UPDATE app_analysis_jobs SET available_at=?3 WHERE id=?1 AND app_id=?2 AND state IN ('staged','published')",params![id,self.app_id,now()?+600]).map_err(db)?;
+        s.connection.execute("UPDATE app_analysis_jobs SET state=CASE WHEN delivery_attempts>=3 THEN 'failed' ELSE state END,available_at=?3+600 WHERE id=?1 AND app_id=?2 AND state IN ('staged','published')",params![id,self.app_id,now()?]).map_err(db)?;
         Ok(())
     }
     /// Persist a validated signed publication intent, never a check URL yet.
@@ -379,8 +443,8 @@ impl AppExecutionQueue {
         super::SetupConfig::new(self.app_id, "receipt".into(), origin.to_owned())?;
         let previous: Option<String> = tx
             .query_row(
-                "SELECT receipt_digest FROM app_report_intents ORDER BY rowid DESC LIMIT 1",
-                [],
+                "SELECT receipt_digest FROM app_report_intents i JOIN app_analysis_jobs j ON j.id=i.job_id WHERE j.app_id=?1 ORDER BY i.rowid DESC LIMIT 1",
+                [self.app_id],
                 |r| r.get(0),
             )
             .optional()
@@ -409,6 +473,51 @@ impl AppExecutionQueue {
         .map_err(db)?;
         tx.commit().map_err(db)?;
         Ok(signed)
+    }
+    pub fn report_is_recoverable(&self, report: &str, job: Option<&str>) -> Result<bool> {
+        let s = self.storage.lock().map_err(|_| SetupError::Unavailable)?;
+        s.connection.query_row("SELECT EXISTS(SELECT 1 FROM app_report_intents i JOIN app_analysis_jobs j ON j.id=i.job_id WHERE j.app_id=?1 AND json_extract(i.receipt,'$.receipt.report_id')=?2) OR EXISTS(SELECT 1 FROM app_analysis_jobs WHERE app_id=?1 AND id=?3 AND state='leased' AND lease_until>?4)",params![self.app_id,report,job,now()?],|r|r.get(0)).map_err(db)
+    }
+    /// Verify every persisted receipt in this App's chain before reopening a report store.
+    /// A valid prefix is not proof against whole-database rollback; an external
+    /// trusted backup anchor is still required for that operational guarantee.
+    pub fn audit_receipts(&self, key: &[u8]) -> Result<usize> {
+        let s = self.storage.lock().map_err(|_| SetupError::Unavailable)?;
+        let mut q=s.connection.prepare("SELECT i.job_id,i.receipt,i.receipt_digest,i.predecessor FROM app_report_intents i JOIN app_analysis_jobs j ON j.id=i.job_id WHERE j.app_id=?1 ORDER BY i.rowid LIMIT 10001").map_err(db)?;
+        let rows = q
+            .query_map([self.app_id], |r| {
+                Ok((
+                    r.get::<_, String>(0)?,
+                    r.get::<_, String>(1)?,
+                    r.get::<_, String>(2)?,
+                    r.get::<_, Option<String>>(3)?,
+                ))
+            })
+            .map_err(db)?;
+        let mut previous = None;
+        let mut count = 0;
+        for row in rows {
+            let (id, raw, hash, predecessor) = row.map_err(db)?;
+            count += 1;
+            if count > 10000
+                || raw.len() > 16384
+                || sha256(raw.as_bytes()) != hash
+                || predecessor != previous
+            {
+                return Err(SetupError::Invalid);
+            }
+            let signed: SignedAppReceipt =
+                serde_json::from_str(&raw).map_err(|_| SetupError::Invalid)?;
+            signed.verify(key)?;
+            if signed.receipt.previous != previous
+                || signed.receipt.job.app_id != self.app_id
+                || signed.receipt.job.id()? != id
+            {
+                return Err(SetupError::Invalid);
+            }
+            previous = Some(hash);
+        }
+        Ok(count)
     }
     /// Recovery reads only the immutable exact intent. This is not publication proof.
     pub fn intent(&self, id: &str, key: &[u8]) -> Result<SignedAppReceipt> {
@@ -1165,5 +1274,85 @@ mod tests {
                 )
                 .is_err()
         );
+    }
+}
+
+fn advance_turn(c: &rusqlite::Connection, app: i64, installation: i64) -> Result<()> {
+    c.execute("INSERT INTO app_dispatch_turns(app_id,installation_id,turn) VALUES(?1,?2,(SELECT coalesce(max(turn),0)+1 FROM app_dispatch_turns WHERE app_id=?1)) ON CONFLICT(app_id,installation_id) DO UPDATE SET turn=excluded.turn",params![app,installation]).map_err(db)?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod safeguard_tests {
+    use super::super::pipeline_tests::Fixture;
+    use super::*;
+    #[test]
+    fn tenant_turns_and_phase_alternation_survive_queue_restart() {
+        let f = Fixture::new();
+        let q = f.queue();
+        let c = rusqlite::Connection::open(f.root.join("state.db")).unwrap();
+        let mut policy = f.request.policy.clone();
+        policy.repository.id = 5;
+        let consent = digest(&format!("1:{}", policy.digest().unwrap()));
+        let mut scope: Value = serde_json::from_str(
+            &c.query_row("SELECT document FROM app_setup_scopes", [], |r| {
+                r.get::<_, String>(0)
+            })
+            .unwrap(),
+        )
+        .unwrap();
+        scope["installation_id"] = json!(4);
+        scope["repository_id"] = json!(5);
+        c.execute("INSERT INTO app_setup_repositories(app_id,installation_id,repository_id,owner,name,selected_by_user_id,selected_at_s) VALUES(1,4,5,'fixture','app',4,1)",[]).unwrap();
+        c.execute(
+            "INSERT INTO app_setup_scopes(app_id,installation_id,repository_id,revision,actor_id,confirmed_at_s,document) VALUES(1,4,5,1,4,1,?1)",
+            [scope.to_string()],
+        )
+        .unwrap();
+        c.execute(
+            "INSERT INTO app_architecture_acceptances(app_id,installation_id,repository_id,scope_revision,actor_id,accepted_at_s,context) VALUES(1,4,5,1,4,1,?1)",
+            [f.request.context.to_string()],
+        )
+        .unwrap();
+        c.execute(
+            "INSERT INTO app_execution_grants VALUES(1,4,5,1,?1,?2,?3,?4,1)",
+            params![
+                consent,
+                f.request.input.engine_digest,
+                f.request.input.engine_metadata_digest,
+                serde_json::to_string(&policy).unwrap()
+            ],
+        )
+        .unwrap();
+        for installation in [2, 4] {
+            for pr in [7, 8] {
+                let mut input = f.request.input.clone();
+                input.installation_id = installation;
+                input.repository_id = if installation == 2 { 3 } else { 5 };
+                input.comparison.repository_id = input.repository_id;
+                input.comparison.number = pr;
+                if installation == 4 {
+                    input.consent_digest = consent.clone();
+                }
+                c.execute("INSERT INTO app_analysis_jobs(id,app_id,installation_id,repository_id,pr_number,consent_digest,input,state,created_at,available_at) VALUES(?1,1,?2,?3,?4,?5,?6,'pending',1,0)",params![input.id().unwrap(),installation,input.repository_id,pr,input.consent_digest,serde_json::to_string(&input).unwrap()]).unwrap();
+            }
+        }
+        assert!(q.analysis_turn().unwrap());
+        assert!(!q.analysis_turn().unwrap());
+        let first = q.claim().unwrap().unwrap();
+        let first_install = first.input.installation_id;
+        q.fail(&first, false).unwrap();
+        drop(q);
+        let q = AppExecutionQueue::new(
+            Storage::open(&f.root.join("state.db"), &f.root.join("artifacts")).unwrap(),
+            1,
+        )
+        .unwrap();
+        assert!(q.analysis_turn().unwrap());
+        let second = q.claim().unwrap().unwrap();
+        assert_ne!(first_install, second.input.installation_id);
+        q.fail(&second, false).unwrap();
+        let third = q.claim().unwrap().unwrap();
+        assert_eq!(first_install, third.input.installation_id);
     }
 }

@@ -145,8 +145,8 @@ python3 -m unittest discover -s tests -p 'app_preview_sandbox_test.py'
 ```
 
 Still required before automatic hosted PR checks: a qualified USD 0 host and
-signed worker release; live OAuth; explicit publication consent; qualified dispatch,
-API budgets and backup/restore operations; live public readback and
+signed worker release; live OAuth; separately approved operator activation; qualified
+backup/restore operations; live public readback and
 
 real second-repository HLD/LLD/source acceptance. Activation remains a separate
 owner approval. The full PR worker, paused dispatcher and separate report server

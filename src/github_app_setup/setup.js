@@ -3,8 +3,8 @@
 (() => {
   const $ = id => document.getElementById(id);
   let repositories = [], selected = null, inventory = null, revision = 0, preview = null;
-  let generation = 0, busy = false, sourceAvailable = false, architecture = null;
-  function clearArchitecture(){architecture=null;["architecture-review","architecture-saved"].forEach(id=>hidden(id,true));$("architecture-components").replaceChildren();$("architecture-gaps").replaceChildren();$("architecture-providers").replaceChildren();$("architecture-receipt").textContent="";$("architecture-gaps-ack").checked=$("architecture-defer").checked=$("scan-consent").checked=false;$("accept-architecture").disabled=$("scan-source").disabled=true;}
+  let generation = 0, busy = false, sourceAvailable = false, architecture = null, publicationAvailable = false, publication = null;
+  function clearArchitecture(){clearPublication();architecture=null;["architecture-review","architecture-saved"].forEach(id=>hidden(id,true));$("architecture-components").replaceChildren();$("architecture-gaps").replaceChildren();$("architecture-providers").replaceChildren();$("architecture-receipt").textContent="";$("architecture-gaps-ack").checked=$("architecture-defer").checked=$("scan-consent").checked=false;$("accept-architecture").disabled=$("scan-source").disabled=true;}
   const hidden = (id, value) => { $(id).hidden = value; };
   const status = text => { $('status').textContent = text; };
   function invalidate() { clearArchitecture();preview = null; hidden('confirmation', true); hidden('complete', true); $('acknowledge').checked = false; $('confirm').disabled = true; }
@@ -34,7 +34,7 @@
     if (busy) return;
     busy=true; hidden('error',true); document.querySelectorAll('button,input,textarea,select').forEach(b=>{b.dataset.wasDisabled=String(b.disabled);b.disabled=true;});
     try { await action(); } catch(error) { fail(error); }
-    finally { busy=false; document.querySelectorAll('button,input,textarea,select').forEach(b=>{if(b.dataset.wasDisabled!==undefined){b.disabled=b.dataset.wasDisabled==='true';delete b.dataset.wasDisabled;}}); $('confirm').disabled=!preview||!$('acknowledge').checked; $('preview').disabled=!inventory; $('scan-source').disabled=!sourceAvailable||!$('scan-consent').checked;syncArchitecture(); }
+    finally { busy=false; document.querySelectorAll('button,input,textarea,select').forEach(b=>{if(b.dataset.wasDisabled!==undefined){b.disabled=b.dataset.wasDisabled==='true';delete b.dataset.wasDisabled;}}); $('confirm').disabled=!preview||!$('acknowledge').checked; $('preview').disabled=!inventory; $('scan-source').disabled=!sourceAvailable||!$('scan-consent').checked;syncArchitecture();syncPublication(); }
   }
   const identity = () => ({installation_id:selected.installation_id, repository_id:selected.repository_id});
   const lines = id => [...new Set($(id).value.split('\n').map(s=>s.trim()).filter(Boolean))];
@@ -60,10 +60,10 @@
     $('revision').textContent=`${inventory.default_branch} · ${inventory.commit}`;
     $('saved-status').textContent=value.saved?`Saved revision ${revision} · ${value.saved.document.commit} · checks off`:'No scope saved yet.';
     if(restore) {$('include').value=value.saved?.document.include.join('\n')||'';$('exclude').value=value.saved?.document.exclude.join('\n')||'';}
-    $('selected-name').textContent=`${selected.owner}/${selected.name}`;hidden('selected-repo',false);hidden('picker',true);hidden('scope',false);renderPaths();$('scope-title').focus();status('Choose paths. No file contents have been read.');if(value.saved&&sourceAvailable&&resume){hidden('scope',true);hidden('complete',false);hidden('source-consent',false);$('receipt').textContent=`${selected.owner}/${selected.name} · revision ${revision} · ${value.saved.document.commit}`;const accepted=await api('architecture/status',identity());if(accepted.architecture_confirmed){showArchitectureSaved(accepted);}}
+    $('selected-name').textContent=`${selected.owner}/${selected.name}`;hidden('selected-repo',false);hidden('picker',true);hidden('scope',false);renderPaths();$('scope-title').focus();status('Choose paths. No file contents have been read.');if(value.saved&&sourceAvailable&&resume){hidden('scope',true);hidden('complete',false);hidden('source-consent',false);$('receipt').textContent=`${selected.owner}/${selected.name} · revision ${revision} · ${value.saved.document.commit}`;const accepted=await api('architecture/status',identity());if(accepted.architecture_confirmed){await showArchitectureSaved(accepted);}}
   }
   async function connect() {
-    clear();const capability=await api('capability');sourceAvailable=capability.source_preview_available===true;
+    clear();const capability=await api('capability');sourceAvailable=capability.source_preview_available===true;publicationAvailable=capability.publication_consent_available===true;
     if(!capability.available) {hidden('login',true);hidden('logout',true);$('connection-detail').textContent='Hosted setup is not configured. No sign-in, repository scan or activation is available on this server.';status('Setup unavailable · checks off');return;}
     hidden('login',false);$('connection-detail').textContent=(params.has('auth_error')?'Authorization was not completed. Sign in again. ':'')+'Only installed public repositories you administer are available.';
     try {const value=await api('repositories');repositories=value.repositories;document.body.classList.add('ready');hidden('login',true);hidden('logout',false);hidden('picker',false);renderRepositories();status('Select a repository. Checks remain off.');} catch(error) {if(error.status===401){status('Sign in to choose an installed repository.');return;}throw error;}
@@ -98,7 +98,7 @@
   $('logout').addEventListener('click',()=>run(async()=>{clear();await api('logout',{});hidden('logout',true);hidden('login',false);status('Signed out. Checks remain off.');}));
 
   function syncArchitecture(){$('accept-architecture').disabled=busy||!architecture||!architecture.result.components.length||!$('architecture-gaps-ack').checked||!$('architecture-defer').checked;}
-  function showArchitectureSaved(value){hidden('complete',true);hidden('architecture-review',true);hidden('architecture-saved',false);$('architecture-receipt').textContent=`${selected.owner}/${selected.name} · scope revision ${value.scope_revision} · ${value.commit||inventory?.commit||""} · publication not authorized`;$('architecture-saved-title').focus();status('Architecture saved. Checks remain off.');}
+  async function showArchitectureSaved(value){hidden('publication',!publicationAvailable);hidden('complete',true);hidden('architecture-review',true);hidden('architecture-saved',false);$('architecture-receipt').textContent=`${selected.owner}/${selected.name} · scope revision ${value.scope_revision} · ${value.commit||inventory?.commit||""} · publication is a separate permission`;$('architecture-saved-title').focus();status('Architecture saved. Checks remain off.');if(publicationAvailable){const consent=await api('publication/status',identity());$('publication-status').textContent=consent.publication_consent?`Consent revision ${consent.consent_revision} saved. Checks remain off pending operator activation.`:'No current publication consent.';}}
   $('scan-consent').addEventListener('change',()=>{$('scan-source').disabled=busy||!sourceAvailable||!$('scan-consent').checked;});
   for(const id of ['architecture-gaps-ack','architecture-defer'])$(id).addEventListener('change',syncArchitecture);
   $('scan-source').addEventListener('click',()=>run(async()=>{
@@ -122,9 +122,27 @@
   $('accept-architecture').addEventListener('click',()=>run(async()=>{
     if(!architecture||!$('architecture-gaps-ack').checked||!$('architecture-defer').checked)return;
     const components=[...$('architecture-components').children].map(card=>{const original=architecture.result.components.find(c=>c.id===card.dataset.id);const name=card.querySelector('[data-field="name"]').value.trim(),roots=[...new Set(card.querySelector('[data-field="roots"]').value.split('\n').map(x=>x.trim()).filter(Boolean))];let decision=card.querySelector('select').value;if(decision==='confirmed'&&(name!==original.name||JSON.stringify(roots)!==JSON.stringify(original.roots)))decision='corrected';return {id:original.id,name,roots,decision};});
-    const value=await api('architecture/confirm',{...identity(),scope_revision:architecture.scope_revision,preview_id:architecture.preview_id,components,accept_known_gaps:true,defer_integrations:true});clearArchitecture();showArchitectureSaved(value);
+    const value=await api('architecture/confirm',{...identity(),scope_revision:architecture.scope_revision,preview_id:architecture.preview_id,components,accept_known_gaps:true,defer_integrations:true});clearArchitecture();await showArchitectureSaved(value);
   }));
   for(const id of ['discard-architecture','architecture-back'])$(id).addEventListener('click',()=>{clearArchitecture();hidden('complete',false);});
 
+  function clearPublication(){publication=null;hidden('publication',true);hidden('publication-review',true);$('publication-details').replaceChildren();$('publication-status').textContent='';for(const id of ['publication-analysis','publication-source','publication-checks'])$(id).checked=false;$('publication-confirm').disabled=true;}
+  function syncPublication(){$('publication-confirm').disabled=busy||!publication||!['publication-analysis','publication-source','publication-checks'].every(id=>$(id).checked);}
+  for(const id of ['publication-analysis','publication-source','publication-checks'])$(id).addEventListener('change',syncPublication);
+  $('publication-preview').addEventListener('click',()=>run(async()=>{
+    publication=await api('publication/preview',identity());const d=publication.document;
+    $('publication-details').replaceChildren();
+    for(const [label,value] of [['Repository',`${selected.owner}/${selected.name}`],['Scope',`Revision ${d.scope_revision} · ${d.scope_commit}`],['Include',d.policy.include.join(', ')],['Exclude',d.policy.exclude.join(', ')||'None'],['Public destination',d.operator.report_origin],['Engine SHA-256',d.operator.engine_digest],['Visibility',d.source_visibility],['Retention',`${d.retention_days} days`],['Limits',`${d.limits.unique_blobs} unique blobs · ${d.limits.job_rest_reservations} reserved REST calls per comparison · ${d.limits.installation_daily_rest_reservations} per installation/day`],['Valid until',new Date(d.expires_at*1000).toLocaleTimeString()],['Activation','Off; separate operator approval required']]){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=label;dd.textContent=value;$('publication-details').append(dt,dd);}
+    for(const id of ['publication-analysis','publication-source','publication-checks'])$(id).checked=false;
+    hidden('publication-review',false);$('publication-analysis').focus();$('publication-status').textContent='Review all three permissions. Nothing is enabled.';
+  }));
+  $('publication-confirm').addEventListener('click',()=>run(async()=>{
+    if(!publication||!['publication-analysis','publication-source','publication-checks'].every(id=>$(id).checked))return;
+    const value=await api('publication/confirm',{...identity(),expected_revision:publication.document.expected_revision,expires_at:publication.document.expires_at,document_digest:publication.document_digest,allow_automatic_analysis:true,allow_public_source:true,allow_checks:true});
+    publication=null;hidden('publication-review',true);$('publication-status').textContent=`Consent revision ${value.consent_revision} saved. Checks remain off pending operator activation.`;
+  }));
+  $('publication-revoke').addEventListener('click',()=>run(async()=>{
+    await api('publication/revoke',identity());publication=null;hidden('publication-review',true);$('publication-status').textContent='Consent revoked. Jobs cancelled and existing reports withdrawn. Checks remain off.';
+  }));
   run(connect);
 })();

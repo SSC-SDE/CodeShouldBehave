@@ -798,3 +798,36 @@ is claimed; deployed release still predates these fixes.
   Committed distribution scan: 377 files, zero secret-pattern findings; 25 local
   documentation links resolve. Locked dependency versions and license inventory
   are unchanged. Continued the same draft PR #32; no additional PR or release.
+
+## 2026-11-06 IST — PR #32 final consent and durable safeguards
+
+- Continued existing draft `phase-6` PR #32 from
+  `ecf79b97ff34677ea6577cd661a8df43c5b58edd`; provider confirmed PR #24 open/unmerged.
+- Added migration 21 and authenticated publication preview/confirm/status/revoke.
+  The browser displays exact scope, destination, engine and retention, with three
+  explicit permissions. Decisions bind numeric actor, scope/context, operator pins,
+  expected revision and expiry. Consent never enables a grant. Replacement/revocation
+  disables previous grants, cancels unfinished work and withdraws reports atomically.
+- Added atomic non-refundable REST reservations before dispatch IO, with actual
+  broker call enforcement. Bounds: 384 tickets/job, 50/notification identity,
+  2,000/installation/day and 10,000/App/day. Failed/crashed passes retain reservations.
+- Added persistent tenant turns, analysis/delivery alternation, three delivery
+  attempts and bounded delayed retry. Idle passes reconcile one tracked PR with a
+  durable ten-minute checkpoint; only previously delivered App checks can map
+  rerequests to a PR. Neither path resets exhausted attempts or duplicates checks.
+- Added per-App signed receipt-chain audit at store opening/maintenance, expiry and
+  revocation cleanup, and bounded old orphan collection. Withdrawal precedes deletion;
+  symlinks/special files are refused. Signed intents and active analysis leases keep
+  recoverable staging. Whole-database rollback still requires an independent trusted
+  backup anchor and remains an explicit operational gate.
+- Validation: 346 all-feature Rust tests and 119 core-only Rust tests passed; the
+  final orphan-cleanup increment additionally passed all 77 App tests. Publication
+  regression suite: 119 passed, no skips. Offline browser suite: 17 scenarios,
+  including final consent, reload, revocation and narrow screens. No live GitHub,
+  HTTPS host or Linux sandbox acceptance is claimed. Tests use isolated fixtures.
+- Remaining gates: approved operator activation transaction, qualified USD 0 host /
+  signed Linux worker, initial PR discovery, queued/failure check UX, exhausted-job
+  recovery decision, trusted backup/restore and live fresh-repository acceptance.
+  Updated [execution contract](APP_EXECUTION_DEVELOPMENT.md) and README accordingly.
+- Activation remains OFF. No credentials, App settings, release pins, deployments,
+  billing resources, existing Actions/Pages ownership or PR #24 merge changed.

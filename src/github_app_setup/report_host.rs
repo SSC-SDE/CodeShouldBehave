@@ -73,6 +73,7 @@ impl AppReportStore {
         if reports.is_symlink() {
             return Err(SetupError::Denied);
         }
+        queue.audit_receipts(&key)?;
         Ok(Self {
             root,
             storage: Mutex::new(storage),
@@ -200,6 +201,106 @@ impl AppReportStore {
             .map_err(db)?;
         Ok(())
     }
+    /// Withdraw before deletion. Only known report identities are removed; never
+    /// restore a catalog from directory contents. Unreferenced staging requires
+    /// a full day of age and absence of a live analysis lease or signed intent.
+    pub fn maintain(&self, limit: usize) -> Result<usize> {
+        self.maintain_at(limit, now()?)
+    }
+    fn maintain_at(&self, limit: usize, at: i64) -> Result<usize> {
+        if limit == 0 || limit > 10 {
+            return Err(SetupError::Invalid);
+        }
+        let _guard = self
+            .publication
+            .try_lock()
+            .map_err(|_| SetupError::Capacity)?;
+        self.queue.audit_receipts(&self.key)?;
+        let records: Vec<(String, String, bool)> = {
+            let s = self.storage.lock().map_err(|_| SetupError::Unavailable)?;
+            s.connection.execute("UPDATE app_report_publications SET withdrawn=1 WHERE app_id=?1 AND expires_at<=?2",params![self.app_id,at]).map_err(db)?;
+            let mut q=s.connection.prepare("SELECT job_id,report_id,withdrawn FROM app_report_publications WHERE app_id=?1 ORDER BY report_id LIMIT 10001").map_err(db)?;
+            q.query_map([self.app_id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+                .map_err(db)?
+                .collect::<std::result::Result<_, _>>()
+                .map_err(db)?
+        };
+        if records.len() > 10000 {
+            return Err(SetupError::Capacity);
+        }
+        let mut removed = 0;
+        for (job, id, withdrawn) in records {
+            if !valid_secret(&id) {
+                return Err(SetupError::Invalid);
+            }
+            let denied = match self.queue.intent(&job, &self.key) {
+                Ok(_) => false,
+                Err(SetupError::Denied) => true,
+                Err(e) => return Err(e),
+            };
+            if !withdrawn && !denied {
+                continue;
+            }
+            self.withdraw(&job)?;
+            let path = self.root.join("reviews").join(id);
+            if path.exists() || path.is_symlink() {
+                safe_remove_report(&path)?;
+                removed += 1;
+                if removed == limit {
+                    break;
+                }
+            }
+        }
+        if removed < limit {
+            let entries = std::fs::read_dir(self.root.join("reviews"))
+                .map_err(|_| SetupError::Unavailable)?;
+            for entry in entries.take(MAX_REPORTS as usize + 1) {
+                let entry = entry.map_err(|_| SetupError::Unavailable)?;
+                let name = entry.file_name();
+                let Some(name) = name.to_str() else {
+                    continue;
+                };
+                if !valid_secret(name) && !name.strip_prefix("pending-").is_some_and(valid_secret) {
+                    continue;
+                }
+                let modified = entry
+                    .metadata()
+                    .map_err(|_| SetupError::Unavailable)?
+                    .modified()
+                    .map_err(|_| SetupError::Unavailable)?
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_err(|_| SetupError::Invalid)?
+                    .as_secs();
+                if modified.saturating_add(86400) > at as u64 {
+                    continue;
+                }
+                let path = entry.path();
+                let job = if valid_secret(name) {
+                    Some(self.manifest_job_for_cleanup(&path, name)?)
+                } else {
+                    None
+                };
+                if self.queue.report_is_recoverable(name, job.as_deref())? {
+                    continue;
+                }
+                // A withdrawn catalog is already authoritative; unregistered bytes
+                // never had public authority and cannot become a recovery source.
+                safe_remove_report(&path)?;
+                removed += 1;
+                if removed == limit {
+                    break;
+                }
+            }
+        }
+        Ok(removed)
+    }
+    fn manifest_job_for_cleanup(&self, path: &FsPath, id: &str) -> Result<String> {
+        let m = verify_bundle(path).map_err(|_| SetupError::Invalid)?;
+        if m.public_report_id != id {
+            return Err(SetupError::Invalid);
+        }
+        Ok(m.analysis_review_id)
+    }
     fn index(&self) -> Result<Vec<u8>> {
         let ids: Vec<String> = {
             let s = self.storage.lock().map_err(|_| SetupError::Unavailable)?;
@@ -251,6 +352,40 @@ impl AppReportStore {
             },
         ))
     }
+}
+fn safe_remove_report(path: &FsPath) -> Result<()> {
+    // Validate all entries before removal; symlinks and special files are never traversed.
+    if path.is_symlink() || !path.is_dir() {
+        return Err(SetupError::Denied);
+    }
+    let mut pending = vec![path.to_path_buf()];
+    let mut count = 0;
+    let mut size = 0u64;
+    while let Some(dir) = pending.pop() {
+        for entry in std::fs::read_dir(dir).map_err(|_| SetupError::Unavailable)? {
+            let entry = entry.map_err(|_| SetupError::Unavailable)?;
+            count += 1;
+            if count > 2048 {
+                return Err(SetupError::Capacity);
+            }
+            let kind = entry.file_type().map_err(|_| SetupError::Unavailable)?;
+            if kind.is_dir() {
+                pending.push(entry.path());
+            } else if kind.is_file() {
+                size = size
+                    .saturating_add(entry.metadata().map_err(|_| SetupError::Unavailable)?.len());
+            } else {
+                return Err(SetupError::Denied);
+            }
+            if size > 8 * 1024 * 1024 {
+                return Err(SetupError::Capacity);
+            }
+        }
+    }
+    std::fs::remove_dir_all(path).map_err(|_| SetupError::Unavailable)?;
+    std::fs::File::open(path.parent().ok_or(SetupError::Invalid)?)
+        .and_then(|f| f.sync_all())
+        .map_err(|_| SetupError::Unavailable)
 }
 fn bounded_file(path: &FsPath, limit: usize) -> Result<Vec<u8>> {
     let mut prefix = PathBuf::new();
@@ -722,6 +857,34 @@ mod tests {
             .unwrap();
         let index: Value = serde_json::from_slice(&bytes).unwrap();
         assert!(index["reports"].as_array().unwrap().is_empty());
+        assert_eq!(store.maintain(1).unwrap(), 1);
+        assert!(
+            !store
+                .root
+                .join("reviews")
+                .join(&bundle.manifest.public_report_id)
+                .exists()
+        );
+        assert!(store.expose(&id, &provider).is_err());
+        let orphan = store
+            .root
+            .join("reviews")
+            .join(format!("pending-{}", "e".repeat(64)));
+        std::fs::create_dir(&orphan).unwrap();
+        std::fs::write(orphan.join("partial.json"), b"{}").unwrap();
+        std::fs::File::open(&orphan)
+            .unwrap()
+            .set_times(
+                std::fs::FileTimes::new()
+                    .set_modified(std::time::UNIX_EPOCH + std::time::Duration::from_secs(1)),
+            )
+            .unwrap();
+        assert_eq!(store.maintain(1).unwrap(), 1);
+        assert!(!orphan.exists());
+        assert_eq!(queue.audit_receipts(key.public_key()).unwrap(), 1);
+        assert!(queue.audit_receipts(signer().public_key()).is_err());
+        c.execute_batch("DROP TRIGGER app_intent_immutable; UPDATE app_report_intents SET receipt_digest=printf('%064d',0);").unwrap();
+        assert!(queue.audit_receipts(key.public_key()).is_err());
     }
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn actual_loopback_readback_checks_all_chunks_and_workspace_then_denies_revoked_scope() {
@@ -779,6 +942,18 @@ mod tests {
         queue
             .confirm_readback(&id, key.public_key(), &verified, &provider)
             .unwrap();
+        assert_eq!(
+            store
+                .maintain_at(1, now().unwrap() + RETENTION + 1)
+                .unwrap(),
+            1
+        );
+        assert!(
+            store
+                .file(&bundle.manifest.public_report_id, "manifest.json")
+                .is_err()
+        );
+        assert!(store.expose(&id, &provider).is_err());
         let c = rusqlite::Connection::open(f.root.join("state.db")).unwrap();
         c.execute(
             "INSERT INTO app_repository_blocks VALUES(1,2,3,'private',1)",

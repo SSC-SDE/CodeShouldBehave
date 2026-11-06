@@ -284,9 +284,11 @@ The optional installation-token/current-PR broker, durable queue and signed-inte
 completed-check outbox primitives now have local tests; see the
 [execution checkpoint](APP_EXECUTION_DEVELOPMENT.md). The scoped PR object fetcher,
 credential-free analysis adapter, paused host dispatcher and separate signed report
-server/readback are now connected locally. Final publication consent, host and Linux
-sandbox qualification, fair dispatch, durable API budgets, reconciliation/recovery
-operations and live acceptance remain pending. The source-preview
+server/readback are now connected locally. Browser final consent, fair dispatch,
+durable REST reservations, tracked-PR repair, App-owned rerequests and bounded
+expiry/withdrawal recovery have local tests. Operator activation, host/Linux sandbox
+qualification, initial PR discovery, status UX, trusted backup restoration and live
+acceptance remain pending. The source-preview
 and inactive architecture review are implemented; see [current checkpoint](APP_SOURCE_PREVIEW.md).
 Live OAuth/worker qualification and activation remain separate and require an
 approved host and operator configuration.

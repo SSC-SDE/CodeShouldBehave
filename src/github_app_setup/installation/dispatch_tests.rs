@@ -13,7 +13,7 @@ use std::{
 
 struct Api {
     objects: BTreeMap<String, Value>,
-    comparison: CurrentPullRequest,
+    comparison: Mutex<CurrentPullRequest>,
     calls: AtomicUsize,
     checks: Mutex<Vec<Value>>,
 }
@@ -29,7 +29,7 @@ impl Transport for Arc<Api> {
         assert!(!token.is_empty());
         let permissions =
             json!({"contents":"read","pull_requests":"read","checks":"write","metadata":"read"});
-        let c = &self.comparison;
+        let c = self.comparison.lock().unwrap();
         match (method, path) {
             ("GET", "/app/installations/2") => {
                 Ok(json!({"id":2,"app_id":1,"suspended_at":null,"permissions":permissions}))
@@ -135,7 +135,7 @@ impl Harness {
             .unwrap();
         let api = Arc::new(Api {
             objects: super::objects::tests::fixture_replies(&f),
-            comparison: f.request.input.comparison.clone(),
+            comparison: Mutex::new(f.request.input.comparison.clone()),
             calls: AtomicUsize::new(0),
             checks: Mutex::new(vec![]),
         });
@@ -174,6 +174,7 @@ impl Harness {
             .unwrap(),
         );
         let dispatcher = AppDispatcher::new(AppDispatchConfig {
+            budget: Arc::new(AppRequestBudget::new(storage(), 1).unwrap()),
             queue,
             inbox,
             broker: Arc::new(broker),
@@ -242,4 +243,99 @@ fn consent_revoked_during_native_analysis_never_stages_or_delivers() {
             .unwrap(),
         0
     );
+}
+
+#[test]
+fn delivery_has_three_durable_attempts_and_broker_requires_reserved_pass() {
+    let h = Harness::new();
+    assert_eq!(h.dispatcher.tick().unwrap(), DispatchOutcome::Analyzed);
+    h.readback.fail.store(true, Ordering::SeqCst);
+    for _ in 0..3 {
+        h.sql("UPDATE app_analysis_jobs SET available_at=0");
+        assert_eq!(h.dispatcher.tick().unwrap(), DispatchOutcome::Deferred);
+    }
+    assert_eq!(h.dispatcher.tick().unwrap(), DispatchOutcome::Idle);
+    assert!(h.api.checks.lock().unwrap().is_empty());
+    let c = rusqlite::Connection::open(h.f.root.join("state.db")).unwrap();
+    assert_eq!(
+        c.query_row("SELECT state FROM app_analysis_jobs", [], |r| r
+            .get::<_, String>(0))
+            .unwrap(),
+        "failed"
+    );
+}
+#[test]
+fn broker_never_sends_a_request_without_remaining_tickets() {
+    let ephemeral = std::process::Command::new("openssl")
+        .args([
+            "genpkey",
+            "-algorithm",
+            "RSA",
+            "-pkeyopt",
+            "rsa_keygen_bits:2048",
+        ])
+        .output()
+        .unwrap();
+    let f = Fixture::new();
+    let api = Arc::new(Api {
+        objects: BTreeMap::new(),
+        comparison: Mutex::new(f.request.input.comparison.clone()),
+        calls: AtomicUsize::new(0),
+        checks: Mutex::new(vec![]),
+    });
+    let mut broker =
+        GitHubInstallationBroker::new(1, "client123".into(), &ephemeral.stdout).unwrap();
+    broker.transport = Box::new(api.clone());
+    assert!(matches!(broker.issue(2, 3), Err(SetupError::Capacity)));
+    assert_eq!(api.calls.load(Ordering::SeqCst), 0);
+    {
+        let _pass = broker.begin_pass(1).unwrap();
+        assert!(matches!(broker.issue(2, 3), Err(SetupError::Capacity)));
+    }
+    assert_eq!(api.calls.load(Ordering::SeqCst), 1);
+    assert!(matches!(broker.issue(2, 3), Err(SetupError::Capacity)));
+    assert_eq!(api.calls.load(Ordering::SeqCst), 1);
+}
+
+#[test]
+fn idle_reconciliation_repairs_tracked_head_changes_without_replaying_checks() {
+    let h = Harness::new();
+    assert_eq!(h.dispatcher.tick().unwrap(), DispatchOutcome::Analyzed);
+    assert_eq!(h.dispatcher.tick().unwrap(), DispatchOutcome::Delivered);
+    h.api.comparison.lock().unwrap().head = "d".repeat(40);
+    assert_eq!(h.dispatcher.tick().unwrap(), DispatchOutcome::Idle);
+    let c = rusqlite::Connection::open(h.f.root.join("state.db")).unwrap();
+    let raw: String = c
+        .query_row(
+            "SELECT input FROM app_analysis_jobs WHERE state='pending'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    let input: AnalysisInput = serde_json::from_str(&raw).unwrap();
+    assert_eq!(input.comparison.head, "d".repeat(40));
+    assert_eq!(h.api.checks.lock().unwrap().len(), 1);
+    // Restarting does not reset the 10-minute provider repair checkpoint.
+    let q = AppExecutionQueue::new(
+        crate::Storage::open(&h.f.root.join("state.db"), &h.f.root.join("artifacts")).unwrap(),
+        1,
+    )
+    .unwrap();
+    assert!(q.claim_reconciliation().unwrap().is_none());
+    let mut n = WebhookNotification {
+        delivery_id: "fixture".into(),
+        installation_id: 2,
+        repository_id: Some(3),
+        pr_number: None,
+        check_id: Some(99),
+        event: "check_run".into(),
+        action: "rerequested".into(),
+        lease_id: "fixture".into(),
+    };
+    assert_eq!(q.tracked_check(&n).unwrap(), Some(7));
+    n.check_id = Some(100);
+    assert!(q.tracked_check(&n).unwrap().is_none());
+    n.check_id = Some(99);
+    n.installation_id = 4;
+    assert!(q.tracked_check(&n).unwrap().is_none());
 }

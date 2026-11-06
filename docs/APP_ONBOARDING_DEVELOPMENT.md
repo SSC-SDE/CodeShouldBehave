@@ -127,12 +127,12 @@ see [current boundaries and operator notes](APP_SOURCE_PREVIEW.md). Remaining:
 
 1. Qualified USD 0 Linux host, independently verified signed preview worker and
    live OAuth/permission acceptance.
-2. Fair scheduling, missed-event repair, check rerequests and durable API budgets.
-   The scoped PR fetcher, full analysis worker adapter and paused host dispatcher
-   are connected locally; see [execution checkpoint](APP_EXECUTION_DEVELOPMENT.md).
-3. Explicit publication consent and qualified recovery/backup operations. Signed
-   report hosting, catalog and HTTP readback are implemented on a separate optional
-   listener, but have not been deployed or activated.
+2. Complete initial PR discovery and queued/failure check UX. Fair admission,
+   tracked-PR repair, owned-check rerequests, durable REST reservations and delivery
+   limits are now locally tested; see [execution checkpoint](APP_EXECUTION_DEVELOPMENT.md).
+3. Separately approved operator activation and trusted backup/restore operations.
+   Browser final consent, signed chain verification, expiry/withdrawal cleanup and
+   public hosting/readback are implemented locally; none are deployed or activated.
 4. Real fresh-repository browser acceptance, HLD/LLD/source traversal, withdrawal,
    backup/restore and explicit activation approval.
 

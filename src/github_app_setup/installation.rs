@@ -31,6 +31,8 @@ pub struct GitHubInstallationBroker {
     key: RsaKeyPair,
     transport: Box<dyn Transport>,
     admission: Mutex<()>,
+    pass_admission: Mutex<()>,
+    tickets: std::sync::atomic::AtomicUsize,
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -100,7 +102,50 @@ impl Transport for Https {
         serde_json::from_slice(&bytes).map_err(|_| SetupError::Unavailable)
     }
 }
+pub struct RequestPass<'a> {
+    broker: &'a GitHubInstallationBroker,
+    _guard: std::sync::MutexGuard<'a, ()>,
+}
+impl Drop for RequestPass<'_> {
+    fn drop(&mut self) {
+        self.broker
+            .tickets
+            .store(0, std::sync::atomic::Ordering::SeqCst);
+    }
+}
 impl GitHubInstallationBroker {
+    /// Caller reserves durable tickets before entering this non-refundable pass.
+    pub fn begin_pass(&self, tickets: usize) -> Result<RequestPass<'_>> {
+        if tickets == 0 || tickets > 100 {
+            return Err(SetupError::Invalid);
+        }
+        let guard = self
+            .pass_admission
+            .try_lock()
+            .map_err(|_| SetupError::Capacity)?;
+        self.tickets
+            .store(tickets, std::sync::atomic::Ordering::SeqCst);
+        Ok(RequestPass {
+            broker: self,
+            _guard: guard,
+        })
+    }
+    fn request(
+        &self,
+        method: &str,
+        path: &str,
+        token: &str,
+        body: Option<&Value>,
+    ) -> Result<Value> {
+        self.tickets
+            .fetch_update(
+                std::sync::atomic::Ordering::SeqCst,
+                std::sync::atomic::Ordering::SeqCst,
+                |n| n.checked_sub(1),
+            )
+            .map_err(|_| SetupError::Capacity)?;
+        self.transport.request(method, path, token, body)
+    }
     /// Call only from the secret-store boundary, never with repository-controlled bytes.
     pub fn new(app_id: i64, client_id: String, pem: &[u8]) -> Result<Self> {
         if app_id <= 0
@@ -155,6 +200,8 @@ impl GitHubInstallationBroker {
             key,
             transport: Box::new(Https(agent)),
             admission: Mutex::new(()),
+            pass_admission: Mutex::new(()),
+            tickets: std::sync::atomic::AtomicUsize::new(0),
         })
     }
     fn jwt(&self, at: i64) -> Result<String> {
@@ -198,7 +245,7 @@ impl GitHubInstallationBroker {
         }
         let jwt = self.jwt(at)?;
         let start = Instant::now();
-        let info = self.transport.request(
+        let info = self.request(
             "GET",
             &format!("/app/installations/{installation}"),
             &jwt,
@@ -213,7 +260,7 @@ impl GitHubInstallationBroker {
         }
         let request = json!({"repository_ids":[repository],"permissions":{
             "contents":"read","pull_requests":"read","checks":"write"}});
-        let response = self.transport.request(
+        let response = self.request(
             "POST",
             &format!("/app/installations/{installation}/access_tokens"),
             &jwt,
@@ -274,16 +321,14 @@ impl GitHubInstallationBroker {
         }
         credential.check(super::now()?)?;
         let prefix = format!("/repos/{owner}/{name}");
-        let repo = self
-            .transport
-            .request("GET", &prefix, &credential.token, None)?;
+        let repo = self.request("GET", &prefix, &credential.token, None)?;
         if repo["id"].as_i64() != Some(credential.repository)
             || repo["private"].as_bool() != Some(false)
             || repo["archived"].as_bool() != Some(false)
         {
             return Err(SetupError::Denied);
         }
-        let pr = self.transport.request(
+        let pr = self.request(
             "GET",
             &format!("{prefix}/pulls/{number}"),
             &credential.token,
@@ -303,7 +348,7 @@ impl GitHubInstallationBroker {
             Some("closed") => false,
             _ => return Err(SetupError::Invalid),
         };
-        let compare = self.transport.request(
+        let compare = self.request(
             "GET",
             &format!("{prefix}/compare/{base}...{head}?per_page=1"),
             &credential.token,
@@ -478,7 +523,6 @@ impl super::execution::AppCheckDelivery for InstallationSession<'_> {
         );
         let response = self
             .broker
-            .transport
             .request("GET", &path, &self.credential.token, None)?;
         let checks = response["check_runs"]
             .as_array()
@@ -517,10 +561,9 @@ impl super::execution::AppCheckDelivery for InstallationSession<'_> {
         }
         oid(&payload["head_sha"])?;
         let path = format!("/repos/{}/{}/check-runs", self.owner, self.name);
-        let result =
-            self.broker
-                .transport
-                .request("POST", &path, &self.credential.token, Some(payload))?;
+        let result = self
+            .broker
+            .request("POST", &path, &self.credential.token, Some(payload))?;
         check_matches(&result, payload, self.broker.app_id)
     }
 }
@@ -615,6 +658,7 @@ mod tests {
             requests: Mutex::new(vec![]),
         });
         broker.transport = Box::new(fake.clone());
+        let _pass = broker.begin_pass(100).unwrap();
         let credential = broker.issue_at(2, 3, at).unwrap();
         assert_eq!(credential.expires, at + 60);
         let calls = fake.requests.lock().unwrap();

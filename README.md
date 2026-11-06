@@ -37,8 +37,9 @@ The App implementation includes OAuth/PKCE, a browser repository picker and
 versioned path-scope confirmation, opt-in isolated source preview and inactive
 architecture acceptance. The PR worker, host dispatcher, signed report server and
 completed-check delivery are connected and tested locally. Dispatch defaults to
-paused; final publication consent, qualified hosting and live acceptance remain
-pending. Installing the App does not activate this development integration.
+paused. Browser publication consent, durable request budgets and bounded recovery
+are implemented locally; operator activation, qualified hosting and live acceptance
+remain pending. Installing the App does not activate this development integration.
 See the [execution checkpoint](docs/APP_EXECUTION_DEVELOPMENT.md) and
 [$0 hosting assessment](docs/APP_HOSTING_OPTIONS.md) for current limits.
 

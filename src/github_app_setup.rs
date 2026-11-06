@@ -18,6 +18,14 @@ use std::{
 };
 
 mod architecture_preview;
+#[cfg(feature = "github-app")]
+mod budget;
+#[cfg(feature = "github-app")]
+mod consent;
+#[cfg(feature = "github-app")]
+pub use budget::AppRequestBudget;
+#[cfg(feature = "github-app")]
+pub use consent::{PublicationConsentInput, PublicationOperatorPolicy};
 mod http;
 mod scan_worker;
 mod scope;
@@ -229,6 +237,8 @@ pub struct AppSetupHost<P> {
     sessions: Mutex<BTreeMap<String, Session>>,
     scan_admission: Mutex<()>,
     scan_worker: Option<std::sync::Arc<dyn AppScanWorker>>,
+    #[cfg(feature = "github-app")]
+    publication_policy: Option<PublicationOperatorPolicy>,
 }
 impl<P: GitHubSetupProvider> AppSetupHost<P> {
     pub fn new(storage: Storage, provider: P, config: SetupConfig) -> Self {
@@ -238,12 +248,24 @@ impl<P: GitHubSetupProvider> AppSetupHost<P> {
             config,
             sessions: Mutex::new(BTreeMap::new()),
             scan_worker: None,
+            #[cfg(feature = "github-app")]
+            publication_policy: None,
             scan_admission: Mutex::new(()),
         }
     }
     pub fn with_scan_worker(mut self, worker: std::sync::Arc<dyn AppScanWorker>) -> Self {
         self.scan_worker = Some(worker);
         self
+    }
+    pub fn publication_consent_available(&self) -> bool {
+        #[cfg(feature = "github-app")]
+        {
+            self.publication_policy.is_some()
+        }
+        #[cfg(not(feature = "github-app"))]
+        {
+            false
+        }
     }
     pub fn scan_available(&self) -> bool {
         self.scan_worker.is_some()

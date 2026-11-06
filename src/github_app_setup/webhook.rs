@@ -215,13 +215,14 @@ impl AppWebhookInbox {
             String,
             String,
         );
-        let row:Option<PendingRow>=tx.query_row("SELECT delivery_id,installation_id,repository_id,pr_number,check_id,event,action FROM app_webhook_inbox WHERE app_id=?1 AND state='pending' ORDER BY attempt,received_at_s,delivery_id LIMIT 1",[self.app_id],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?))).optional().map_err(db)?;
+        let row:Option<PendingRow>=tx.query_row("SELECT delivery_id,installation_id,repository_id,pr_number,check_id,event,action FROM app_webhook_inbox n WHERE app_id=?1 AND state='pending' ORDER BY coalesce((SELECT turn FROM app_notification_turns t WHERE t.app_id=n.app_id AND t.installation_id=n.installation_id),0),attempt,received_at_s,delivery_id LIMIT 1",[self.app_id],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?))).optional().map_err(db)?;
         let Some((delivery_id, installation_id, repository_id, pr_number, check_id, event, action)) =
             row
         else {
             tx.commit().map_err(db)?;
             return Ok(None);
         };
+        tx.execute("INSERT INTO app_notification_turns(app_id,installation_id,turn) VALUES(?1,?2,(SELECT coalesce(max(turn),0)+1 FROM app_notification_turns WHERE app_id=?1)) ON CONFLICT(app_id,installation_id) DO UPDATE SET turn=excluded.turn",params![self.app_id,installation_id]).map_err(db)?;
         let lease_id = secret()?;
         tx.execute("UPDATE app_webhook_inbox SET state='leased',attempt=attempt+1,lease_id=?3,lease_expires_at_s=?4 WHERE app_id=?1 AND delivery_id=?2",params![self.app_id,delivery_id,lease_id,at+60]).map_err(db)?;
         tx.commit().map_err(db)?;

@@ -34,10 +34,9 @@ impl InstallationSession<'_> {
                 return Err(SetupError::Capacity);
             }
             calls += 1;
-            let value =
-                self.broker
-                    .transport
-                    .request("GET", &path, &self.credential.token, None)?;
+            let value = self
+                .broker
+                .request("GET", &path, &self.credential.token, None)?;
             total += serde_json::to_vec(&value)
                 .map_err(|_| SetupError::Invalid)?
                 .len();
@@ -364,6 +363,7 @@ pub(super) mod tests {
         let mut broker =
             GitHubInstallationBroker::new(1, "client".into(), &generated.stdout).unwrap();
         broker.transport = Box::new(replies.clone());
+        let _pass = broker.begin_pass(100).unwrap();
         let session = InstallationSession {
             broker: &broker,
             credential: InstallationCredential {

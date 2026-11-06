@@ -4,9 +4,9 @@ use flowdiff::{
     Storage,
     github_app_setup::{
         AppDispatchConfig, AppDispatcher, AppExecutionQueue, AppReceiptSigner, AppReportStore,
-        AppSetupHost, AppWebhookInbox, GitHubInstallationBroker, GitHubWebProvider,
-        HttpsReportReadback, SandboxPrWorker, SandboxPreviewWorker, SetupConfig, app_report_router,
-        router, webhook_router,
+        AppRequestBudget, AppSetupHost, AppWebhookInbox, GitHubInstallationBroker,
+        GitHubWebProvider, HttpsReportReadback, PublicationOperatorPolicy, SandboxPrWorker,
+        SandboxPreviewWorker, SetupConfig, app_report_router, router, webhook_router,
     },
 };
 use std::{
@@ -150,6 +150,18 @@ async fn run() -> Result<(), ()> {
             .map_err(|_| ())?,
         ));
     }
+    if let (Some(origin), Some(engine)) = (opts.get("--report-origin"), opts.get("--pr-sha256")) {
+        let metadata = serde_json::json!({"package":"flowdiff","version":env!("CARGO_PKG_VERSION"),"hld_generator":flowdiff::design::HLD_GENERATOR_VERSION,"lld_generator":flowdiff::lld::LLD_GENERATOR_VERSION,"lld_parser":flowdiff::lld::LLD_IR_VERSION,"public_projection":flowdiff::public_report::PUBLIC_SCHEMA});
+        let hash = flowdiff::public_report::sha256(
+            &flowdiff::public_report::canonical_json(&metadata).map_err(|_| ())?,
+        );
+        host = host
+            .with_publication_policy(
+                PublicationOperatorPolicy::new(origin.clone(), engine.clone(), hash)
+                    .map_err(|_| ())?,
+            )
+            .map_err(|_| ())?;
+    }
     let mut app = router(Arc::new(host));
     let mut inbox_handle = None;
     if let Some(path) = opts.get("--webhook-secret-file") {
@@ -238,6 +250,14 @@ async fn run() -> Result<(), ()> {
         let readback = Arc::new(HttpsReportReadback::new(report_origin.clone()).map_err(|_| ())?);
         let dispatcher = Arc::new(
             AppDispatcher::new(AppDispatchConfig {
+                budget: Arc::new(
+                    AppRequestBudget::new(
+                        Storage::open(&state.join("app.sqlite"), &state.join("artifacts"))
+                            .map_err(|_| ())?,
+                        app_id,
+                    )
+                    .map_err(|_| ())?,
+                ),
                 queue,
                 inbox: inbox_handle.ok_or(())?,
                 broker,

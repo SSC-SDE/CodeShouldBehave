@@ -39,14 +39,15 @@ References: [App JWTs](https://docs.github.com/en/apps/creating-github-apps/auth
 
 Migration 19 adds execution grants, analysis jobs and immutable signed intents.
 It creates **no grants**. Existing inactive scope/architecture records are not
-converted to publication consent. There is no browser route, CLI flag or production
-helper that enables a grant in this checkpoint. Tests seed explicit isolated grants.
+converted to publication consent. Final authenticated consent now has separate
+preview/confirm/status/revoke routes; it never creates or enables an execution
+grant. Tests seed isolated enabled grants. Operator activation remains unavailable.
 
 `AppExecutionQueue::reconcile_notification` consumes a leased PR notification and
 persists the freshly resolved comparison in one transaction. A forged, expired or
 consumed lease cannot acknowledge or enqueue it. `reconcile` supports bounded
 future sweep callers. The optional host dispatcher now consumes inbox events;
-missed-event sweeps remain pending.
+idle passes repair tracked comparisons; initial PR discovery remains pending.
 
 Job identity binds App, installation, numeric repository, PR, selected base,
 merge-base, head, scope revision, publication-consent digest, signed binary digest
@@ -60,8 +61,9 @@ check current consent and sticky revocation blocks. Limits are two leased worker
 globally, one per repository, 100 unfinished jobs globally, 25 per installation,
 10,000 total retained job rows, a 15-minute hard lease and three total attempts.
 Retries are delayed; stale leases cannot stage a report or report a failure.
-FIFO admission plus tenant caps is implemented; fair round-robin dispatch and
-explicit reanalysis of failed identities remain unfinished. Draft-to-ready or
+Durable least-recently-served installation turns now order notification, analysis
+and delivery admission. Analysis and delivery alternate when both have work.
+Explicit reanalysis of exhausted identities remains unfinished. Draft-to-ready or
 reopened comparisons resume their exact cancelled job within the existing attempt
 limit; previously signed bytes must pass promotion checks again.
 
@@ -150,7 +152,8 @@ qualify an actual Linux host.
 `AppDispatcher::tick` handles at most one notification and one analysis/delivery
 item. No enabled grant means no GitHub requests. The host timer is ten seconds;
 `--dispatch-mode paused` is the default. `consented` additionally requires a saved
-execution grant, which onboarding still cannot create. The dispatcher reacquires
+execution grant, which onboarding still cannot create. Final consent records an
+admin decision without granting runtime access. The dispatcher reacquires
 short-lived credentials and checks current PR/consent before analysis, staging,
 publication and check delivery. Worker processes receive no token or signer.
 
@@ -180,7 +183,9 @@ undo withdrawal. Every report read checks current consent/revocation and file ha
 
 Reports expire after seven days. At most 100 staged report directories are retained
 (including orphaned staging), with at most 8 MiB each; reaching the cap refuses new
-staging. Disk cleanup/backup restoration remains a gate. The router serves only the
+staging. Bounded maintenance now removes expired/withdrawn known report directories;
+old unreferenced staging is collected only after a day with no signed intent or
+live analysis lease. Trusted backup restoration remains an operator gate. The router serves only the
 catalog, authorized report descriptors and embedded approved workspace assets.
 It uses no cookies, account routes or external assets, and sends `no-store`, CSP,
 `nosniff` and `no-referrer` headers. Root opens Standard; signed PR links open Focus.
@@ -191,6 +196,97 @@ then validates the whole bundle. Chunk reads use eight concurrent requests with 
 60-second admission deadline and five-second request timeouts. Readback failure
 prevents completed-check creation. The local HTTP test uses an ephemeral loopback
 transport; production accepts HTTPS only.
+
+## Final consent and durable safeguards
+
+### Browser consent, with checks still off
+
+After architecture acceptance, **Publication consent** displays the exact scope,
+source revision, public report origin, engine digest, source visibility, seven-day
+retention and request limits. Three unchecked permissions cover automatic scoped
+analysis, public source excerpts and advisory checks. All three are required.
+
+`POST /v1/github-app/publication/preview` derives the document from saved scope,
+accepted architecture and trusted operator settings. Confirm binds its digest,
+current numeric actor, expected consent revision and ten-minute preview expiry.
+Fresh GitHub admin/public-installation access and current inventory are checked;
+a final SQLite transaction fences session, scope and consent revisions. Stale,
+expired, tampered, cross-origin or unauthenticated confirmations fail. The browser
+cannot supply a different destination, engine or publication policy.
+
+`publication/confirm` appends an immutable record in migration 21, with **activation
+off**. It also disables any previous grant, cancels unfinished jobs and withdraws
+previous reports so consent replacement cannot leave old publication authority
+running. It never creates an enabled grant. `publication/status` restores current
+saved consent after login/reload. Changed scope or operator pins require new consent.
+`publication/revoke` atomically revokes consent, disables grants, cancels unfinished
+work and withdraws reports. Re-consent creates a new revision; it cannot un-revoke
+old records or restore old report URLs. Browser storage contains none of this state.
+
+These routes require the existing secure session and exact Origin/CSRF boundary.
+Consent preview is available only when the host has explicit operator report/pin
+settings. No live operator configuration or consent was created during development.
+
+### Request reservations and scheduling
+
+Before provider IO, `AppRequestBudget` reserves durable, non-refundable tickets:
+
+| Operation/boundary | Reserved request limit |
+|---|---:|
+| One notification reconciliation or tracked-PR repair | 10 |
+| One analysis pass, including acquisition and stage recheck | 80 |
+| One report-delivery pass | 32 |
+| Lifetime immutable comparison/job | 384 |
+| Lifetime notification/repair-window identity | 50 |
+| Installation per UTC day | 2,000 |
+| App per UTC day | 10,000 |
+
+The broker decrements an in-memory ticket before **every** actual HTTP request;
+without an admitted pass it cannot issue a request. Reservations commit before IO
+and include unused tickets, errors and crashes. A restart does not refund them.
+All three durable bucket updates are atomic. Accounting rows are capped at 20,000;
+capacity exhaustion stops work rather than deleting history to reset limits.
+These are App REST safeguards, not a claim that cloud hosting/billing is configured.
+OAuth/setup requests retain their earlier bounded adapters; these dispatch limits
+do not replace reverse-proxy abuse/rate limits required during host qualification.
+
+Persistent installation turns prevent a busy tenant from monopolizing notification,
+analysis or delivery admission. A persistent phase toggle alternates analysis and
+delivery. A delivery pass claims a 15-minute slot before IO; at most three passes
+are allowed. Failed readback delays the next pass by ten minutes. Exhaustion remains
+failed and does not silently reset the unknown-create fence or lifetime budget.
+
+An idle pass repairs one **already tracked** PR's fresh head/base state, with a
+persisted ten-minute checkpoint before provider requests. Duplicate input does not
+create another job/check; a changed comparison is queued normally. An App-owned
+check rerequest resolves only through the locally recorded check ID, installation
+and repository, then reconciles fresh provider state. Unknown/foreign checks are
+ignored without token issuance. Neither mechanism resets failed job attempts.
+Initial PR discovery without a webhook remains pending.
+
+### Recovery and report retention
+
+Opening a report store verifies this App's complete retained Ed25519 receipt chain:
+raw receipt hashes, signature key, predecessor, job ID and App binding. Cross-App
+chains are separate. Invalid chains stop the store; directory contents never become
+publication authority. Repeated exact-intent promotion still requires fresh PR and
+consent checks and cannot change catalog identity, expiry or withdrawal.
+
+Dispatch maintenance validates the chain and marks expired or no-longer-authorized
+known reports withdrawn before deleting at most two report directories per tick.
+Deletion refuses symlinks/special files and enforces the existing file/byte bounds.
+Interrupted deletion remains withdrawn on restart. Immutable catalog tombstones
+and receipt/accounting history are retained. Paused dispatch does not perform disk
+maintenance, but every report read still enforces expiry and current authorization.
+Unreferenced staging older than a day is eligible for the same bounded cleanup,
+after checking that no signed intent or active analysis lease needs it. New staging
+and recoverable signed reports are retained under the 100-directory cap. Malformed
+or unsafe paths stop cleanup for operator investigation.
+
+A restored old database may contain a valid signed prefix and old consent/budget
+state. **Do not serve a restored database without validating an independently held
+trusted recovery anchor.** Automatic backup restoration is not implemented or
+qualified by this work.
 
 ## Run the local acceptance checks
 
@@ -215,26 +311,29 @@ are fixtures. This is **not** live App or browser end-to-end evidence.
 
 ## Remaining implementation and activation gates
 
-1. Add the authenticated final publication-consent transaction and operator policy
-   covering origins, independently verified binary, storage/API/CPU budgets. No
-   production grant writer exists. Do not enable grants via manual SQL.
-2. Finish fair scheduling, periodic missed-event reconciliation, check rerequests,
-   queued/running/failure checks and persistent per-job/tenant API ticket accounting.
-   Current admission is FIFO with caps; delivery failures defer for ten minutes,
-   but do not yet have a durable lifetime retry/request budget.
-3. Qualify the Linux sandbox and signed PR worker release. The scoped adapter
-   deliberately refuses unrepresentable Git commits and oversized scopes (limits
-   below); arbitrary repository/commit support and fork analysis are not claimed.
-4. Add expired/orphaned-file cleanup, durable revocation-ledger backup/restore,
-   receipt-chain recovery procedure and retention operations. Existing exact-intent
-   recovery is tested; backup restoration is not qualified. Full storage stops at
-   the hard cap rather than silently deleting or expanding it.
-5. Qualify a USD 0 Linux host, configure protected App/signing keys and separate
-   approved HTTPS origins, then obtain activation approval. No suitable host/account
-   currently exists; no service, spending, App settings or release pins changed.
-6. Test a fresh repository install/select/confirm and real new-head/base/revocation
-   journeys, followed by PR check → Focus → HLD → LLD → exact-source browser
-   acceptance. Local mocks and HTTP readback are not live onboarding acceptance.
+1. Implement the separately approved operator activation transaction: validate the
+   latest unrevoked consent digest, scope, architecture, trusted report origin,
+   independently verified signed binary and current installation permissions before
+   enabling a grant. Browser consent alone must never enable it. No production
+   activation writer exists; do not enable via manual SQL.
+2. Qualify a USD 0 Linux host, signed sandbox binary, HTTPS proxy and protected
+   key stores. No suitable host/account exists, and no provisioning, spending,
+   App settings, deployment or release pins changed in this checkpoint.
+3. Add complete bounded repository PR discovery (including PRs whose first webhook
+   was missed), queued/running/failure check UX, and an explicit recovery decision
+   for exhausted/unknown check outcomes. Current periodic repair covers tracked PRs;
+   rerequests map only already delivered App-owned checks and do not reset attempts.
+4. Qualify backup/restore against an independently retained trusted chain/budget/
+   revocation anchor. A valid signed prefix cannot detect a whole-database rollback.
+   Qualify accounting/history retention procedures without refunding lifetime
+   reservations or restoring withdrawn reports; orphan cleanup is now bounded
+   and locally tested.
+5. Keep the existing scoped acquisition limits explicit: 64 unique authorized blobs
+   across a comparison, exactly reconstructable commits, no fork adapter. Larger or
+   unsupported inputs fail rather than being silently treated as complete.
+6. Run live fresh-repository install/select/consent and PR check → Focus → HLD → LLD
+   → exact-source browser acceptance, plus cost/permission/revocation and restart
+   qualification, before any activation claim.
 
 No activation action is required from the user at this checkpoint. Existing
-Actions/Pages publication and PR #24 remain unchanged and unmerged respectively.
+Actions/Pages publication and open PR #24 remain unchanged.
