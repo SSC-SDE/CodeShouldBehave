@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased: explicit historical report retirement
+
+- Base-owned, repository-bound approval of exact obsolete public report IDs.
+- Durable signed withdrawals and expiry records preserve all unselected reports
+  without increasing the 64 MiB site or artifact budget limits.
+- Retired results cannot receive a successful/dead check link; intent receipts
+  retain the complete irreversible withdrawal state across interrupted deployment.
+
 ## Unreleased: public landing page
 
 - Replace the Pages root redirect with a responsive, system-themed product page.

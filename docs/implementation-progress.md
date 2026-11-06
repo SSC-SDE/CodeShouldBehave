@@ -106,10 +106,56 @@ Image provenance and preview commands:
 - Only engine identity changes in public-ci/engine-pins. Production bootstrap
   from the published URLs passed signature/hash/ELF checks and extraction.
   All 121 public Python regressions passed, no skips; existing ResourceWarnings
-  remain visible. Native Linux preflight and live Pages acceptance remain
-  pending, not inferred from the macOS/bootstrap checks.
+  remain visible.
+- Native Linux sandbox [preflight 42289513084](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/42289513084)
+  passed on exact pin commit `40f12bcd99db2e7270333cf47c709c1438f42290`:
+  signed Ubuntu Bubblewrap, empty credential-free/networkless sandbox, pinned
+  release verification and actual ELF execution inside that sandbox.
+- [Pin PR #34](https://github.com/SSC-SDE/CodeShouldBehave/pull/34) merged at
+  provider-confirmed `134c895ef4baba5f50427906d432fc66a2bca462`.
+  Manual controller 42289665798 was cancelled as the normal shared concurrency
+  slot selected automatic run
+  [42289687915](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/42289687915)
+  on the same exact merge. Staging failed before deployment; local replay of
+  those exact inputs confirmed `Site cap exceeded; preserve previous generation`.
+  Earlier source-fbe4b73 controller refused after main advanced; its current
+  workflow/head checks were retained, not bypassed.
 - No App execution grant, policy, source scope, consent, workflow, runtime
   budget identity, billing control or existing report has been changed.
+
+## 2026-11-06 - explicitly approved obsolete report retirement
+
+The user selected retirement rather than increasing capacity, then explicitly
+approved these two redundant versions:
+
+- PR24 older-scope bundle
+  `7519517202cfdf944deb441c07cfece712f3e8908ca4c23700b70ee80f07a02c`.
+- PR31 superseded-commit bundle
+  `aa78ab56631a941bcd4b78ec3e7058615adf2fd5ae5af92637a578651906b46b`.
+
+The current PR24 demo `4b0d25a5…` and current PR31 `3d77c185…` stay available.
+Authorization is a bounded, repository-bound, base-owned exact-ID document,
+not PR input or direct deletion. The publisher commits the existing monotonic
+withdrawal ledger in its signed intent before deployment, emits expiry records,
+and cancels any attempted successful check for a retired bundle. No source
+scope, budget identity, receipt validation or 64 MiB site bound was relaxed.
+
+Local verification: all 125 public Python regressions pass, no skips, including
+actual site-byte removal, unselected report preservation, repeated retirement,
+invalid/foreign/linked approval, signed intent retention and dead-link refusal.
+The former mocked scope-withdrawal forwarding test now exercises real site output.
+
+Exact failed-run replay used the digest-pinned previous Pages artifact from
+run 42179183640, both real handoffs from 42289687915 and the actual macOS native
+semantic verifier. The signed empty `.nojekyll` marker was reconstructed under
+the existing restore rule; no missing source file was fabricated. Without
+retirement: the exact capacity failure reproduced. With only the approved two
+IDs: native verification and site integrity pass, six other existing reports
+remain and the seven-report site occupies 55,894,576 bytes. Local snapshot hash:
+`5db5d3da2e11e3e45180c48479865e97719112279636712ffcfcbe9d8b9b98c4`.
+No live report was removed by this replay. Trusted Linux release, pin promotion
+and actual deployment/readback remain required.
+
 
 ## 2026-10-24 — context finalized and drift verified
 
