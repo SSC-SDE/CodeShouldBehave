@@ -67,8 +67,24 @@ Local evidence:
   8.92:1 dark. Final desktop/mobile captures and Lighthouse JSON are retained
   under ignored `target/landing-final-*` and `target/landing-lighthouse-*-final.json`.
 
-Native release packaging smoke remains in progress. Image provenance and local
-preview commands are in [public usage](PUBLIC_MVP_USAGE.md#public-landing-page).
+Implementation and native package smoke passed at exact local commit
+`5df2e62d128c2507ab65da76c729839c723db825`. The isolated Rust 1.87 release build
+produced all eight binaries for `aarch64-apple-darwin`. Source archive SHA-256:
+`0ca1182a8ab47779f136f21366a3f6c779b33a2d1f13afe92db2cc9cd69b1c47`;
+runtime archive SHA-256:
+`0f97b63a15eaf97ed99326122116455d231120a4e6a9aba58c6dc27b3cc4ef47`.
+Archives and manifests are retained in ignored `target/landing-runtime-5df2e62/`.
+The package inventory retains 108 locked license packages and reports zero
+findings under its declared credential-pattern rules, not exhaustive detection.
+
+The extracted runtime's own native verifier and Python assembler accepted the
+real 235-file public bundle and generated an integrity-verified 11,403,352-byte
+site. Actual Chrome loaded all three images and the font from that packaged
+site, then followed the primary CTA and selected the exact PR32 review/bundle
+successfully, with no page exceptions. This is local macOS packaging proof,
+not signed Linux, hosted App, deployment or beta qualification. Temporary raw
+capture files were removed. Image provenance and preview commands are in
+[public usage](PUBLIC_MVP_USAGE.md#public-landing-page).
 No push, deployment, App activation, merge or launch is authorized by this work.
 
 ## 2026-10-24 — context finalized and drift verified
