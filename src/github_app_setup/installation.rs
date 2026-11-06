@@ -1,7 +1,10 @@
 //! Credential broker: fixed API origin, repository-limited tokens, no worker credentials.
+pub mod activation;
+pub(crate) mod discovery;
 #[cfg(test)]
 mod dispatch_tests;
 mod objects;
+mod status;
 use super::{Result, SetupError, slug};
 use base64::{
     Engine,
@@ -552,19 +555,18 @@ impl super::execution::AppCheckDelivery for InstallationSession<'_> {
             .try_lock()
             .map_err(|_| SetupError::Capacity)?;
         self.credential.check(super::now()?)?;
-        if repository != self.credential.repository
-            || payload["name"] != "CodeShouldBehave / Architecture"
-            || payload["status"] != "completed"
-            || !matches!(payload["conclusion"].as_str(), Some("success" | "neutral"))
-        {
+        if repository != self.credential.repository {
             return Err(SetupError::Denied);
         }
-        oid(&payload["head_sha"])?;
+        status::valid_payload(payload)?;
         let path = format!("/repos/{}/{}/check-runs", self.owner, self.name);
         let result = self
             .broker
             .request("POST", &path, &self.credential.token, Some(payload))?;
         check_matches(&result, payload, self.broker.app_id)
+    }
+    fn update(&self, repository: i64, check_id: i64, payload: &Value) -> Result<i64> {
+        self.update_owned_check(repository, check_id, payload)
     }
 }
 fn check_matches(check: &Value, payload: &Value, app: i64) -> Result<i64> {

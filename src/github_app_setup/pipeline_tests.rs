@@ -76,13 +76,13 @@ impl Fixture {
             .trim()
             .to_owned();
         let policy:PublicPolicy=serde_json::from_value(json!({"schema_version":"csb-public-policy-v1","repository":{"id":3,"owner":"fixture","name":"app"},"public":true,"publication_consent":true,"include":["."],"exclude":["private"],"baseline_mode":"merge_base","max_details":100})).unwrap();
-        let input = AnalysisInput {
+        let mut input = AnalysisInput {
             schema: "csb-app-analysis-v1".into(),
             app_id: 1,
             installation_id: 2,
             repository_id: 3,
             scope_revision: 1,
-            consent_digest: digest(&format!("1:{}", policy.digest().unwrap())),
+            consent_digest: String::new(),
             engine_digest: "c".repeat(64),
             engine_metadata_digest: sha256(&canonical_json(&engine()).unwrap()),
             comparison: CurrentPullRequest {
@@ -109,6 +109,15 @@ impl Fixture {
             decision: crate::ComponentDecision::Confirmed,
         };
         let context = json!({"version":"csb-accepted-context-v1","usable":true,"sensitive_paths_excluded":true,"repository":{"security_domain":"github-app-2","provider":"github","owner":"fixture","name":"app"},"confirmation":{"input_fingerprint":"a".repeat(64),"proposal_fingerprint":"b".repeat(64)},"commit":base,"session_id":"fixture-context","session_revision":1,"input_fingerprint":"a".repeat(64),"proposal_fingerprint":"b".repeat(64),"components":[component],"providers":[],"integrations":[],"gaps":[],"contexts":[]});
+        let consent = execution::fixture_consent_document(
+            2,
+            &input.comparison.merge_base,
+            &policy,
+            &context.to_string(),
+            &input.engine_digest,
+            &input.engine_metadata_digest,
+        );
+        input.consent_digest = sha256(&canonical_json(&consent).unwrap());
         let mut objects = BTreeMap::new();
         for commit in [&base, &head] {
             objects.insert(
@@ -153,7 +162,15 @@ impl Fixture {
         storage.connection.execute("INSERT INTO app_setup_repositories(app_id,installation_id,repository_id,owner,name,selected_by_user_id,selected_at_s) VALUES(1,2,3,'fixture','app',4,1)",[]).unwrap();
         storage.connection.execute("INSERT INTO app_setup_scopes(app_id,installation_id,repository_id,revision,actor_id,confirmed_at_s,document) VALUES(1,2,3,1,4,1,?1)",[document.to_string()]).unwrap();
         storage.connection.execute("INSERT INTO app_architecture_acceptances(app_id,installation_id,repository_id,scope_revision,actor_id,accepted_at_s,context) VALUES(1,2,3,1,4,1,?1)",[self.request.context.to_string()]).unwrap();
-        // Only tests create enabled grants. No production consent API exists yet.
+        let consent = execution::fixture_consent_document(
+            2,
+            &i.comparison.merge_base,
+            p,
+            &self.request.context.to_string(),
+            &i.engine_digest,
+            &i.engine_metadata_digest,
+        );
+        storage.connection.execute("INSERT INTO app_publication_consents(app_id,installation_id,repository_id,revision,actor_id,created_at,document,digest) VALUES(1,2,3,1,4,1,?1,?2)",params![consent.to_string(),i.consent_digest]).unwrap();
         storage.connection.execute("INSERT INTO app_execution_grants(app_id,installation_id,repository_id,scope_revision,consent_digest,engine_digest,engine_metadata_digest,policy,enabled) VALUES(1,2,3,1,?1,?2,?3,?4,1)",params![i.consent_digest,i.engine_digest,i.engine_metadata_digest,serde_json::to_string(p).unwrap()]).unwrap();
         Arc::new(AppExecutionQueue::new(storage, 1).unwrap())
     }

@@ -7,6 +7,13 @@ use ring::signature::{ED25519, Ed25519KeyPair, KeyPair, UnparsedPublicKey};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
+pub mod activation;
+mod discovery;
+pub mod recovery;
+mod status;
+#[cfg(test)]
+mod status_tests;
+
 /// Trusted broker adapter only. Must independently establish installation/repository
 /// ownership, current public visibility and exact PR revisions on every call.
 pub trait AppExecutionProvider {
@@ -58,6 +65,7 @@ struct Grant {
     engine: String,
     metadata: String,
     policy: PublicPolicy,
+    origin: String,
 }
 impl AppExecutionQueue {
     pub fn new(storage: Storage, app_id: i64) -> Result<Self> {
@@ -423,6 +431,7 @@ impl AppExecutionQueue {
             return Err(SetupError::Denied);
         }
         if m.repository != grant.policy.repository
+            || origin != grant.origin
             || m.pr_number != lease.input.comparison.number as u64
             || m.selected_baseline != lease.input.comparison.selected_base
             || m.baseline != lease.input.comparison.merge_base
@@ -568,6 +577,8 @@ impl AppExecutionQueue {
 pub trait AppCheckDelivery {
     fn find(&self, repository: i64, head: &str, payload: &Value) -> Result<Option<i64>>;
     fn create(&self, repository: i64, payload: &Value) -> Result<i64>;
+    /// Verify exact App/head/job ownership before an idempotent PATCH.
+    fn update(&self, repository: i64, check_id: i64, payload: &Value) -> Result<i64>;
 }
 impl AppExecutionQueue {
     pub fn deliver(
@@ -579,67 +590,17 @@ impl AppExecutionQueue {
     ) -> Result<i64> {
         let signed = self.intent(id, key)?;
         let input = &signed.receipt.job;
-        let payload = json!({"name":"CodeShouldBehave / Architecture","head_sha":input.comparison.head,
-            "external_id":format!("csb-app-v1:{id}"),"details_url":signed.receipt.focus_url,
-            "status":"completed","conclusion":signed.receipt.check.conclusion,
-            "output":{"title":signed.receipt.check.title,"summary":format!("[Open CodeShouldBehave report]({})\n\nStatic evidence within selected scope; runtime effects require review. This check does not approve merging.\n\nBaseline: `{}` → Proposal: `{}`",signed.receipt.focus_url,input.comparison.selected_base,input.comparison.head)}});
-        let mut s = self.storage.lock().map_err(|_| SetupError::Unavailable)?;
-        let tx = s
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(db)?;
-        current_grant(&tx, input)?;
-        recheck(input, provider)?;
-        let row:Option<(bool,Option<i64>)>=tx.query_row("SELECT delivery_attempted,check_id FROM app_analysis_jobs WHERE id=?1 AND app_id=?2 AND state IN ('published','delivered')",params![id,self.app_id],|r|Ok((r.get(0)?,r.get(1)?))).optional().map_err(db)?;
-        let (attempted, done) = row.ok_or(SetupError::Conflict)?;
-        if let Some(done) = done {
-            return Ok(done);
-        }
-        let found = writer.find(input.repository_id, &input.comparison.head, &payload)?;
-        let check = if let Some(found) = found {
-            tx.commit().map_err(db)?;
-            found
-        } else {
-            if attempted {
-                return Err(SetupError::Conflict);
-            }
-            tx.execute(
-                "UPDATE app_analysis_jobs SET delivery_attempted=1 WHERE id=?1",
-                [id],
-            )
-            .map_err(db)?;
-            tx.commit().map_err(db)?;
-            // Another process cannot create again: the durable attempted bit is already set.
-            let gate = s
-                .connection
-                .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(db)?;
-            current_grant(&gate, input)?;
-            recheck(input, provider)?;
-            let active:bool=gate.query_row("SELECT EXISTS(SELECT 1 FROM app_analysis_jobs WHERE id=?1 AND state='published')",[id],|r|r.get(0)).map_err(db)?;
-            if !active {
-                return Err(SetupError::Conflict);
-            }
-            let check = writer.create(input.repository_id, &payload)?;
-            gate.commit().map_err(db)?;
-            check
-        };
-        if check <= 0 {
-            return Err(SetupError::Invalid);
-        }
-        let tx = s
-            .connection
-            .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(db)?;
-        current_grant(&tx, input)?;
-        recheck(input, provider)?;
-        let n=tx.execute("UPDATE app_analysis_jobs SET state='delivered',check_id=?2 WHERE id=?1 AND state IN ('published','delivered')",params![id,check]).map_err(db)?;
-        if n != 1 {
-            return Err(SetupError::Conflict);
-        }
-        tx.commit().map_err(db)?;
-        Ok(check)
+        let payload = completed_check_payload(id, &signed);
+        self.send_check(id, input, &payload, true, provider, writer)
     }
+}
+
+fn completed_check_payload(id: &str, signed: &SignedAppReceipt) -> Value {
+    let input = &signed.receipt.job;
+    json!({"name":"CodeShouldBehave / Architecture","head_sha":input.comparison.head,
+        "external_id":format!("csb-app-v1:{id}"),"details_url":signed.receipt.focus_url,
+        "status":"completed","conclusion":signed.receipt.check.conclusion,
+        "output":{"title":signed.receipt.check.title,"summary":format!("[Open CodeShouldBehave report]({})\n\nStatic evidence within selected scope; runtime effects require review. This check does not approve merging.\n\nBaseline: `{}` → Proposal: `{}`",signed.receipt.focus_url,input.comparison.selected_base,input.comparison.head)}})
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -721,21 +682,62 @@ fn grant(c: &rusqlite::Connection, app: i64, installation: i64, repository: i64)
     if policy.repository.id != repository as u64 || policy.baseline_mode != "merge_base" {
         return Err(SetupError::Denied);
     }
-    // Consent digest identifies the exact approved publication policy and scope version.
-    if digest(&format!(
-        "{revision}:{}",
-        policy.digest().map_err(|_| SetupError::Invalid)?
-    )) != consent
+    // A scope/policy hash is not admin consent. Bind every read/publication to
+    // the latest immutable consent and its exact accepted architecture.
+    let consent_row: Option<(i64, String, String, bool)> = c.query_row(
+        "SELECT actor_id,digest,document,revoked FROM app_publication_consents WHERE app_id=?1 AND installation_id=?2 AND repository_id=?3 ORDER BY revision DESC LIMIT 1",
+        params![app,installation,repository],
+        |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?)),
+    ).optional().map_err(db)?;
+    let (actor, approved_digest, document, revoked) = consent_row.ok_or(SetupError::Denied)?;
+    let document: Value = serde_json::from_str(&document).map_err(|_| SetupError::Invalid)?;
+    let context: String = c.query_row(
+        "SELECT context FROM app_architecture_acceptances WHERE app_id=?1 AND installation_id=?2 AND repository_id=?3 AND scope_revision=?4",
+        params![app,installation,repository,revision], |r| r.get(0),
+    ).map_err(db)?;
+    if revoked
+        || approved_digest != consent
+        || sha256(&canonical_json(&document).map_err(|_| SetupError::Invalid)?) != consent
+        || document["schema"] != "csb-app-publication-consent-v1"
+        || document["app_id"].as_i64() != Some(app)
+        || document["installation_id"].as_i64() != Some(installation)
+        || document["repository_id"].as_i64() != Some(repository)
+        || document["actor_id"].as_i64() != Some(actor)
+        || document["scope_revision"].as_i64() != Some(revision)
+        || document["scope_commit"].as_str() != Some(scope.commit.as_str())
+        || document["context_digest"] != sha256(context.as_bytes())
+        || document["operator"]["engine_digest"] != engine
+        || document["operator"]["engine_metadata_digest"] != metadata
+        || document["policy"] != serde_json::to_value(&policy).map_err(|_| SetupError::Invalid)?
     {
         return Err(SetupError::Denied);
     }
+    let origin = document["operator"]["report_origin"]
+        .as_str()
+        .ok_or(SetupError::Denied)?
+        .to_owned();
+    SetupConfig::new(app, "grant".into(), origin.clone())?;
     Ok(Grant {
         revision,
         consent,
         engine,
         metadata,
         policy,
+        origin,
     })
+}
+
+pub(super) fn operator_authorized(
+    c: &rusqlite::Connection,
+    app: i64,
+    installation: i64,
+    repository: i64,
+) -> Result<bool> {
+    match grant(c, app, installation, repository) {
+        Ok(_) => Ok(true),
+        Err(SetupError::Denied) => Ok(false),
+        Err(error) => Err(error),
+    }
 }
 fn current_grant(c: &rusqlite::Connection, input: &AnalysisInput) -> Result<Grant> {
     let g = grant(c, input.app_id, input.installation_id, input.repository_id)?;
@@ -854,6 +856,22 @@ impl SignedAppReceipt {
 }
 
 #[cfg(test)]
+pub(super) fn fixture_consent_document(
+    installation: i64,
+    commit: &str,
+    policy: &PublicPolicy,
+    context: &str,
+    engine: &str,
+    metadata: &str,
+) -> Value {
+    json!({"schema":"csb-app-publication-consent-v1","app_id":1,
+        "installation_id":installation,"repository_id":policy.repository.id,"actor_id":4,
+        "scope_revision":1,"scope_commit":commit,"context_digest":sha256(context.as_bytes()),
+        "operator":{"report_origin":"https://reports.example.test","engine_digest":engine,"engine_metadata_digest":metadata},
+        "policy":policy,"activation":"off"})
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use crate::public_report::{ExpectedComparison, export_public_report};
@@ -889,8 +907,17 @@ mod tests {
             storage.connection.execute("INSERT INTO app_setup_repositories(app_id,installation_id,repository_id,owner,name,selected_by_user_id,selected_at_s) VALUES(1,2,3,'fixture','app',4,1)",[]).unwrap();
             storage.connection.execute("INSERT INTO app_setup_scopes(app_id,installation_id,repository_id,revision,actor_id,confirmed_at_s,document) VALUES(1,2,3,1,4,1,?1)",[document.to_string()]).unwrap();
             storage.connection.execute("INSERT INTO app_architecture_acceptances(app_id,installation_id,repository_id,scope_revision,actor_id,accepted_at_s,context) VALUES(1,2,3,1,4,1,'{}')",[]).unwrap();
-            // Test-only activation fixture. There is deliberately no production grant writer.
-            storage.connection.execute("INSERT INTO app_execution_grants(app_id,installation_id,repository_id,scope_revision,consent_digest,engine_digest,engine_metadata_digest,policy) VALUES(1,2,3,1,?1,?2,?3,?4)",params![digest(&format!("1:{}",policy.digest().unwrap())),"a".repeat(64),sha256(&canonical_json(&engine()).unwrap()),serde_json::to_string(&policy).unwrap()]).unwrap();
+            let consent = fixture_consent_document(
+                2,
+                &"a".repeat(40),
+                &policy,
+                "{}",
+                &"a".repeat(64),
+                &sha256(&canonical_json(&engine()).unwrap()),
+            );
+            let hash = sha256(&canonical_json(&consent).unwrap());
+            storage.connection.execute("INSERT INTO app_publication_consents(app_id,installation_id,repository_id,revision,actor_id,created_at,document,digest) VALUES(1,2,3,1,4,1,?1,?2)",params![consent.to_string(),hash]).unwrap();
+            storage.connection.execute("INSERT INTO app_execution_grants(app_id,installation_id,repository_id,scope_revision,consent_digest,engine_digest,engine_metadata_digest,policy) VALUES(1,2,3,1,?1,?2,?3,?4)",params![hash,"a".repeat(64),sha256(&canonical_json(&engine()).unwrap()),serde_json::to_string(&policy).unwrap()]).unwrap();
             let queue = AppExecutionQueue::new(storage, 1).unwrap();
             let provider = Provider(RefCell::new(CurrentPullRequest {
                 repository_id: 3,
@@ -1166,6 +1193,13 @@ mod tests {
                 Ok(91)
             }
         }
+        fn update(&self, _: i64, check_id: i64, payload: &Value) -> Result<i64> {
+            if check_id != 91 || !self.visible.get() {
+                return Err(SetupError::Conflict);
+            }
+            self.payload.replace(Some(payload.clone()));
+            Ok(check_id)
+        }
     }
     #[test]
     fn signed_intent_readback_unknown_write_and_restart_recovery() {
@@ -1293,7 +1327,6 @@ mod safeguard_tests {
         let c = rusqlite::Connection::open(f.root.join("state.db")).unwrap();
         let mut policy = f.request.policy.clone();
         policy.repository.id = 5;
-        let consent = digest(&format!("1:{}", policy.digest().unwrap()));
         let mut scope: Value = serde_json::from_str(
             &c.query_row("SELECT document FROM app_setup_scopes", [], |r| {
                 r.get::<_, String>(0)
@@ -1314,8 +1347,18 @@ mod safeguard_tests {
             [f.request.context.to_string()],
         )
         .unwrap();
+        let document = fixture_consent_document(
+            4,
+            &f.request.input.comparison.merge_base,
+            &policy,
+            &f.request.context.to_string(),
+            &f.request.input.engine_digest,
+            &f.request.input.engine_metadata_digest,
+        );
+        let consent = sha256(&canonical_json(&document).unwrap());
+        c.execute("INSERT INTO app_publication_consents(app_id,installation_id,repository_id,revision,actor_id,created_at,document,digest) VALUES(1,4,5,1,4,1,?1,?2)",params![document.to_string(),consent]).unwrap();
         c.execute(
-            "INSERT INTO app_execution_grants VALUES(1,4,5,1,?1,?2,?3,?4,1)",
+            "INSERT INTO app_execution_grants(app_id,installation_id,repository_id,scope_revision,consent_digest,engine_digest,engine_metadata_digest,policy,enabled) VALUES(1,4,5,1,?1,?2,?3,?4,1)",
             params![
                 consent,
                 f.request.input.engine_digest,

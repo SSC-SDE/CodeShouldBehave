@@ -64,3 +64,13 @@ required-features = ["github-app"]
 name = "csb-app-pr-worker"
 path = "src/bin/csb_app_pr_worker.rs"
 required-features = ["github-app"]
+
+[[bin]]
+name = "csb-app-operator"
+path = "src/bin/csb_app_operator.rs"
+required-features = ["github-app"]
+
+[[bin]]
+name = "csb-app-recovery"
+path = "src/bin/csb_app_recovery.rs"
+required-features = ["github-app"]

@@ -3,8 +3,8 @@
 use flowdiff::{
     Storage,
     github_app_setup::{
-        AppDispatchConfig, AppDispatcher, AppExecutionQueue, AppReceiptSigner, AppReportStore,
-        AppRequestBudget, AppSetupHost, AppWebhookInbox, GitHubInstallationBroker,
+        AppDispatchConfig, AppDispatcher, AppExecutionQueue, AppOfflineRecovery, AppReceiptSigner,
+        AppReportStore, AppRequestBudget, AppSetupHost, AppWebhookInbox, GitHubInstallationBroker,
         GitHubWebProvider, HttpsReportReadback, PublicationOperatorPolicy, SandboxPrWorker,
         SandboxPreviewWorker, SetupConfig, app_report_router, router, webhook_router,
     },
@@ -78,12 +78,69 @@ fn options() -> Result<BTreeMap<String, String>, ()> {
                 | "--pr-engine"
                 | "--pr-sha256"
                 | "--dispatch-mode"
+                | "--restore-from"
+                | "--recovery-anchor-file"
+                | "--recovery-anchor-sha256"
+                | "--recovery-receipt-key-file"
+                | "--recovery-safety"
         ) || result.insert(pair[0].clone(), pair[1].clone()).is_some()
         {
             return Err(());
         }
     }
     Ok(result)
+}
+
+/// A restored database is verified before Storage can migrate or serve it. This
+/// one-shot import always boots paused and refuses an existing destination.
+fn restore_state(opts: &BTreeMap<String, String>, state: &Path, app_id: i64) -> Result<(), ()> {
+    let keys = [
+        "--restore-from",
+        "--recovery-anchor-file",
+        "--recovery-anchor-sha256",
+        "--recovery-receipt-key-file",
+        "--recovery-safety",
+    ];
+    if !keys.iter().any(|k| opts.contains_key(*k)) {
+        return Ok(());
+    }
+    if keys.iter().any(|k| !opts.contains_key(*k))
+        || opts
+            .get("--dispatch-mode")
+            .is_some_and(|mode| mode != "paused")
+        || opts.get("--recovery-safety").map(String::as_str) != Some("latest-committed-quiesced")
+    {
+        return Err(());
+    }
+    let public_key = private_bytes(Path::new(&opts["--recovery-receipt-key-file"]), 32)?;
+    if public_key.len() != 32 {
+        return Err(());
+    }
+    AppOfflineRecovery::verify_and_copy(
+        Path::new(&opts["--restore-from"]),
+        state,
+        Path::new(&opts["--recovery-anchor-file"]),
+        &opts["--recovery-anchor-sha256"],
+        app_id,
+        &public_key,
+    )
+    .map_err(|_| ())?;
+    // Import data, not runtime authority. Re-enablement needs a fresh signed
+    // operator activation; budgets, attempts and tombstones remain unchanged.
+    {
+        let imported = rusqlite::Connection::open_with_flags(
+            state.join("state.db"),
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE,
+        )
+        .map_err(|_| ())?;
+        imported
+            .execute("UPDATE app_execution_grants SET enabled=0", [])
+            .map_err(|_| ())?;
+    }
+    std::fs::rename(state.join("state.db"), state.join("app.sqlite")).map_err(|_| ())?;
+    std::fs::File::open(state)
+        .and_then(|f| f.sync_all())
+        .map_err(|_| ())
 }
 async fn run() -> Result<(), ()> {
     let opts = options()?;
@@ -96,6 +153,8 @@ async fn run() -> Result<(), ()> {
     if !state.is_absolute() {
         return Err(());
     }
+    let app_id = get("--app-id")?.parse().map_err(|_| ())?;
+    restore_state(&opts, &state, app_id)?;
     if !state.exists() {
         let mut builder = std::fs::DirBuilder::new();
         #[cfg(unix)]
@@ -116,7 +175,6 @@ async fn run() -> Result<(), ()> {
             return Err(());
         }
     }
-    let app_id = get("--app-id")?.parse().map_err(|_| ())?;
     let config = SetupConfig::new(
         app_id,
         get("--client-id")?.clone(),
@@ -348,6 +406,78 @@ mod tests {
         assert!(secret_file(&linked).is_err());
         std::fs::write(&file, vec![b'x'; 1025]).unwrap();
         assert!(secret_file(&file).is_err());
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
+    #[cfg(unix)]
+    fn verified_import_pauses_grants_and_preserves_nonrefundable_state() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = std::env::temp_dir()
+            .canonicalize()
+            .unwrap()
+            .join(format!("csb-host-restore-{}", std::process::id()));
+        std::fs::create_dir(&root).unwrap();
+        let database = root.join("source.db");
+        let artifacts = root.join("artifacts");
+        let storage = Storage::open(&database, &artifacts).unwrap();
+        let c = rusqlite::Connection::open(&database).unwrap();
+        c.execute_batch("INSERT INTO app_setup_repositories(app_id,installation_id,repository_id,owner,name,selected_by_user_id,selected_at_s) VALUES(1,2,3,'fixture','app',4,1);
+            INSERT INTO app_setup_scopes(app_id,installation_id,repository_id,revision,actor_id,confirmed_at_s,document) VALUES(1,2,3,1,4,1,'{}');
+            INSERT INTO app_architecture_acceptances(app_id,installation_id,repository_id,scope_revision,actor_id,accepted_at_s,context) VALUES(1,2,3,1,4,1,'{}');
+            INSERT INTO app_execution_grants(app_id,installation_id,repository_id,scope_revision,consent_digest,engine_digest,engine_metadata_digest,policy,enabled)
+            VALUES(1,2,3,1,printf('%064x',1),printf('%064x',2),printf('%064x',3),'{}',1);
+            INSERT INTO app_request_budgets VALUES(1,'job:fixture',123);").unwrap();
+        drop(c);
+        let queue = AppExecutionQueue::new(storage, 1).unwrap();
+        let pkcs8 =
+            ring::signature::Ed25519KeyPair::generate_pkcs8(&ring::rand::SystemRandom::new())
+                .unwrap();
+        let signer = AppReceiptSigner::from_pkcs8(pkcs8.as_ref()).unwrap();
+        let backup = root.join("backup");
+        let anchor = queue
+            .create_recovery_backup(&backup, &artifacts, &signer)
+            .unwrap();
+        drop(queue);
+        let public_key = root.join("receipt.pub");
+        std::fs::write(&public_key, signer.public_key()).unwrap();
+        std::fs::set_permissions(&public_key, std::fs::Permissions::from_mode(0o600)).unwrap();
+        let destination = root.join("imported");
+        let mut opts = BTreeMap::from([
+            ("--restore-from".into(), backup.to_str().unwrap().into()),
+            (
+                "--recovery-anchor-file".into(),
+                backup.join("anchor.json").to_str().unwrap().into(),
+            ),
+            ("--recovery-anchor-sha256".into(), anchor.digest().unwrap()),
+            (
+                "--recovery-receipt-key-file".into(),
+                public_key.to_str().unwrap().into(),
+            ),
+            (
+                "--recovery-safety".into(),
+                "latest-committed-quiesced".into(),
+            ),
+            ("--dispatch-mode".into(), "consented".into()),
+        ]);
+        assert!(restore_state(&opts, &destination, 1).is_err());
+        assert!(!destination.exists());
+        opts.insert("--dispatch-mode".into(), "paused".into());
+        restore_state(&opts, &destination, 1).unwrap();
+        let c = rusqlite::Connection::open(destination.join("app.sqlite")).unwrap();
+        assert_eq!(
+            c.query_row("SELECT enabled FROM app_execution_grants", [], |r| r
+                .get::<_, i64>(0))
+                .unwrap(),
+            0
+        );
+        assert_eq!(
+            c.query_row("SELECT used FROM app_request_budgets", [], |r| r
+                .get::<_, i64>(0))
+                .unwrap(),
+            123
+        );
+        assert!(restore_state(&opts, &destination, 1).is_err());
+        drop(c);
         std::fs::remove_dir_all(root).unwrap();
     }
 }

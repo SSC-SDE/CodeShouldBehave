@@ -113,8 +113,16 @@ impl<P: GitHubSetupProvider> AppSetupHost<P> {
                 .publication_policy
                 .as_ref()
                 .is_some_and(|p| serde_json::to_value(p).ok().as_ref() == Some(&doc["operator"]));
+        let authorized = current
+            && !revoked
+            && execution::operator_authorized(
+                &s.connection,
+                self.config.app_id,
+                installation,
+                repository,
+            )?;
         Ok(
-            json!({"consent_revision":revision,"publication_consent":!revoked&&current,"revoked":revoked,"scope_current":current,"activation":"off"}),
+            json!({"consent_revision":revision,"publication_consent":!revoked&&current,"revoked":revoked,"scope_current":current,"activation":if authorized {"operator_authorized"} else {"off"},"runtime_status":"unknown"}),
         )
     }
     pub fn preview_publication_consent(

@@ -59,6 +59,8 @@ impl AppDispatcher {
         if !self.queue.has_enabled_repository()? {
             return Ok(DispatchOutcome::Inactive);
         }
+        // Discovery/status faults must not starve already-admitted deterministic work.
+        let mut auxiliary_deferred = self.queue.discover_one(&self.budget, &self.broker).is_err();
         if let Some(n) = self.inbox.claim()? {
             let target = if n.pr_number.is_some() {
                 n.pr_number
@@ -109,6 +111,9 @@ impl AppDispatcher {
                 let _ = self.inbox.finish(&n);
             }
         }
+        if let Some(id) = self.queue.pending_progress()? {
+            auxiliary_deferred |= self.progress(&id).is_err();
+        }
         let lease = if self.queue.analysis_turn()? {
             self.queue.claim()?
         } else {
@@ -129,8 +134,16 @@ impl AppDispatcher {
             Some(lease) => Some(lease),
             None => self.queue.claim()?,
         }) else {
-            return self.repair_one();
+            let outcome = self.repair_one()?;
+            return Ok(if auxiliary_deferred && outcome == DispatchOutcome::Idle {
+                DispatchOutcome::Deferred
+            } else {
+                outcome
+            });
         };
+        // A failed status write never blocks the scoped native analysis. The
+        // durable progress outbox and normal final delivery repair the same check.
+        let _ = self.progress(&lease.input.id()?);
         let result = (|| {
             let (policy, context) = self.queue.work_configuration(&lease)?;
             self.budget
@@ -196,6 +209,16 @@ impl AppDispatcher {
             Ok(_) | Err(SetupError::Conflict) => Ok(DispatchOutcome::Idle),
             Err(e) => Err(e),
         }
+    }
+    fn progress(&self, id: &str) -> Result<()> {
+        let (input, policy) = self.queue.progress_configuration(id)?;
+        self.budget.reserve(input.installation_id, id, 12, false)?;
+        let _requests = self.broker.begin_pass(12)?;
+        let session = self
+            .broker
+            .session(input.installation_id, &policy.repository)?;
+        self.queue.deliver_progress(id, &session, &session)?;
+        Ok(())
     }
     fn deliver(&self, id: &str) -> Result<()> {
         let (input, policy) = self

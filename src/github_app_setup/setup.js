@@ -28,7 +28,7 @@
     if(inventory)hidden('scope',false);
     if ([401,403].includes(error.status)) { clear(); hidden('login',false); hidden('logout',false); }
     if (error.status===409) { inventory=null; $('preview').disabled=true; }
-    $('error').textContent=message(error); hidden('error',false); status('Setup needs attention. Checks remain off.');
+    $('error').textContent=message(error); hidden('error',false); status('Setup needs attention. Runtime status is not available here.');
   }
   async function run(action) {
     if (busy) return;
@@ -58,7 +58,7 @@
     inventory={...value.inventory,blocked:new Set(value.automatically_excluded)};revision=value.saved?.revision||0;
     $('scope-title').textContent=`2. Choose paths · ${selected.owner}/${selected.name}`;
     $('revision').textContent=`${inventory.default_branch} · ${inventory.commit}`;
-    $('saved-status').textContent=value.saved?`Saved revision ${revision} · ${value.saved.document.commit} · checks off`:'No scope saved yet.';
+    $('saved-status').textContent=value.saved?`Saved revision ${revision} · ${value.saved.document.commit} · scope record only`:'No scope saved yet.';
     if(restore) {$('include').value=value.saved?.document.include.join('\n')||'';$('exclude').value=value.saved?.document.exclude.join('\n')||'';}
     $('selected-name').textContent=`${selected.owner}/${selected.name}`;hidden('selected-repo',false);hidden('picker',true);hidden('scope',false);renderPaths();$('scope-title').focus();status('Choose paths. No file contents have been read.');if(value.saved&&sourceAvailable&&resume){hidden('scope',true);hidden('complete',false);hidden('source-consent',false);$('receipt').textContent=`${selected.owner}/${selected.name} · revision ${revision} · ${value.saved.document.commit}`;const accepted=await api('architecture/status',identity());if(accepted.architecture_confirmed){await showArchitectureSaved(accepted);}}
   }
@@ -66,7 +66,7 @@
     clear();const capability=await api('capability');sourceAvailable=capability.source_preview_available===true;publicationAvailable=capability.publication_consent_available===true;
     if(!capability.available) {hidden('login',true);hidden('logout',true);$('connection-detail').textContent='Hosted setup is not configured. No sign-in, repository scan or activation is available on this server.';status('Setup unavailable · checks off');return;}
     hidden('login',false);$('connection-detail').textContent=(params.has('auth_error')?'Authorization was not completed. Sign in again. ':'')+'Only installed public repositories you administer are available.';
-    try {const value=await api('repositories');repositories=value.repositories;document.body.classList.add('ready');hidden('login',true);hidden('logout',false);hidden('picker',false);renderRepositories();status('Select a repository. Checks remain off.');} catch(error) {if(error.status===401){status('Sign in to choose an installed repository.');return;}throw error;}
+    try {const value=await api('repositories');repositories=value.repositories;document.body.classList.add('ready');hidden('login',true);hidden('logout',false);hidden('picker',false);renderRepositories();status('Select a repository. Setup does not activate checks.');} catch(error) {if(error.status===401){status('Sign in to choose an installed repository.');return;}throw error;}
     if(hint&&/^\d+$/.test(hint)) {repositories.sort((a,b)=>Number(String(b.installation_id)===hint)-Number(String(a.installation_id)===hint));renderRepositories();}
   }
   const params=new URLSearchParams(location.search), hint=params.get('installation_id');
@@ -95,10 +95,22 @@
   $('revise').addEventListener('click',()=>run(()=>load(true)));
   const chooseAnother=()=>{invalidate();selected=inventory=null;hidden('scope',true);hidden('selected-repo',true);hidden('picker',false);$('repo-search').focus();};
   $('another').addEventListener('click',chooseAnother);$('change-repository').addEventListener('click',chooseAnother);
-  $('logout').addEventListener('click',()=>run(async()=>{clear();await api('logout',{});hidden('logout',true);hidden('login',false);status('Signed out. Checks remain off.');}));
+  $('logout').addEventListener('click',()=>run(async()=>{clear();await api('logout',{});hidden('logout',true);hidden('login',false);status('Signed out of setup. Existing operator permissions are unchanged.');}));
 
   function syncArchitecture(){$('accept-architecture').disabled=busy||!architecture||!architecture.result.components.length||!$('architecture-gaps-ack').checked||!$('architecture-defer').checked;}
-  async function showArchitectureSaved(value){hidden('publication',!publicationAvailable);hidden('complete',true);hidden('architecture-review',true);hidden('architecture-saved',false);$('architecture-receipt').textContent=`${selected.owner}/${selected.name} · scope revision ${value.scope_revision} · ${value.commit||inventory?.commit||""} · publication is a separate permission`;$('architecture-saved-title').focus();status('Architecture saved. Checks remain off.');if(publicationAvailable){const consent=await api('publication/status',identity());$('publication-status').textContent=consent.publication_consent?`Consent revision ${consent.consent_revision} saved. Checks remain off pending operator activation.`:'No current publication consent.';}}
+  async function showArchitectureSaved(value){
+    hidden('publication',!publicationAvailable);hidden('complete',true);hidden('architecture-review',true);hidden('architecture-saved',false);
+    $('architecture-receipt').textContent=`${selected.owner}/${selected.name} · scope revision ${value.scope_revision} · ${value.commit||inventory?.commit||""} · publication is a separate permission`;
+    $('architecture-saved-title').focus();status('Architecture acceptance recorded. Runtime status is separate.');
+    if(publicationAvailable){
+      const consent=await api('publication/status',identity());
+      $('publication-status').textContent=consent.publication_consent
+        ? consent.activation==='operator_authorized'
+          ? `Consent revision ${consent.consent_revision} saved. Operator authorization recorded; runtime availability is unknown here.`
+          : `Consent revision ${consent.consent_revision} saved. Checks remain off pending operator activation.`
+        : 'No current publication consent.';
+    }
+  }
   $('scan-consent').addEventListener('change',()=>{$('scan-source').disabled=busy||!sourceAvailable||!$('scan-consent').checked;});
   for(const id of ['architecture-gaps-ack','architecture-defer'])$(id).addEventListener('change',syncArchitecture);
   $('scan-source').addEventListener('click',()=>run(async()=>{

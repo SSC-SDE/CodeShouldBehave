@@ -39,6 +39,15 @@ impl Fixture {
         )
     }
     fn with_scope(proposed_source: &str, unchanged_source: &str, scope_version: &str) -> Self {
+        Self::with_scope_from_baseline(proposed_source, unchanged_source, |_| {
+            scope_version.to_owned()
+        })
+    }
+    fn with_scope_from_baseline(
+        proposed_source: &str,
+        unchanged_source: &str,
+        scope_version: impl FnOnce(&str) -> String,
+    ) -> Self {
         let root = std::env::temp_dir().join(format!(
             "csb-public-{}-{}",
             std::process::id(),
@@ -86,6 +95,7 @@ impl Fixture {
         git(&["add", "."]);
         git(&["commit", "-qm", "baseline"]);
         let baseline = git(&["rev-parse", "HEAD"]);
+        let scope_version = scope_version(&baseline);
         fs::write(root.join("src/lib.rs"), proposed_source).unwrap();
         git(&["add", "."]);
         git(&["commit", "--allow-empty", "-qm", "proposal"]);
@@ -98,7 +108,7 @@ impl Fixture {
         )
         .unwrap();
         let scope = ScopeRecord {
-            version: ScopeVersion::new(scope_version).unwrap(),
+            version: ScopeVersion::new(scope_version.as_str()).unwrap(),
             primary_repository: repository,
             primary_paths: PathScope::new(vec![".".into()], vec!["private".into()]).unwrap(),
             contexts: vec![],
@@ -677,12 +687,17 @@ fn app_signed_delivery_preserves_real_hld_lld_and_exact_source_routes() {
     };
     use std::cell::RefCell;
     let policy:PublicPolicy=serde_json::from_value(json!({"schema_version":"csb-public-policy-v1","repository":{"id":42,"owner":"fixture","name":"public"},"public":true,"publication_consent":true,"include":["."],"exclude":["private"],"baseline_mode":"merge_base","max_details":100})).unwrap();
-    let consent = sha256(format!("1:{}", policy.digest().unwrap()).as_bytes());
-    let version = format!("app-scope-v1:1:2:42:1:{consent}");
-    let mut f = Fixture::with_scope(
+    let metadata = json!({"package":"flowdiff","version":env!("CARGO_PKG_VERSION"),"hld_generator":flowdiff::design::HLD_GENERATOR_VERSION,"lld_generator":flowdiff::lld::LLD_GENERATOR_VERSION,"lld_parser":flowdiff::lld::LLD_IR_VERSION,"public_projection":flowdiff::public_report::PUBLIC_SCHEMA});
+    let mut consent_document = Value::Null;
+    let mut consent = String::new();
+    let mut f = Fixture::with_scope_from_baseline(
         "pub fn guard(n:i32)->i32 { if n > 5 { return 3; } 0 }\n",
         "",
-        &version,
+        |baseline| {
+            consent_document = json!({"schema":"csb-app-publication-consent-v1","app_id":1,"installation_id":2,"repository_id":42,"actor_id":4,"scope_revision":1,"scope_commit":baseline,"context_digest":sha256(b"{}"),"operator":{"report_origin":"https://reports.example.test","engine_digest":"c".repeat(64),"engine_metadata_digest":sha256(&canonical_json(&metadata).unwrap())},"policy":policy});
+            consent = sha256(&canonical_json(&consent_document).unwrap());
+            format!("app-scope-v1:1:2:42:1:{consent}")
+        },
     );
     f.policy = policy.clone();
     let bundle = export_public_report(&f.artifact, &f.policy, &f.expected).unwrap();
@@ -698,6 +713,7 @@ fn app_signed_delivery_preserves_real_hld_lld_and_exact_source_routes() {
     let scope = json!({"schema":"csb-app-scope-v1","installation_id":2,"repository_id":42,"commit":f.expected.baseline,"tree":"a".repeat(40),"default_branch":"main","include":["."],"exclude":["private"],"files":["src/lib.rs"],"rust_candidates":1,"unsupported_files":0,"automatically_excluded":1,"inventory_fingerprint":"b".repeat(64),"sensitive_path_policy":"v1","source_scanned":false,"architecture_confirmed":false,"publication_consent":false});
     conn.execute("INSERT INTO app_setup_scopes(app_id,installation_id,repository_id,revision,actor_id,confirmed_at_s,document) VALUES(1,2,42,1,4,1,?1)",[scope.to_string()]).unwrap();
     conn.execute("INSERT INTO app_architecture_acceptances(app_id,installation_id,repository_id,scope_revision,actor_id,accepted_at_s,context) VALUES(1,2,42,1,4,1,'{}')",[]).unwrap();
+    conn.execute("INSERT INTO app_publication_consents(app_id,installation_id,repository_id,revision,actor_id,created_at,document,digest) VALUES(1,2,42,1,4,1,?1,?2)",rusqlite::params![consent_document.to_string(),consent]).unwrap();
     conn.execute("INSERT INTO app_execution_grants(app_id,installation_id,repository_id,scope_revision,consent_digest,engine_digest,engine_metadata_digest,policy,enabled) VALUES(1,2,42,1,?1,?2,?3,?4,1)",rusqlite::params![consent,"c".repeat(64),sha256(&canonical_json(&bundle.manifest.engine).unwrap()),serde_json::to_string(&policy).unwrap()]).unwrap();
     struct Provider(CurrentPullRequest);
     impl AppExecutionProvider for Provider {
@@ -715,6 +731,13 @@ fn app_signed_delivery_preserves_real_hld_lld_and_exact_source_routes() {
             self.0.replace(Some(payload.clone()));
             Ok(99)
         }
+        fn update(&self, _: i64, id: i64, payload: &Value) -> Result<i64, SetupError> {
+            if id != 99 {
+                return Err(SetupError::Conflict);
+            }
+            self.0.replace(Some(payload.clone()));
+            Ok(id)
+        }
     }
     let provider = Provider(CurrentPullRequest {
         repository_id: 42,
@@ -728,7 +751,10 @@ fn app_signed_delivery_preserves_real_hld_lld_and_exact_source_routes() {
     let queue = AppExecutionQueue::new(storage, 1).unwrap();
     let id = queue.reconcile(2, 42, 7, &provider).unwrap().unwrap();
     let lease = queue.claim().unwrap().unwrap();
-    assert_eq!(lease.input.scope_version(), version);
+    assert_eq!(
+        lease.input.scope_version(),
+        format!("app-scope-v1:1:2:42:1:{consent}")
+    );
     let key = AppReceiptSigner::from_pkcs8(
         ring::signature::Ed25519KeyPair::generate_pkcs8(&ring::rand::SystemRandom::new())
             .unwrap()

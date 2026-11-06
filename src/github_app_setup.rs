@@ -3,7 +3,8 @@
 //! This module saves inactive scope/context and supports explicit bounded source
 //! preview with an operator-configured isolated worker. The optional execution
 //! integration supplies an opt-in paused host dispatcher and separate report
-//! listener. No execution grants or production consent writer are created.
+//! listener. Browser consent never enables a grant; only the separately authorized
+//! operator process can do so after verifying independent qualification evidence.
 //! A host must explicitly supply a trusted GitHub web-auth provider to mount it.
 //! The existing local device-login broker is not a hosted identity authority.
 use crate::Storage;
@@ -61,11 +62,17 @@ mod installation;
 #[cfg(feature = "github-app")]
 mod provider;
 #[cfg(feature = "github-app")]
+pub use execution::activation::*;
+#[cfg(feature = "github-app")]
+pub use execution::recovery::*;
+#[cfg(feature = "github-app")]
 pub use execution::{
     AnalysisInput, AnalysisLease, AppCheckDelivery, AppExecutionProvider, AppExecutionQueue,
     AppReceiptSigner, SignedAppReceipt,
 };
 pub use http::{disabled_router, router};
+#[cfg(feature = "github-app")]
+pub use installation::activation::BrokerActivationProvider;
 #[cfg(feature = "github-app")]
 pub use installation::{
     CurrentPullRequest, GitHubInstallationBroker, InstallationCredential, InstallationSession,

@@ -16,6 +16,7 @@ struct Api {
     comparison: Mutex<CurrentPullRequest>,
     calls: AtomicUsize,
     checks: Mutex<Vec<Value>>,
+    discover_existing: AtomicBool,
 }
 impl Transport for Arc<Api> {
     fn request(
@@ -42,6 +43,15 @@ impl Transport for Arc<Api> {
                 )
             }
             ("GET", "/repos/fixture/app") => Ok(json!({"id":3,"private":false,"archived":false})),
+            ("GET", _) if path.starts_with("/repos/fixture/app/pulls?") => {
+                if self.discover_existing.load(Ordering::SeqCst) && path.ends_with("&page=1") {
+                    Ok(
+                        json!([{"number":7,"state":"open","draft":false,"base":{"repo":{"id":3}},"head":{"repo":{"id":3,"private":false}}}]),
+                    )
+                } else {
+                    Ok(json!([]))
+                }
+            }
             ("GET", "/repos/fixture/app/pulls/7") => Ok(
                 json!({"number":7,"state":"open","draft":false,"base":{"sha":c.selected_base,"repo":{"id":3}},"head":{"sha":c.head,"repo":{"id":3,"private":false}}}),
             ),
@@ -58,6 +68,21 @@ impl Transport for Arc<Api> {
                 value["app"] = json!({"id":1});
                 self.checks.lock().unwrap().push(value.clone());
                 Ok(value)
+            }
+            ("GET", "/repos/fixture/app/check-runs/99") => self
+                .checks
+                .lock()
+                .unwrap()
+                .first()
+                .cloned()
+                .ok_or(SetupError::Unavailable),
+            ("PATCH", "/repos/fixture/app/check-runs/99") => {
+                let mut checks = self.checks.lock().unwrap();
+                let check = checks.first_mut().ok_or(SetupError::Conflict)?;
+                for (key, value) in body.unwrap().as_object().unwrap() {
+                    check[key] = value.clone();
+                }
+                Ok(check.clone())
             }
             ("GET", _) => self
                 .objects
@@ -138,6 +163,7 @@ impl Harness {
             comparison: Mutex::new(f.request.input.comparison.clone()),
             calls: AtomicUsize::new(0),
             checks: Mutex::new(vec![]),
+            discover_existing: AtomicBool::new(false),
         });
         let ephemeral = std::process::Command::new("openssl")
             .args([
@@ -208,10 +234,11 @@ fn notification_to_native_analysis_signed_report_and_check_requires_successful_r
     assert_eq!(h.api.calls.load(Ordering::SeqCst), 0);
     h.sql("UPDATE app_execution_grants SET enabled=1");
     assert_eq!(h.dispatcher.tick().unwrap(), DispatchOutcome::Analyzed);
-    assert!(h.api.checks.lock().unwrap().is_empty());
+    assert_eq!(h.api.checks.lock().unwrap()[0]["status"], "in_progress");
     h.readback.fail.store(true, Ordering::SeqCst);
     assert_eq!(h.dispatcher.tick().unwrap(), DispatchOutcome::Deferred);
-    assert!(h.api.checks.lock().unwrap().is_empty());
+    assert_eq!(h.api.checks.lock().unwrap()[0]["status"], "in_progress");
+    assert!(h.api.checks.lock().unwrap()[0]["details_url"].is_null());
     h.sql("UPDATE app_analysis_jobs SET available_at=0");
     h.readback.fail.store(false, Ordering::SeqCst);
     assert_eq!(h.dispatcher.tick().unwrap(), DispatchOutcome::Delivered);
@@ -235,7 +262,14 @@ fn consent_revoked_during_native_analysis_never_stages_or_delivers() {
     h.worker.revoke.store(true, Ordering::SeqCst);
     assert!(h.dispatcher.tick().is_err());
     assert_eq!(h.dispatcher.tick().unwrap(), DispatchOutcome::Inactive);
-    assert!(h.api.checks.lock().unwrap().is_empty());
+    assert!(
+        h.api
+            .checks
+            .lock()
+            .unwrap()
+            .iter()
+            .all(|c| c["status"] != "completed" && c["details_url"].is_null())
+    );
     let db = rusqlite::Connection::open(h.f.root.join("state.db")).unwrap();
     assert_eq!(
         db.query_row("SELECT count(*) FROM app_report_intents", [], |r| r
@@ -255,7 +289,9 @@ fn delivery_has_three_durable_attempts_and_broker_requires_reserved_pass() {
         assert_eq!(h.dispatcher.tick().unwrap(), DispatchOutcome::Deferred);
     }
     assert_eq!(h.dispatcher.tick().unwrap(), DispatchOutcome::Idle);
-    assert!(h.api.checks.lock().unwrap().is_empty());
+    assert_eq!(h.api.checks.lock().unwrap()[0]["status"], "completed");
+    assert_eq!(h.api.checks.lock().unwrap()[0]["conclusion"], "failure");
+    assert!(h.api.checks.lock().unwrap()[0]["details_url"].is_null());
     let c = rusqlite::Connection::open(h.f.root.join("state.db")).unwrap();
     assert_eq!(
         c.query_row("SELECT state FROM app_analysis_jobs", [], |r| r
@@ -282,6 +318,7 @@ fn broker_never_sends_a_request_without_remaining_tickets() {
         comparison: Mutex::new(f.request.input.comparison.clone()),
         calls: AtomicUsize::new(0),
         checks: Mutex::new(vec![]),
+        discover_existing: AtomicBool::new(false),
     });
     let mut broker =
         GitHubInstallationBroker::new(1, "client123".into(), &ephemeral.stdout).unwrap();
@@ -338,4 +375,25 @@ fn idle_reconciliation_repairs_tracked_head_changes_without_replaying_checks() {
     n.check_id = Some(99);
     n.installation_id = 4;
     assert!(q.tracked_check(&n).unwrap().is_none());
+}
+
+#[test]
+fn missed_first_webhook_is_discovered_analyzed_and_delivered_without_an_event() {
+    let h = Harness::new();
+    h.sql("DELETE FROM app_webhook_inbox");
+    h.api.discover_existing.store(true, Ordering::SeqCst);
+    assert_eq!(h.dispatcher.tick().unwrap(), DispatchOutcome::Idle);
+    assert_eq!(h.dispatcher.tick().unwrap(), DispatchOutcome::Analyzed);
+    assert_eq!(h.dispatcher.tick().unwrap(), DispatchOutcome::Delivered);
+    let checks = h.api.checks.lock().unwrap();
+    assert_eq!(checks.len(), 1);
+    assert_eq!(checks[0]["status"], "completed");
+    assert_eq!(checks[0]["head_sha"], h.f.request.input.comparison.head);
+    assert_eq!(checks[0]["conclusion"], "neutral");
+    assert!(
+        checks[0]["details_url"]
+            .as_str()
+            .unwrap()
+            .contains("mode=focus&design=hld")
+    );
 }

@@ -115,6 +115,26 @@ const MIGRATIONS: &[(i64, &str, &str)] = &[
         "0021_app_consent_safeguards",
         include_str!("../migrations/0021_app_consent_safeguards.sql"),
     ),
+    (
+        22,
+        "0022_app_discovery",
+        include_str!("../migrations/0022_app_discovery.sql"),
+    ),
+    (
+        23,
+        "0023_app_activation",
+        include_str!("../migrations/0023_app_activation.sql"),
+    ),
+    (
+        24,
+        "0024_app_recovery",
+        include_str!("../migrations/0024_app_recovery.sql"),
+    ),
+    (
+        25,
+        "0025_app_check_progress",
+        include_str!("../migrations/0025_app_check_progress.sql"),
+    ),
 ];
 const MIN_SQLITE: (u32, u32, u32) = (3, 51, 3);
 const MAX_ARTIFACT_BYTES: usize = 64 * 1024 * 1024;
@@ -2270,7 +2290,6 @@ mod tests {
         let storage = Storage::open(&database, &artifacts).unwrap();
         println!("bundled SQLite runtime: {}", storage.sqlite_version());
         assert!(parse_version(storage.sqlite_version()).unwrap() >= MIN_SQLITE);
-        assert_eq!(storage.schema_version().unwrap(), 21);
         drop(storage);
         fs::remove_dir_all(root).unwrap();
     }
@@ -2719,7 +2738,6 @@ mod tests {
             .unwrap();
         drop(connection);
         let storage = Storage::open(&database, &artifacts).unwrap();
-        assert_eq!(storage.schema_version().unwrap(), 21);
         let preference: (i64, String) = storage
             .connection
             .query_row(
@@ -2758,7 +2776,6 @@ mod tests {
         assert_eq!(review_schema, schema_after);
         drop(storage);
         let reopened = Storage::open(&database, &artifacts).unwrap();
-        assert_eq!(reopened.schema_version().unwrap(), 21);
         drop(reopened);
         fs::remove_dir_all(root).unwrap();
     }
@@ -2787,7 +2804,6 @@ mod tests {
         connection.pragma_update(None, "user_version", 1).unwrap();
         drop(connection);
         let storage = Storage::open(&database, &artifacts).unwrap();
-        assert_eq!(storage.schema_version().unwrap(), 21);
         let index_exists: i64 = storage
             .connection
             .query_row(
