@@ -756,3 +756,8 @@ is claimed; deployed release still predates these fixes.
   passed. The real HLD/LLD fixture retained exact baseline/proposal source bytes
   through signed intent, readback and a captured check payload. No live GitHub
   installation token, check write, public upload or browser E2E run is claimed.
+- Implementation commit: `cd0f8154fe1f01cb1973a849f65391ee6c48ba04`.
+  Committed source-distribution scan: 367 files, zero secret-pattern findings.
+  Dependency versions/license inventory are unchanged; `ring` is now an optional
+  direct dependency using its existing locked version. PR #32 remains draft;
+  this checkpoint does not claim full APP-3/APP-4 acceptance.
