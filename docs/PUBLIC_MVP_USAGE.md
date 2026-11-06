@@ -6,25 +6,45 @@ HLD → component → LLD declaration/function → exact baseline/proposal sourc
 The same dark workspace provides combined, before/after and split/unified views.
 
 **Open source · MIT · experimental.** Created by Shankhya Subhra Chatterjee,
-with contributor attribution retained in [LICENSE](LICENSE). Development,
+with contributor attribution retained in [LICENSE](../LICENSE). Development,
 issues and contributions belong in the public
 [CodeShouldBehave repository](https://github.com/SSC-SDE/CodeShouldBehave).
 
-The [Linux x86_64 experimental release](https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-2917f1bb352b)
-is built and signed; checksums and release bootstrap verification passed.
-Native sandbox startup for this release and the live PR-to-dashboard journey
-remain pending. Automatic PR analysis and a hosted dashboard are **not enabled
-by cloning this repository**. See [release status](docs/RELEASE_STATUS.md).
+## Current status
 
-After one-time maintainer setup and activation, opening, reopening or updating a
-PR is intended to trigger analysis automatically. Reviewers follow the check's
-Details link without terminal commands, API keys or a local server.
+The repository's **Actions → Architecture check → hosted Focus dashboard** demo
+is working. [PR #24's check](https://github.com/SSC-SDE/CodeShouldBehave/runs/127446113035)
+was followed in-browser through HLD, LLD and exact baseline/proposal source diffs.
+[Controller 42083656278](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/42083656278)
+passed publication and check delivery; its application REST audit used 71/100 calls.
+This is own-repository acceptance, not a general hosted-service or capacity claim.
+
+The deployed [signed Linux release](https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-c46c28a509b6)
+passed signature, checksum, production bootstrap and native sandbox verification.
+See [release evidence](RELEASE_STATUS.md).
+
+| Installation | Status | Maintainer setup | Reviewer entry |
+| --- | --- | --- | --- |
+| Repository Actions + Pages | Working on this repository; available for reviewed public-repo setup | Confirm paths/components, prepare pinned config/workflows, configure Pages and budget controls, approve activation | Architecture check → Open CodeShouldBehave report → Focus |
+| GitHub App install-and-confirm | In development; not available for installation yet | Target: install App, choose repo, preview/confirm scope in browser | Automatic App check → Focus |
+
+Cloning the project or installing the registered App alone does not currently
+activate checks in another repository. The [App onboarding plan](GITHUB_APP_ONBOARDING_PLAN.md)
+defines the simpler target and its hosted-service, scope, security and cost gates.
+The existing public CI profile needs no reviewer terminal, API key or local server.
+
+The App implementation includes OAuth/PKCE, a browser repository picker and
+versioned path-scope confirmation with checks off. Source scanning, architecture
+acceptance and automatic App checks are not yet connected or activated.
+See the [development checkpoint](APP_ONBOARDING_DEVELOPMENT.md) and
+[$0 hosting assessment](APP_HOSTING_OPTIONS.md) for current limits.
 
 ## Reviewer journey
 
-1. After repository activation, open the exact Architecture check on the PR
-   revision you want to review. Details opens **Focus** with the pinned report;
-   direct dashboard entry opens **Standard**.
+1. After repository activation, open **CodeShouldBehave / Architecture** on the
+   PR revision, then **Open CodeShouldBehave report** in its summary. GitHub may
+   route Details to its own check page. The report link opens **Focus** with the
+   pinned comparison; direct dashboard entry opens **Standard**.
 2. Verify repository, baseline and proposal commits. The link pins both analysis
    and public export identities; a newer PR head does not change that report.
 3. Open **Architecture diff**, inspect HLD direction/component changes and choose
@@ -55,7 +75,7 @@ clears them. They are not shared reviewer state, GitHub approval or a privacy
 boundary between projects on the same Pages origin. Feedback exports locally;
 nothing is automatically sent to another person or analytics provider.
 
-## Maintainer installation contract
+## Install on another public repository today
 
 This profile is for **one opted-in public repository**. Setup requires a
 base-owned public path policy, confirmed component context, immutable analyzer
@@ -66,8 +86,15 @@ external services are outside the initial public context.
 Installation templates live under `templates/public-ci/`; they are not active
 workflows merely because the source exists. The installer must reject unresolved
 pins, missing context, invalid activation proof or disabled live-write consent.
-The final installation walkthrough records actual release digests, repo ID and
-Pages URL rather than asking a reviewer to enter host/PR values repeatedly.
+Use the [maintainer setup guide](../templates/public-ci/README.md)
+for preparation and activation. Generate the new repository's own confirmed
+context and policy; do not copy this repository's IDs, consent, budget evidence
+or receipt history. Review the installation diff before enabling it. If that
+repository already has a Pages site, resolve the hosting conflict first.
+
+The planned App route moves this work into the service. It needs a real backend
+and isolated workers; free static hosting alone cannot provide it. No hosted
+App service or new spending is activated by this implementation.
 
 GitHub Actions produces this profile's check. It does not impersonate the
 registered CodeShouldBehave GitHub App. A complete check is advisory and does
@@ -160,13 +187,13 @@ canary activation require a separately reviewed manifest and final approval.
 ## Contributing and licensing
 
 Use branches and pull requests against this public repository. Read
-[CONTRIBUTING.md](CONTRIBUTING.md) and report vulnerabilities privately using
-[SECURITY.md](SECURITY.md). Earlier private development history is not part of
+[CONTRIBUTING.md](../CONTRIBUTING.md) and report vulnerabilities privately using
+[SECURITY.md](../SECURITY.md). Earlier private development history is not part of
 this public repository and is not needed to contribute.
 
 Project code is MIT licensed; retain copyright and license notices when
 redistributing. Dependencies and bundled fonts retain their own licenses; see
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) and [font notices](src/fonts/README.md).
+[THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md) and [font notices](../src/fonts/README.md).
 
 ### Preserve the activated budget identity during release refreshes
 

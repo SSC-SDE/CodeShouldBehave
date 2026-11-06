@@ -9,6 +9,8 @@ pub mod design;
 pub mod design_storage;
 mod git;
 #[cfg(feature = "server")]
+pub mod github_app_setup;
+#[cfg(feature = "server")]
 mod github_check;
 #[cfg(feature = "server")]
 mod http;

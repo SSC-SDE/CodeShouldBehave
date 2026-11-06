@@ -47,3 +47,8 @@ by a historical passing lifecycle report.
 The public source and experimental Linux release are available at
 [CodeShouldBehave](https://github.com/SSC-SDE/CodeShouldBehave). Local browser
 results do not establish automatic PR workflow or hosted dashboard acceptance.
+
+The upstream hosted demo has separate [live acceptance evidence](../../docs/RELEASE_STATUS.md)
+through PR #30. That does not change the local-only meaning of these helpers.
+App installation and automatic provisioning are [planned](../../docs/GITHUB_APP_ONBOARDING_PLAN.md),
+not capabilities supplied by this browser harness.

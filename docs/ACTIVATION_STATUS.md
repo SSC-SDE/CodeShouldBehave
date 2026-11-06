@@ -1,5 +1,12 @@
 # Activation checkpoint
 
+**Current status (November 6, 2026 IST):** the Actions/Pages installation is active
+and the live check-to-Focus/HLD/LLD/source journey passed. See
+[release evidence](RELEASE_STATUS.md) and [current usage](PUBLIC_MVP_USAGE.md).
+The October 25 text below is retained as historical preparation evidence, not
+current installation instructions. GitHub App provisioning is a separate
+[proposed plan](GITHUB_APP_ONBOARDING_PLAN.md).
+
 Owner requested activation on 2026-10-25 after merging PR #7 at
 `0e5403557bf36bb01aede19eb0d28062dbf93716`.
 
