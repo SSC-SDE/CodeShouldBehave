@@ -55,9 +55,29 @@ Original UI evidence at `5df2e62` (retained in `CodeShouldBehave-public/target/`
   8.92:1 dark. Final desktop/mobile captures and Lighthouse JSON are retained
   under ignored `target/landing-final-*` and `target/landing-lighthouse-*-final.json`.
 
-The isolated landing-only tree requires its own publication tests and runtime
-smoke; the earlier eight-binary App package is not this release's artifact.
-Image provenance and preview commands are in
+Landing-only publication evidence:
+
+- Pushed implementation commit `914254fc727980eb345ef756524e1858d13dd476`
+  to `codex/public-landing`; GitHub's ref API confirmed that exact identity.
+  No App continuation commits were pushed and PR #32 remains unchanged.
+- Re-ran all 121 public Python tests on the isolated main-based tree: pass,
+  no skips. Existing HTTPError cleanup ResourceWarnings remain visible.
+- A clean-source Rust 1.87 macOS release build produced the existing three
+  public-profile binaries, with 108 locked license packages and zero findings
+  under the declared credential-pattern rules (not exhaustive detection).
+  Local source archive SHA-256:
+  `d42bd32c8e578cc21c105d64c0750904460fb56bb518f956f794cc0369b4d656`;
+  runtime archive SHA-256:
+  `5ce59502034480ee147417c14fd5889592f2cd520a81bdc355de97cff2b66f0c`.
+- The extracted landing-only runtime's verifier and site assembler accepted the
+  real 235-file published report and generated an integrity-verified
+  11,403,352-byte site. Actual Chrome loaded all images and the self-hosted
+  font, then opened its PR32 report through the primary CTA and selected card,
+  retaining exact review/bundle identities with no page exceptions.
+- These are local macOS artifacts, not uploaded releases or signed Linux
+  qualification. No remote CI, PR, deployment or merge was performed.
+
+Image provenance and preview commands:
 [public usage](PUBLIC_MVP_USAGE.md#public-landing-page).
 
 Deployment prerequisites: merge the reviewed landing-only source, build and
@@ -66,8 +86,10 @@ existing report-preserving controller and live readback. The installed package
 is still `canary-c46c28a509b6` and therefore still generates the root redirect.
 The last release observation expired at `2026-11-06T04:53:50Z`; current hard-zero
 Actions/Packages controls must be observed again before starting new remote
-CI/storage. Authenticated browser relay timed out and Tern is unavailable in
-this environment; no replacement observation or billing assertion was invented.
+CI/storage. Browser relay is running but its Chrome extension is not connected;
+extension files were installed at the user's request. Chrome's Load unpacked
+confirmation remains an operator step. Tern is unavailable in this environment.
+No replacement observation or billing assertion was invented.
 CLI repository authentication works. No budget settings, credentials, pins,
 workflows, App grants, deployments or existing reports have been changed.
 No new PR or remote workflow is started while that cost evidence is unknown.

@@ -45,7 +45,8 @@ New site builds open on a responsive product introduction, with system light/dar
 themes and real captures of a published PR review. **Open workspace** preserves
 the existing reviewer entry; exact report links are unchanged. Actions/Pages
 setup and the unavailable App route are clearly separated. This landing change
-is local development, not a deployment. See [preview and image provenance](docs/PUBLIC_MVP_USAGE.md#public-landing-page).
+is source-published on `codex/public-landing`; live deployment awaits the trusted
+Linux release and exact pin update. See [preview and image provenance](docs/PUBLIC_MVP_USAGE.md#public-landing-page).
 
 ## Reviewer journey
 
