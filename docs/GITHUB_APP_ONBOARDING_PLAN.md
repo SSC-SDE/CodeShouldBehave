@@ -282,9 +282,11 @@ capacity once. End users install/select/preview/confirm; organization permission
 or rejected billing eligibility get a clear blocking state, not manual YAML steps.
 The optional installation-token/current-PR broker, durable queue and signed-intent/
 completed-check outbox primitives now have local tests; see the
-[execution checkpoint](APP_EXECUTION_DEVELOPMENT.md). The next implementation steps
-are the scoped PR object fetcher/isolated analysis adapter, host dispatch loop,
-explicit final consent, real immutable report publisher/readback and operations. The source-preview
+[execution checkpoint](APP_EXECUTION_DEVELOPMENT.md). The scoped PR object fetcher,
+credential-free analysis adapter, paused host dispatcher and separate signed report
+server/readback are now connected locally. Final publication consent, host and Linux
+sandbox qualification, fair dispatch, durable API budgets, reconciliation/recovery
+operations and live acceptance remain pending. The source-preview
 and inactive architecture review are implemented; see [current checkpoint](APP_SOURCE_PREVIEW.md).
 Live OAuth/worker qualification and activation remain separate and require an
 approved host and operator configuration.

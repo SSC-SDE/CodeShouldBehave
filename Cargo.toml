@@ -38,7 +38,7 @@ tree-sitter-rust = "=0.24.2"
 axum = { version = "=0.8.9", default-features = false, features = ["http1", "json", "query", "tokio"], optional = true }
 serde = { version = "=1.0.229", features = ["derive"], optional = true }
 serde_json = { version = "=1.0.151", optional = true }
-tokio = { version = "~1.51", default-features = false, features = ["macros", "net", "rt-multi-thread"], optional = true }
+tokio = { version = "~1.51", default-features = false, features = ["macros", "net", "rt-multi-thread", "time"], optional = true }
 toml = { version = "=0.9.8", default-features = false, features = ["parse", "serde", "std"], optional = true }
 
 [dev-dependencies]
@@ -58,4 +58,9 @@ required-features = ["server"]
 [[bin]]
 name = "csb-app-host"
 path = "src/bin/csb_app_host.rs"
+required-features = ["github-app"]
+
+[[bin]]
+name = "csb-app-pr-worker"
+path = "src/bin/csb_app_pr_worker.rs"
 required-features = ["github-app"]

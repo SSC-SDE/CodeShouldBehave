@@ -761,3 +761,36 @@ is claimed; deployed release still predates these fixes.
   Dependency versions/license inventory are unchanged; `ring` is now an optional
   direct dependency using its existing locked version. PR #32 remains draft;
   this checkpoint does not claim full APP-3/APP-4 acceptance.
+
+## 2026-11-06 IST — PR #32 PR worker, dispatch and report hosting
+
+- Resumed draft [PR #32](https://github.com/SSC-SDE/CodeShouldBehave/pull/32) on
+  `phase-6` from `9dfb47744645020d8152fe2565ffd9cbb07ad829`. Provider confirmed
+  PR #24 remains open/unmerged. No main commit, merge, release or activation.
+- Added bounded installation-token Git object acquisition with exact hash checks
+  and authorized blob-only reads. New credential-free PR worker reuses the native
+  engine for HLD/LLD and exact source export. Linux launcher is pinned/networkless;
+  offline policy tests pass, actual Linux qualification remains pending.
+- Connected inbox → queue → worker → signed intent → report publication/readback
+  → App completed-check delivery. Host dispatch defaults paused; absent consent
+  performs no GitHub requests. Migration 20 creates only an empty report catalog.
+- Added separate cookie-free report listener using the approved workspace, atomic
+  immutable file staging, signed catalog recovery, seven-day expiry, irreversible
+  withdrawal and current-consent checks on each report read. Readback verifies all
+  chunks, exact catalog identity and viewer assets before check delivery.
+- Verified local notification-to-check composition with real native diffs and mock
+  GitHub writes; failing readback cannot post a completed check, retry posts once,
+  and consent revoked during analysis cannot stage a signed report. Actual loopback
+  HTTP readback passes. Recovery cannot undo withdrawal; tampered source is refused.
+- Validation: 338 all-feature Rust tests, 119 core-only Rust tests, 119 public Python
+  regressions (Python 3.13, no skips), eight sandbox policy tests, both strict Clippy
+  configurations and formatting passed. Existing browser UI was not changed; no
+  live App/HTTPS/browser or Linux sandbox acceptance is claimed by these tests.
+- Explicit limitations: 64 unique authorized blobs across the comparison,
+  reconstructable exact commits only, no fork adapter, pending final authenticated
+  publication consent, durable lifetime API/delivery budgets, fair scheduling,
+  missed-event/rerequest repair, queued/failure checks, cleanup and backup restore.
+  Details, resource caps and operator options: [execution checkpoint](APP_EXECUTION_DEVELOPMENT.md).
+- No protected credentials, production origin, host account, App setting, workflow,
+  existing Actions/Pages deployment, engine pin or paid resource changed. PR #32
+  remains draft pending the documented implementation and live qualification gates.

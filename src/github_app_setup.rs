@@ -2,8 +2,8 @@
 //!
 //! This module saves inactive scope/context and supports explicit bounded source
 //! preview with an operator-configured isolated worker. The optional execution
-//! library provides inactive scheduling/delivery primitives; no host drain loop,
-//! active grant or report publisher is mounted.
+//! integration supplies an opt-in paused host dispatcher and separate report
+//! listener. No execution grants or production consent writer are created.
 //! A host must explicitly supply a trusted GitHub web-auth provider to mount it.
 //! The existing local device-login broker is not a hosted identity authority.
 use crate::Storage;
@@ -33,7 +33,21 @@ pub use scope::{
 };
 pub use webhook::{AppWebhookInbox, WebhookNotification, WebhookReceipt, webhook_router};
 #[cfg(feature = "github-app")]
+mod dispatch;
+#[cfg(feature = "github-app")]
 mod execution;
+#[cfg(feature = "github-app")]
+mod pr_worker;
+#[cfg(feature = "github-app")]
+mod report_host;
+#[cfg(feature = "github-app")]
+pub use dispatch::{AppDispatchConfig, AppDispatcher, DispatchOutcome};
+#[cfg(feature = "github-app")]
+pub use pr_worker::{
+    AppPrWorker, GitObject, PrWorkerOutput, PrWorkerRequest, SandboxPrWorker, analyze_pr_objects,
+};
+#[cfg(feature = "github-app")]
+pub use report_host::{AppReportReadback, AppReportStore, HttpsReportReadback, app_report_router};
 #[cfg(feature = "github-app")]
 mod installation;
 #[cfg(feature = "github-app")]
@@ -566,3 +580,6 @@ fn encode(s: &str) -> String {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(all(test, feature = "github-app"))]
+mod pipeline_tests;

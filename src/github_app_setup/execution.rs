@@ -262,6 +262,66 @@ impl AppExecutionQueue {
         tx.execute("UPDATE app_analysis_jobs SET state=CASE WHEN ?2 AND attempts<3 THEN 'pending' ELSE 'failed' END, available_at=?3+60*attempts,lease=NULL,lease_until=NULL WHERE id=?1",params![lease.id,retryable,at]).map_err(db)?;
         tx.commit().map_err(db)
     }
+    pub fn work_configuration(&self, lease: &AnalysisLease) -> Result<(PublicPolicy, Value)> {
+        if lease.input.app_id != self.app_id {
+            return Err(SetupError::Denied);
+        }
+        let s = self.storage.lock().map_err(|_| SetupError::Unavailable)?;
+        lease_fence(&s.connection, lease, now()?)?;
+        let grant = current_grant(&s.connection, &lease.input)?;
+        let context:String=s.connection.query_row("SELECT context FROM app_architecture_acceptances WHERE app_id=?1 AND installation_id=?2 AND repository_id=?3 AND scope_revision=?4",params![self.app_id,lease.input.installation_id,lease.input.repository_id,lease.input.scope_revision],|r|r.get(0)).map_err(db)?;
+        Ok((
+            grant.policy,
+            serde_json::from_str(&context).map_err(|_| SetupError::Invalid)?,
+        ))
+    }
+    pub fn delivery_configuration(
+        &self,
+        id: &str,
+        key: &[u8],
+    ) -> Result<(AnalysisInput, PublicPolicy)> {
+        let signed = self.intent(id, key)?;
+        let s = self.storage.lock().map_err(|_| SetupError::Unavailable)?;
+        let grant = current_grant(&s.connection, &signed.receipt.job)?;
+        Ok((signed.receipt.job, grant.policy))
+    }
+    pub fn installation_policy(&self, installation: i64, repository: i64) -> Result<PublicPolicy> {
+        let s = self.storage.lock().map_err(|_| SetupError::Unavailable)?;
+        Ok(grant(&s.connection, self.app_id, installation, repository)?.policy)
+    }
+    pub fn has_enabled_repository(&self) -> Result<bool> {
+        let s = self.storage.lock().map_err(|_| SetupError::Unavailable)?;
+        s.connection
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM app_execution_grants WHERE app_id=?1 AND enabled=1)",
+                [self.app_id],
+                |r| r.get(0),
+            )
+            .map_err(db)
+    }
+    pub fn authorize_publication(
+        &self,
+        id: &str,
+        key: &[u8],
+        provider: &dyn AppExecutionProvider,
+    ) -> Result<SignedAppReceipt> {
+        let receipt = self.intent(id, key)?;
+        recheck(&receipt.receipt.job, provider)?;
+        Ok(receipt)
+    }
+    pub fn pending_delivery(&self) -> Result<Vec<String>> {
+        let s = self.storage.lock().map_err(|_| SetupError::Unavailable)?;
+        let mut q=s.connection.prepare("SELECT id FROM app_analysis_jobs WHERE app_id=?1 AND state IN ('staged','published') AND available_at<=?2 ORDER BY available_at,created_at,id LIMIT 100").map_err(db)?;
+        q.query_map(params![self.app_id, now()?], |r| r.get(0))
+            .map_err(db)?
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(db)
+    }
+    pub fn defer_delivery(&self, id: &str) -> Result<()> {
+        let s = self.storage.lock().map_err(|_| SetupError::Unavailable)?;
+        s.connection.execute("UPDATE app_analysis_jobs SET available_at=?3 WHERE id=?1 AND app_id=?2 AND state IN ('staged','published')",params![id,self.app_id,now()?+600]).map_err(db)?;
+        Ok(())
+    }
     /// Persist a validated signed publication intent, never a check URL yet.
     /// The caller must stage immutable bytes before this transaction; workers cannot sign.
     pub fn stage(
@@ -666,6 +726,18 @@ impl SignedAppReceipt {
                 &signature,
             )
             .map_err(|_| SetupError::Denied)
+    }
+    pub fn report_id(&self) -> &str {
+        &self.receipt.report_id
+    }
+    pub fn manifest_digest(&self) -> &str {
+        &self.receipt.bundle_digest
+    }
+    pub fn job_id(&self) -> Result<String> {
+        self.receipt.job.id()
+    }
+    pub fn app_id(&self) -> i64 {
+        self.receipt.job.app_id
     }
     pub fn focus_url(&self) -> &str {
         &self.receipt.focus_url

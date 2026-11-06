@@ -35,9 +35,11 @@ The existing public CI profile needs no reviewer terminal, API key or local serv
 
 The App implementation includes OAuth/PKCE, a browser repository picker and
 versioned path-scope confirmation, opt-in isolated source preview and inactive
-architecture acceptance. Authenticated webhook intake is implemented; automatic
-App analysis, publication and check delivery are not yet connected or activated.
-See the [development checkpoint](docs/APP_ONBOARDING_DEVELOPMENT.md) and
+architecture acceptance. The PR worker, host dispatcher, signed report server and
+completed-check delivery are connected and tested locally. Dispatch defaults to
+paused; final publication consent, qualified hosting and live acceptance remain
+pending. Installing the App does not activate this development integration.
+See the [execution checkpoint](docs/APP_EXECUTION_DEVELOPMENT.md) and
 [$0 hosting assessment](docs/APP_HOSTING_OPTIONS.md) for current limits.
 
 ## Reviewer journey

@@ -1,4 +1,7 @@
 //! Credential broker: fixed API origin, repository-limited tokens, no worker credentials.
+#[cfg(test)]
+mod dispatch_tests;
+mod objects;
 use super::{Result, SetupError, slug};
 use base64::{
     Engine,

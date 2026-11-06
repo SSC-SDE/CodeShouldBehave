@@ -52,8 +52,10 @@ than removing a production check. These commands do not deploy or enroll a repo.
 
 `--features github-app` enables the HTTPS adapter and implies `server`. The
 factory workspace deliberately mounts only `disabled_router()` even with that
-feature. Tests construct `router(Arc<AppSetupHost<P>>)` explicitly. The optional `csb-app-host` launcher explicitly composes setup routes only; no
-configuration switch enables automatic PR analysis or publication.
+feature. Tests construct `router(Arc<AppSetupHost<P>>)` explicitly. The optional
+`csb-app-host` composes setup routes and can now configure a separate report listener
+and paused dispatcher. No configuration switch grants repository publication
+consent; see [execution development](APP_EXECUTION_DEVELOPMENT.md).
 The browser screen is available at `/github-app/setup`; the factory host shows
 setup unavailable and makes no account-service calls beyond its capability check.
 The explicitly mounted router supports the picker and scope review after login.
@@ -125,12 +127,12 @@ see [current boundaries and operator notes](APP_SOURCE_PREVIEW.md). Remaining:
 
 1. Qualified USD 0 Linux host, independently verified signed preview worker and
    live OAuth/permission acceptance.
-2. Scoped PR fetcher, full isolated analysis worker binding and host dispatch/fair
-   scheduling. The token broker, fresh-PR queue and durable inbox now have local
-   coverage; see [execution checkpoint](APP_EXECUTION_DEVELOPMENT.md).
-3. Explicit publication consent, real public report hosting/readback and recovery
-   operations. Signed-intent and completed-check outbox primitives are implemented,
-   but are not mounted or activated.
+2. Fair scheduling, missed-event repair, check rerequests and durable API budgets.
+   The scoped PR fetcher, full analysis worker adapter and paused host dispatcher
+   are connected locally; see [execution checkpoint](APP_EXECUTION_DEVELOPMENT.md).
+3. Explicit publication consent and qualified recovery/backup operations. Signed
+   report hosting, catalog and HTTP readback are implemented on a separate optional
+   listener, but have not been deployed or activated.
 4. Real fresh-repository browser acceptance, HLD/LLD/source traversal, withdrawal,
    backup/restore and explicit activation approval.
 

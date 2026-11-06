@@ -334,6 +334,17 @@ impl AppScanWorker for SandboxPreviewWorker {
         if data.len() > 16 * 1024 * 1024 {
             return Err(SetupError::Capacity);
         }
+        let bytes = self.run_protocol(data, 1024 * 1024, 50)?;
+        serde_json::from_slice(&bytes).map_err(|_| SetupError::Unavailable)
+    }
+}
+impl SandboxPreviewWorker {
+    pub(super) fn run_protocol(
+        &self,
+        data: Vec<u8>,
+        limit: usize,
+        seconds: u64,
+    ) -> Result<Vec<u8>> {
         let mut child = Command::new(&self.python)
             .arg("-I")
             .arg(&self.launcher)
@@ -352,13 +363,13 @@ impl AppScanWorker for SandboxPreviewWorker {
         let reader = std::thread::spawn(move || {
             let mut bytes = Vec::new();
             stdout
-                .take(1024 * 1024 + 1)
+                .take(limit as u64 + 1)
                 .read_to_end(&mut bytes)
                 .map(|_| bytes)
         });
         let start = std::time::Instant::now();
         let success = loop {
-            if start.elapsed() > std::time::Duration::from_secs(50) {
+            if start.elapsed() > std::time::Duration::from_secs(seconds) {
                 let _ = child.kill();
                 let _ = child.wait();
                 break false;
@@ -378,9 +389,9 @@ impl AppScanWorker for SandboxPreviewWorker {
             .join()
             .map_err(|_| SetupError::Unavailable)?
             .map_err(|_| SetupError::Unavailable)?;
-        if !success || !written || bytes.len() > 1024 * 1024 {
+        if !success || !written || bytes.len() > limit {
             return Err(SetupError::Unavailable);
         }
-        serde_json::from_slice(&bytes).map_err(|_| SetupError::Unavailable)
+        Ok(bytes)
     }
 }

@@ -145,11 +145,13 @@ python3 -m unittest discover -s tests -p 'app_preview_sandbox_test.py'
 ```
 
 Still required before automatic hosted PR checks: a qualified USD 0 host and
-signed worker release; live OAuth; the isolated full PR worker and host dispatch
-loop; explicit publication consent; actual public report publication/readback;
-withdrawal/restore and
+signed worker release; live OAuth; explicit publication consent; qualified dispatch,
+API budgets and backup/restore operations; live public readback and
+
 real second-repository HLD/LLD/source acceptance. Activation remains a separate
-owner approval. This checkpoint does not complete the one-click App rollout.
+owner approval. The full PR worker, paused dispatcher and separate report server
+are now connected locally; see [execution development](APP_EXECUTION_DEVELOPMENT.md).
+This checkpoint does not complete the one-click App rollout.
 
 Protocol references: [GitHub immutable blob reads](https://docs.github.com/en/rest/git/blobs#get-a-blob)
 and [webhook validation](https://docs.github.com/en/webhooks/using-webhooks/validating-webhook-deliveries).
