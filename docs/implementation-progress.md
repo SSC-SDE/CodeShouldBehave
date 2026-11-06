@@ -2,6 +2,97 @@
 
 This tracks the public Phase 6 continuation; private historical records are not
 copied into this repository. Branch: `phase-6`; PR base: `main`.
+The standalone landing-page publication below uses `codex/public-landing`;
+it does not advance, merge or activate the Phase 6 App implementation.
+
+## 2026-11-06 - public landing page
+
+User requested pushing and deploying the landing page. Its implementation was
+isolated from `5df2e62d128c2507ab65da76c729839c723db825` onto current public
+`main`, `c52b5527d8d480c5b9e62863fe3ff4e94cf4bab5`, in a separate worktree.
+Branch: `codex/public-landing`. The four local App/backend continuation commits
+and the existing [draft PR #32](https://github.com/SSC-SDE/CodeShouldBehave/pull/32)
+remain unchanged. This is a standalone marketing-site release, not a new phase
+or an alternative Phase 6 integration PR.
+
+Audit: deployed `/CodeShouldBehave/` is only a workspace redirect, with no
+description or social metadata. Preserve `/workspace/`, immutable report links,
+existing branding and the dark reviewer UI. Landing work uses native CSS,
+self-hosted JetBrains Mono, graphite/blue tokens and system light/dark preference.
+No framework or design-system migration, invented customer proof, App install
+CTA, deployment, activation, credentials, release pins or budget changes.
+
+Implemented: static product introduction, actual published PR24 HLD/LLD/source
+captures, existing `[!]` brand favicon, system light/dark and reduced-motion
+preferences, self-hosted type, accessible keyboard entry and explicit setup
+availability. Zero landing scripts or trackers. Site/source/runtime inventories
+include only the declared landing assets; unapproved neighboring files stay out
+of the published site. Workspace/report paths and release controls are unchanged.
+
+Original UI evidence at `5df2e62` (retained in `CodeShouldBehave-public/target/`):
+
+- 121 public Python regressions pass, no skips. Existing HTTPError cleanup
+  ResourceWarnings remain visible. New tests cover unapproved neighboring
+  assets and missing/symlinked/oversized landing inputs, not page wording.
+- Actual Chrome: widths 320, 390, 768, 1024 and 1440; both themes at desktop
+  and mobile. No horizontal overflow; desktop headline two lines, subtext at
+  most four, hero/CTA visible. All three image decodes observed. Keyboard skip,
+  section anchor, reduced-motion behavior, documentation/source/notices links
+  and landing-to-workspace navigation exercised. No page exceptions.
+- CTA also opened a locally assembled real published PR32 report, bundle
+  `a1f293a0cfc5bc0ab2e4dc3ef5d0186f6e419edc9291165af7ad5f65fb6cf7e3`.
+  All 235 files matched the public manifest and the native semantic verifier
+  accepted the complete bundle before assembly. Selecting its card retained
+  exact review/bundle identities. Provider freshness is intentionally unknown
+  because this preview did not invent a new GitHub observation.
+- Lighthouse 12.8.2 against local Python HTTP: desktop performance 100,
+  mobile 99, accessibility 100 and best practices 100 in both runs. LCP:
+  desktop 0.48s, simulated mobile 2.25s; CLS 0 and TBT 0. SEO 92 because the
+  preview origin has no valid root robots.txt. No origin-wide crawler policy,
+  cache or compression changes were made. These are local lab results, not
+  deployed field Core Web Vitals or an INP measurement.
+- Hero body contrast: 7.49:1 light, 9.06:1 dark. CTA contrast: 6.42:1 light,
+  8.92:1 dark. Final desktop/mobile captures and Lighthouse JSON are retained
+  under ignored `target/landing-final-*` and `target/landing-lighthouse-*-final.json`.
+
+Landing-only publication evidence:
+
+- Pushed implementation commit `914254fc727980eb345ef756524e1858d13dd476`
+  to `codex/public-landing`; GitHub's ref API confirmed that exact identity.
+  No App continuation commits were pushed and PR #32 remains unchanged.
+- Re-ran all 121 public Python tests on the isolated main-based tree: pass,
+  no skips. Existing HTTPError cleanup ResourceWarnings remain visible.
+- A clean-source Rust 1.87 macOS release build produced the existing three
+  public-profile binaries, with 108 locked license packages and zero findings
+  under the declared credential-pattern rules (not exhaustive detection).
+  Local source archive SHA-256:
+  `d42bd32c8e578cc21c105d64c0750904460fb56bb518f956f794cc0369b4d656`;
+  runtime archive SHA-256:
+  `5ce59502034480ee147417c14fd5889592f2cd520a81bdc355de97cff2b66f0c`.
+- The extracted landing-only runtime's verifier and site assembler accepted the
+  real 235-file published report and generated an integrity-verified
+  11,403,352-byte site. Actual Chrome loaded all images and the self-hosted
+  font, then opened its PR32 report through the primary CTA and selected card,
+  retaining exact review/bundle identities with no page exceptions.
+- These are local macOS artifacts, not uploaded releases or signed Linux
+  qualification. No remote CI, PR, deployment or merge was performed.
+
+Image provenance and preview commands:
+[public usage](PUBLIC_MVP_USAGE.md#public-landing-page).
+
+Deployment prerequisites: merge the reviewed landing-only source, build and
+verify its trusted signed Linux release, update exact package pins, then use the
+existing report-preserving controller and live readback. The installed package
+is still `canary-c46c28a509b6` and therefore still generates the root redirect.
+The last release observation expired at `2026-11-06T04:53:50Z`; current hard-zero
+Actions/Packages controls must be observed again before starting new remote
+CI/storage. Browser relay is running but its Chrome extension is not connected;
+extension files were installed at the user's request. Chrome's Load unpacked
+confirmation remains an operator step. Tern is unavailable in this environment.
+No replacement observation or billing assertion was invented.
+CLI repository authentication works. No budget settings, credentials, pins,
+workflows, App grants, deployments or existing reports have been changed.
+No new PR or remote workflow is started while that cost evidence is unknown.
 
 ## 2026-10-24 — context finalized and drift verified
 

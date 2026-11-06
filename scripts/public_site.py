@@ -303,6 +303,10 @@ def assemble_site(bundles, output, observed_at, previous=None, previous_sha256=N
         (temporary / "workspace/index.html").write_text(html)
         for name, source in {"inter.ttf": "src/fonts/inter.ttf", "jetbrains-mono.ttf": "src/fonts/jetbrains-mono.ttf", "inter-OFL.txt": "src/fonts/inter-OFL.txt", "jetbrains-mono-OFL.txt": "src/fonts/jetbrains-mono-OFL.txt", "workspace-preferences.js": "src/workspace-preferences.js", "workspace-registry.json": "src/workspace-registry.json", "workspace.js": "src/workspace.js", "workspace.css": "src/workspace.css", "public-workspace.js": "src/public-workspace.js", "mermaid.js": "docs/prototypes/vendor/mermaid.tiny-12.1.0.js", "mermaid-LICENSE.txt": "docs/prototypes/vendor/mermaid-LICENSE.txt"}.items():
             (temporary / "assets" / name).write_bytes(read_file(project_root / source, 4 * 1024 * 1024))
+        (temporary / "assets/landing.css").write_bytes(read_file(project_root / "src/landing.css", 4 * 1024 * 1024))
+        (temporary / "assets/landing").mkdir()
+        for name in ("architecture.webp", "detail.webp", "source.webp", "favicon.png"):
+            (temporary / "assets/landing" / name).write_bytes(read_file(project_root / "src/landing" / name, 4 * 1024 * 1024))
         for name in ("LICENSE", "THIRD_PARTY_NOTICES.md"):
             (temporary / name).write_bytes(read_file(project_root / name, 2 * 1024 * 1024))
         for group in ("javascript", "native"):
@@ -318,7 +322,7 @@ def assemble_site(bundles, output, observed_at, previous=None, previous_sha256=N
         notice.parent.mkdir(parents=True)
         notice.write_bytes(read_file(project_root / "docs/prototypes/vendor/mermaid-LICENSE.txt", 64 * 1024))
         (temporary / ".nojekyll").write_text("")
-        (temporary / "index.html").write_text('<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=workspace/"><title>CodeShouldBehave</title><a href="workspace/">Open review workspace</a>\n')
+        (temporary / "index.html").write_bytes(read_file(project_root / "src/landing.html", 512 * 1024))
         (temporary / "404.html").write_text('<!doctype html><meta charset="utf-8"><title>Report unavailable · CodeShouldBehave</title><h1>Report unavailable</h1><p>This path is not a published report. Open the workspace from its exact Architecture check link.</p>\n')
         reports = []
         for identity, source in sorted(sources.items()):
