@@ -80,19 +80,36 @@ Landing-only publication evidence:
 Image provenance and preview commands:
 [public usage](PUBLIC_MVP_USAGE.md#public-landing-page).
 
-Deployment prerequisites: merge the reviewed landing-only source, build and
-verify its trusted signed Linux release, update exact package pins, then use the
-existing report-preserving controller and live readback. The installed package
-is still `canary-c46c28a509b6` and therefore still generates the root redirect.
-The last release observation expired at `2026-11-06T04:53:50Z`; current hard-zero
-Actions/Packages controls must be observed again before starting new remote
-CI/storage. Browser relay is running but its Chrome extension is not connected;
-extension files were installed at the user's request. Chrome's Load unpacked
-confirmation remains an operator step. Tern is unavailable in this environment.
-No replacement observation or billing assertion was invented.
-CLI repository authentication works. No budget settings, credentials, pins,
-workflows, App grants, deployments or existing reports have been changed.
-No new PR or remote workflow is started while that cost evidence is unknown.
+## 2026-11-06 - landing release deployment
+
+- User authorized landing push and deployment. Landing-only
+  [PR #33](https://github.com/SSC-SDE/CodeShouldBehave/pull/33) merged at
+  provider-confirmed `fbe4b73340778311965d6bbf24919beb969c1c71`.
+  Draft App PR #32 and its unpublished continuation remain separate.
+- Authenticated GitHub UI confirmed GitHub Free and account-wide Actions and
+  Packages USD 0 budgets with Usage blocked. Existing controls were not changed.
+  Fresh release proof observed at `2026-11-06T20:29:16.428Z`, expires
+  `2026-11-07T08:29:16.428Z`; the actual release guard accepted its exact bytes.
+  Only the existing release proof secret/digest and release source variable
+  were refreshed. Runtime budget identity and its historical observation remain
+  unchanged because they belong to the existing signed activation ledger.
+- Trusted Linux build and hosted attestation
+  [42288835561](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/42288835561)
+  passed from the exact merge source. Both archive checksums and offline
+  signature verification passed with exact source/signer commits and hosted
+  runners required.
+- [Canary release](https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-fbe4b7334077)
+  published. Linux runtime SHA-256:
+  `d780fc5cc5a44bf43fe1f7a76c04df95ffc88d5a5768e33526d9fdb7dc1b5870`;
+  offline proof SHA-256:
+  `691c557c7b9344da489c9fcd4f11a3e752079025605b4a9de3fb0b909c5028c9`.
+- Only engine identity changes in public-ci/engine-pins. Production bootstrap
+  from the published URLs passed signature/hash/ELF checks and extraction.
+  All 121 public Python regressions passed, no skips; existing ResourceWarnings
+  remain visible. Native Linux preflight and live Pages acceptance remain
+  pending, not inferred from the macOS/bootstrap checks.
+- No App execution grant, policy, source scope, consent, workflow, runtime
+  budget identity, billing control or existing report has been changed.
 
 ## 2026-10-24 — context finalized and drift verified
 
