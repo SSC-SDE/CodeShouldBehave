@@ -212,13 +212,19 @@ impl AppDispatcher {
     }
     fn progress(&self, id: &str) -> Result<()> {
         let (input, policy) = self.queue.progress_configuration(id)?;
-        self.budget.reserve(input.installation_id, id, 12, false)?;
-        let _requests = self.broker.begin_pass(12)?;
-        let session = self
-            .broker
-            .session(input.installation_id, &policy.repository)?;
-        self.queue.deliver_progress(id, &session, &session)?;
-        Ok(())
+        let result = (|| {
+            self.budget.reserve(input.installation_id, id, 12, false)?;
+            let _requests = self.broker.begin_pass(12)?;
+            let session = self
+                .broker
+                .session(input.installation_id, &policy.repository)?;
+            self.queue.deliver_progress(id, &session, &session)?;
+            Ok(())
+        })();
+        if result.is_err() {
+            self.queue.backoff_progress(id)?;
+        }
+        result
     }
     fn deliver(&self, id: &str) -> Result<()> {
         let (input, policy) = self

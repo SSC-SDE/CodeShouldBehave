@@ -118,6 +118,34 @@ impl AppExecutionQueue {
         s.connection.execute("UPDATE app_check_progress SET delivered_digest=?2 WHERE job_id=?1 AND desired_digest=?2",params![id,hash]).map_err(db)?;
         Ok(check)
     }
+    /// A quota/credential failure can happen before deliver_progress records an
+    /// attempt. Persist its delay too, so one blocked job cannot monopolize UI IO.
+    pub(crate) fn backoff_progress(&self, id: &str) -> Result<()> {
+        let mut s = self.storage.lock().map_err(|_| SetupError::Unavailable)?;
+        let tx = s
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(db)?;
+        let (raw, state): (String, String) = tx
+            .query_row(
+                "SELECT input,state FROM app_analysis_jobs WHERE app_id=?1 AND id=?2",
+                params![self.app_id, id],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .optional()
+            .map_err(db)?
+            .ok_or(SetupError::Conflict)?;
+        if matches!(state.as_str(), "cancelled" | "delivered") {
+            return Ok(());
+        }
+        let input: AnalysisInput = serde_json::from_str(&raw).map_err(|_| SetupError::Invalid)?;
+        let hash = sha256(
+            &canonical_json(&progress_payload(id, &input, &state)?)
+                .map_err(|_| SetupError::Invalid)?,
+        );
+        tx.execute("INSERT INTO app_check_progress(job_id,desired_digest,observed_state,attempts,next_at) VALUES(?1,?2,?3,0,?4) ON CONFLICT(job_id) DO UPDATE SET observed_state=excluded.observed_state,desired_digest=excluded.desired_digest,attempts=CASE WHEN desired_digest!=excluded.desired_digest THEN 0 ELSE attempts END,next_at=max(next_at,excluded.next_at)",params![id,hash,state,now()?+600]).map_err(db)?;
+        tx.commit().map_err(db)
+    }
     /// All lifecycle writes share the original durable create fence. PATCH retries
     /// are idempotent; unknown POST outcomes only reconcile the exact first payload.
     pub(super) fn send_check(

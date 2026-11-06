@@ -187,3 +187,44 @@ fn terminal_failure_is_not_a_clean_result_and_revocation_prevents_status_io() {
     );
     assert_eq!(blocked.posts.get(), 0);
 }
+
+#[test]
+fn exhausted_progress_budget_does_not_hide_other_checks_after_restart() {
+    struct CurrentByNumber(CurrentPullRequest);
+    impl AppExecutionProvider for CurrentByNumber {
+        fn current_pr(&self, _: i64, _: i64, pr: i64) -> Result<CurrentPullRequest> {
+            let mut current = self.0.clone();
+            current.number = pr;
+            Ok(current)
+        }
+    }
+    let f = Fixture::new();
+    let q = f.queue();
+    let provider = CurrentByNumber(f.request.input.comparison.clone());
+    let first = q.reconcile(2, 3, 7, &provider).unwrap().unwrap();
+    let second = q.reconcile(2, 3, 8, &provider).unwrap().unwrap();
+    let budget = AppRequestBudget::new(
+        Storage::open(&f.root.join("state.db"), &f.root.join("artifacts")).unwrap(),
+        1,
+    )
+    .unwrap();
+    for tickets in [100, 100, 100, 84] {
+        budget.reserve(2, &first, tickets, false).unwrap();
+    }
+    assert_eq!(
+        budget.reserve(2, &first, 12, false),
+        Err(SetupError::Capacity)
+    );
+    q.backoff_progress(&first).unwrap();
+    let reopened = AppExecutionQueue::new(
+        Storage::open(&f.root.join("state.db"), &f.root.join("artifacts")).unwrap(),
+        1,
+    )
+    .unwrap();
+    assert_eq!(reopened.pending_progress().unwrap(), Some(second.clone()));
+    budget.reserve(2, &second, 12, false).unwrap();
+    assert_eq!(
+        budget.reserve(2, &first, 1, false),
+        Err(SetupError::Capacity)
+    );
+}
