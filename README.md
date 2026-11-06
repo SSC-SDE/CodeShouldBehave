@@ -36,10 +36,13 @@ The existing public CI profile needs no reviewer terminal, API key or local serv
 The App implementation includes OAuth/PKCE, a browser repository picker and
 versioned path-scope confirmation, opt-in isolated source preview and inactive
 architecture acceptance. The PR worker, host dispatcher, signed report server and
-completed-check delivery are connected and tested locally. Dispatch defaults to
-paused. Browser publication consent, durable request budgets and bounded recovery
-are implemented locally; operator activation, qualified hosting and live acceptance
-remain pending. Installing the App does not activate this development integration.
+check delivery are connected and tested locally. Bounded PR discovery, queued/
+running/failure check states, signed operator approval and exact offline recovery
+tools are implemented on the local `phase-6` continuation; they have not been
+pushed to PR #32. Dispatch defaults paused, and browser consent never activates it.
+Qualified hosting, signed Linux workers, externally fresh recovery authority and
+live App acceptance remain required. Installing the App does not activate this
+development integration.
 See the [execution checkpoint](docs/APP_EXECUTION_DEVELOPMENT.md) and
 [$0 hosting assessment](docs/APP_HOSTING_OPTIONS.md) for current limits.
 

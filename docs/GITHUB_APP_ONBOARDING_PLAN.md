@@ -286,9 +286,11 @@ completed-check outbox primitives now have local tests; see the
 credential-free analysis adapter, paused host dispatcher and separate signed report
 server/readback are now connected locally. Browser final consent, fair dispatch,
 durable REST reservations, tracked-PR repair, App-owned rerequests and bounded
-expiry/withdrawal recovery have local tests. Operator activation, host/Linux sandbox
-qualification, initial PR discovery, status UX, trusted backup restoration and live
-acceptance remain pending. The source-preview
-and inactive architecture review are implemented; see [current checkpoint](APP_SOURCE_PREVIEW.md).
+expiry/withdrawal recovery have local tests. The local continuation additionally
+implements bounded initial PR discovery, check lifecycle UX, signed operator
+activation and exact offline recovery tools. It has not been pushed to PR #32.
+Host/Linux sandbox qualification, independently fresh recovery authority and live
+acceptance remain pending. Source-preview and inactive architecture review remain
+available; see [current checkpoint](APP_SOURCE_PREVIEW.md).
 Live OAuth/worker qualification and activation remain separate and require an
 approved host and operator configuration.

@@ -1,9 +1,18 @@
 # App execution and signed delivery: development checkpoint
 
-November 6, 2026. Implemented on `phase-6` in
+November 7, 2026. Local continuation on `phase-6` for
 [PR #32](https://github.com/SSC-SDE/CodeShouldBehave/pull/32).
 **Activation remains off. This is a locally tested host integration, not a running
 hosted App service. PR #24 and its existing Actions/Pages publisher are unchanged.**
+
+The continuation started from inspected PR head
+`6efe23e26118bcd7e5351b3946b7f7fdd49f9faf`. Implementation is committed locally at
+`14012713ee3a505dd1f1d45bb7b33a049126183c`; runtime distribution follows at
+`6edfc70c1129b4f23b6c384fad3d91e571a2cd3b`, with final progress-quota fairness
+correction `f041715cb9a2498b603fcac412d026dedd511cf9`. None has been pushed.
+Discovery, operator activation validation, check lifecycle delivery and offline
+recovery tools have local evidence; no real installation was enabled. See
+[implementation progress](implementation-progress.md).
 
 ## Implemented
 
@@ -41,13 +50,15 @@ Migration 19 adds execution grants, analysis jobs and immutable signed intents.
 It creates **no grants**. Existing inactive scope/architecture records are not
 converted to publication consent. Final authenticated consent now has separate
 preview/confirm/status/revoke routes; it never creates or enables an execution
-grant. Tests seed isolated enabled grants. Operator activation remains unavailable.
+grant. A separate signed operator transaction can enable an exact grant after
+independent engine/host qualification and fresh provider checks; it is never
+mounted on the browser router.
 
 `AppExecutionQueue::reconcile_notification` consumes a leased PR notification and
 persists the freshly resolved comparison in one transaction. A forged, expired or
-consumed lease cannot acknowledge or enqueue it. `reconcile` supports bounded
-future sweep callers. The optional host dispatcher now consumes inbox events;
-idle passes repair tracked comparisons; initial PR discovery remains pending.
+consumed lease cannot acknowledge or enqueue it. `reconcile` supports
+caller-owned bounded sweeps. The dispatcher consumes inbox events, repairs tracked
+comparisons and traverses initial open-PR inventories independently of webhooks.
 
 Job identity binds App, installation, numeric repository, PR, selected base,
 merge-base, head, scope revision, publication-consent digest, signed binary digest
@@ -63,9 +74,9 @@ globally, one per repository, 100 unfinished jobs globally, 25 per installation,
 Retries are delayed; stale leases cannot stage a report or report a failure.
 Durable least-recently-served installation turns now order notification, analysis
 and delivery admission. Analysis and delivery alternate when both have work.
-Explicit reanalysis of exhausted identities remains unfinished. Draft-to-ready or
-reopened comparisons resume their exact cancelled job within the existing attempt
-limit; previously signed bytes must pass promotion checks again.
+Exhausted identities require explicit operator reconciliation of an existing check
+or terminal abandonment; there is no attempt/budget reset or blind replacement POST.
+Ordinary draft-to-ready/reopened jobs resume only within their existing limits.
 
 Fresh-provider reconciliation currently holds a serialized SQLite write
 transaction. This gives unambiguous ordering but is not a measured high-throughput
@@ -105,7 +116,18 @@ check inventories fail closed. It records a create attempt **before** sending it
 If a write's outcome is unknown, subsequent attempts only reconcile the matching
 check; they never blindly create another. Missing or mismatched outcomes remain
 blocked for explicit recovery. Existing foreign checks are never overwritten.
-No queued/running/failure check lifecycle is mounted yet.
+The same immutable check now transitions through queued, in-progress and honest
+failure states. Only verified full report readback permits the completed result
+and Focus link. Progress failure cannot block deterministic analysis. Each status
+has three delayed attempts; all requests still consume the original lifetime and
+daily budgets. A lost queued POST response is reconciled using its persisted
+initial payload, even if the desired state has since changed. PATCH first checks
+the exact App, head and immutable job identity.
+Quota/credential refusal before the provider pass also persists a ten-minute
+backoff, allowing other pending checks to progress without refunding any tickets.
+Status delivery itself can be deferred when credentials, provider access or
+remaining reservations are unavailable. A previously queued/running GitHub check
+is not proof of completion; operator recovery must preserve the same budgets.
 
 ## PR worker, host dispatch and report hosting
 
@@ -168,6 +190,56 @@ The optional host execution configuration is all-or-nothing:
 | `--pr-launcher`, `--python` | Absolute qualified launcher/interpreter paths |
 | `--pr-engine`, `--pr-sha256` | Independently verified PR worker path and binary digest |
 | `--dispatch-mode` | `paused` (default); `consented` is not a consent grant |
+
+### Explicit operator activation
+
+`csb-app-operator` provides `preview`, `approve`, `commit` and `verify-evidence`.
+Protected operator configuration pins three distinct Ed25519 public roots:
+operator approval, independently verified signed-engine evidence and Linux host
+qualification. Qualification binds origins, host target/identity, engine/metadata,
+launcher and interpreter digests, retained provenance and expiry. Fixture
+signatures verify this protocol; they do not qualify a real host or release.
+
+Preview reads the latest unrevoked admin consent, saved scope and accepted
+architecture, then checks current numeric repository/installation/admin access.
+The full unsigned document binds expected consent/activation revisions and expires
+within ten minutes. The operator reviews and signs it; commit independently
+rechecks all bindings in the atomic grant/audit transaction. Exact retries are
+idempotent; stale, expired, consumed or revoked approvals cannot overwrite newer
+authority. Grant checks use the actual canonical consent-document digest, not a
+synthetic scope/policy hash. Report staging also checks the consented origin.
+
+`verify-evidence` and `approve` are offline: neither loads App credentials, opens
+the database nor contacts GitHub. Operator PKCS#8 v1/v2 DER keys must derive the
+independently configured public root. Live preview/commit reserve five
+nonrefundable tickets before the fresh GitHub checks. Preview does not mutate
+activation state, although its live request reservations are intentionally durable.
+Run `csb-app-operator --help` for the exact command arguments. No automatic mode,
+browser activation route or manual-SQL activation procedure is provided.
+
+Operator `--config` is strict JSON in a protected regular absolute file:
+
+| Fields | Contract |
+| --- | --- |
+| `app_id`, `client_id` | Actual positive numeric App ID and registered public client identifier |
+| `state`, `artifacts` | Absolute existing App database and its artifact root |
+| `app_private_key_file` | Protected RSA key file for live preview/commit; may be null for offline commands |
+| `runtime` | `ActivationRuntimePins`: authentication/report HTTPS origins, engine/metadata/launcher/interpreter SHA-256 digests, host identity digest and qualified Linux target |
+| `operator_public_key`, `engine_verifier_public_key`, `host_qualifier_public_key` | Distinct independently provisioned raw 32-byte Ed25519 roots encoded base64url without padding |
+| `engine_file`, `launcher_file`, `interpreter_file` | Absolute trusted regular files, not group/world-writable; live commands verify bytes against runtime pins |
+| `engine_metadata_file` | Protected JSON whose canonical hash matches the metadata pin |
+
+Engine/host evidence and approval are `SignedActivationDocument<T>` JSON: exact
+typed document plus Ed25519 signature over canonical JSON, base64url without
+padding. Public types are reexported from `flowdiff::github_app_setup`; see
+`ActivationEngineEvidence`, `ActivationHostEvidence`, `ActivationDocument` and
+`ActivationSelection`. Configuration/evidence JSON is
+bounded to 64 KiB. No sample credentials or self-issued qualification are supplied.
+
+The setup consent status distinguishes `operator_authorized` from runtime
+availability (`unknown`). Signing out of setup is not consent revocation.
+
+### Host runtime and report listener
 
 This extends the existing host options; authenticated webhook intake also requires
 `--webhook-secret-file`. It is configuration documentation, not an activation
@@ -262,7 +334,17 @@ create another job/check; a changed comparison is queued normally. An App-owned
 check rerequest resolves only through the locally recorded check ID, installation
 and repository, then reconciles fresh provider state. Unknown/foreign checks are
 ignored without token issuance. Neither mechanism resets failed job attempts.
-Initial PR discovery without a webhook remains pending.
+Migration 22 adds durable initial PR discovery: one inventory page or one pending
+PR per tick, alongside ordinary analysis/delivery. Pages contain at most 20 PRs;
+page/PR passes reserve four/five REST tickets including credential issuance.
+Leases last 120 seconds, failures defer 600 seconds, completed walks repeat after
+one hour. At most 1,000 pending hints per repository and 10,000 globally are kept.
+Capacity/crash/failure cannot acknowledge an unfinished number or advance a failed
+page. Turns rotate installations/repositories and pending failures. Already tracked
+exact-authority jobs stay with ordinary repair; drafts remain discoverable.
+Only an empty page ends a walk. REST pagination is not snapshot completeness;
+moving inventories require repeated walks. Fork/deleted-head inventories do not
+expand the existing same-repository worker support.
 
 ### Recovery and report retention
 
@@ -283,10 +365,54 @@ after checking that no signed intent or active analysis lease needs it. New stag
 and recoverable signed reports are retained under the 100-directory cap. Malformed
 or unsafe paths stop cleanup for operator investigation.
 
-A restored old database may contain a valid signed prefix and old consent/budget
-state. **Do not serve a restored database without validating an independently held
-trusted recovery anchor.** Automatic backup restoration is not implemented or
-qualified by this work.
+`csb-app-recovery` creates signed exact offline snapshots and verifies/copies them
+into a **new** destination only. It reuses consistent SQLite/artifact backup and
+binds database/manifest hashes, receipt chain, all App tables, consent/revocations,
+withdrawals, activation records, attempts and nonrefundable reservations.
+Verification requires the expected App/key and an independently retained anchor
+SHA-256; a signature or valid receipt prefix alone is insufficient.
+
+Stop all writers through capture, verification and copy. The trusted external
+anchor must cover the **latest committed safety state**, not merely the newest
+available periodic backup. After any subsequent mutation that older anchor is not
+restore authority. Continuous external freshness/fencing and operator storage
+qualification remain unresolved deployment gates; this tooling cannot prove them.
+Report directories need separate immutable retention and normal validation.
+
+`csb-app-host` accepts a one-shot verified import into a nonexistent `--state`
+using `--restore-from`, `--recovery-anchor-file`, `--recovery-anchor-sha256`,
+`--recovery-receipt-key-file` (protected raw 32-byte public key) and
+`--recovery-safety latest-committed-quiesced`. It verifies before migrations or
+serving, refuses `consented` dispatch, disables all imported execution grants,
+and preserves budgets/attempts/tombstones. New operator approval is required to
+re-enable execution. This safety mutation itself needs a new external anchor
+before a later restore. Import is not live recovery qualification.
+
+Privileged `recover_job` decisions can abandon an exhausted/unknown job or
+reconcile an exact existing App-owned progress/completed check. Completed
+reconciliation additionally requires signed intent, complete validated readback
+and an unwithdrawn/unexpired catalog entry. No recovery decision creates or
+updates an unknown check, refunds tickets or restarts attempts. Abandonment is
+terminal. Database triggers retain decisions and prevent counter/create-fence or
+withdrawal-history resets. Provider-backed recovery callers must reserve the same
+lifetime/daily request budget before issuing broker requests.
+
+Before upgrading existing state, stop all writers and preserve an approved
+consistent database/artifact backup with its current external safety authority.
+Opening the new binaries applies additive migrations 22–25; older binaries reject
+that newer schema. The new recovery CLI requires the recovery schema and is not
+a pre-upgrade backup command for older databases. Rollback needs a compatible,
+verified database/artifact restore, not just an older executable, and may never
+refund later reservations or undo revocations. No live upgrade was performed.
+
+### Offline runtime distribution
+
+The clean-source runtime package now includes `csb-app-preview`,
+`csb-app-pr-worker`, `csb-app-host`, `csb-app-operator` and `csb-app-recovery`,
+alongside the existing review/export/onboarding binaries. A local isolated
+`aarch64-apple-darwin` build and clean extraction exercised the recovery command,
+operator help and invalid-worker-input rejection. It is not a signed Linux
+release or production sandbox qualification; existing release pins are unchanged.
 
 ## Run the local acceptance checks
 
@@ -311,29 +437,19 @@ are fixtures. This is **not** live App or browser end-to-end evidence.
 
 ## Remaining implementation and activation gates
 
-1. Implement the separately approved operator activation transaction: validate the
-   latest unrevoked consent digest, scope, architecture, trusted report origin,
-   independently verified signed binary and current installation permissions before
-   enabling a grant. Browser consent alone must never enable it. No production
-   activation writer exists; do not enable via manual SQL.
-2. Qualify a USD 0 Linux host, signed sandbox binary, HTTPS proxy and protected
-   key stores. No suitable host/account exists, and no provisioning, spending,
-   App settings, deployment or release pins changed in this checkpoint.
-3. Add complete bounded repository PR discovery (including PRs whose first webhook
-   was missed), queued/running/failure check UX, and an explicit recovery decision
-   for exhausted/unknown check outcomes. Current periodic repair covers tracked PRs;
-   rerequests map only already delivered App-owned checks and do not reset attempts.
-4. Qualify backup/restore against an independently retained trusted chain/budget/
-   revocation anchor. A valid signed prefix cannot detect a whole-database rollback.
-   Qualify accounting/history retention procedures without refunding lifetime
-   reservations or restoring withdrawn reports; orphan cleanup is now bounded
-   and locally tested.
-5. Keep the existing scoped acquisition limits explicit: 64 unique authorized blobs
-   across a comparison, exactly reconstructable commits, no fork adapter. Larger or
-   unsupported inputs fail rather than being silently treated as complete.
-6. Run live fresh-repository install/select/consent and PR check → Focus → HLD → LLD
-   → exact-source browser acceptance, plus cost/permission/revocation and restart
-   qualification, before any activation claim.
+1. Review the local commits and obtain required remote PR/head CI evidence.
+   Local tests and packaging do not publish these changes or authorize a merge.
+2. Qualify a USD 0 Linux host, freshly signed sandbox workers, HTTPS proxies,
+   protected key stores and independent engine/host authorities. No account,
+   resource, App setting, deployment, release or pin was configured here.
+3. Qualify external backup authority/fencing against the latest committed safety
+   state; periodic old snapshots cannot restore revoked consent or spent budgets.
+   Local exact-snapshot tools do not solve unavailable external freshness evidence.
+4. Preserve scoped acquisition limits: 64 authorized blobs, exactly reconstructable
+   commits and no fork worker adapter. Larger/unsupported inputs fail explicitly.
+5. Run live fresh-repository install/select/consent/explicit operator approval and
+   PR check → Focus → HLD → LLD → exact-source browser acceptance, including cost,
+   permission, revocation, restart and recovery qualification.
 
 No activation action is required from the user at this checkpoint. Existing
 Actions/Pages publication and open PR #24 remain unchanged.

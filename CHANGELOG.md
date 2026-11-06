@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased: App execution continuation
+
+- Durable bounded initial PR discovery independently of webhooks, with fair,
+  restart-safe pending admission and unchanged scope/request limits.
+- One App-owned check progresses through queued/running/failure states to a
+  verified exact-head report; unknown creates cannot duplicate a check.
+- Explicit signed operator activation bound to current consent, architecture,
+  runtime pins and independent engine/host qualification; browser consent and
+  startup still do not activate execution.
+- Exact offline recovery anchors, new-destination-only import with execution
+  disabled, and terminal exhausted/unknown-job decisions without counter resets.
+- Runtime packaging includes the App host, preview/PR workers and operator/recovery
+  tools. Local macOS package smoke is not signed Linux or live App qualification.
+
+Locally committed development only; not uploaded, deployed or accepted as beta.
+
 ## Unreleased: public-ci-v1
 
 - Explicit consent-bound public HLD/LLD/source projection and immutable bundles.

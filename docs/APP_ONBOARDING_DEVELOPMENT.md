@@ -127,12 +127,12 @@ see [current boundaries and operator notes](APP_SOURCE_PREVIEW.md). Remaining:
 
 1. Qualified USD 0 Linux host, independently verified signed preview worker and
    live OAuth/permission acceptance.
-2. Complete initial PR discovery and queued/failure check UX. Fair admission,
-   tracked-PR repair, owned-check rerequests, durable REST reservations and delivery
-   limits are now locally tested; see [execution checkpoint](APP_EXECUTION_DEVELOPMENT.md).
-3. Separately approved operator activation and trusted backup/restore operations.
-   Browser final consent, signed chain verification, expiry/withdrawal cleanup and
-   public hosting/readback are implemented locally; none are deployed or activated.
+2. Review the locally committed discovery, queued/running/failure checks, explicit
+   signed operator activation and exhausted-job recovery; obtain remote PR CI
+   before integration. See [execution checkpoint](APP_EXECUTION_DEVELOPMENT.md).
+3. Qualify the operator trust roots and independently retained latest-committed
+   backup authority/fencing. Local exact-snapshot verification is not proof that
+   an available periodic backup includes later withdrawals or spent budgets.
 4. Real fresh-repository browser acceptance, HLD/LLD/source traversal, withdrawal,
    backup/restore and explicit activation approval.
 
