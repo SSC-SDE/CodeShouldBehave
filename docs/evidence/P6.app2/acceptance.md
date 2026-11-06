@@ -68,3 +68,12 @@ silent deletion, partial success or paid fallback when a limit is reached.
 Selected-path source scanning, component/gap review, architecture/publication
 consent, verified webhooks, workers, App receipts/checks and real host acceptance
 remain pending. Host unqualified; activation off; PR #24 unmerged.
+
+## Committed checkpoint
+
+Implementation: `49a0b80cc18afec57341bd69945f4387052315ef` on `phase-6`, existing PR #31.
+Committed distribution boundary: **355 files**, zero secret-pattern findings.
+Changed documentation: **27 local links** verified. No package was uploaded or
+release built by this check. The dependency set is unchanged from APP-1.
+GitHub confirmed PR #24 remains open, unmerged, at
+`b312bbf3c3f01299d04745b73ca3b81d24582a40`.

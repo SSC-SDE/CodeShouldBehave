@@ -699,3 +699,8 @@ is claimed; deployed release still predates these fixes.
   pipeline tests and ten offline browser scenarios passed. Strict Clippy in both
   configurations, formatting and whitespace checks passed. The legacy private-plan
   checker is unavailable in the public snapshot; see APP-2 evidence for that limit.
+- Implementation commit: `49a0b80cc18afec57341bd69945f4387052315ef`. Updated the existing
+  [PR #31](https://github.com/SSC-SDE/CodeShouldBehave/pull/31); provider-confirmed
+  state is open/non-draft, with no merge or activation performed. Committed source
+  distribution scan: 355 files, zero secret-pattern findings; 27 local docs links
+  verified. Dependency/license inventory is unchanged from APP-1.
