@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; font-src 'self'; style-src 'self'; script-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>CodeShouldBehave | See beyond the diff</title>
+  <meta name="description" content="Review Rust pull requests through architecture changes, local behavior and exact baseline/proposal source. Open-source, source-backed code review.">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="CodeShouldBehave | See beyond the diff">
+  <meta property="og:description" content="Trace a Rust pull request from architecture changes to local behavior and the exact source behind them.">
+  <meta property="og:image" content="https://ssc-sde.github.io/CodeShouldBehave/assets/landing/architecture.webp">
+  <meta property="og:image:alt" content="CodeShouldBehave architecture review workspace showing a published Rust pull request.">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="assets/landing/favicon.png" type="image/png">
+  <link rel="preload" href="assets/jetbrains-mono.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="preload" href="assets/landing/architecture.webp" as="image" fetchpriority="high">
+  <link rel="stylesheet" href="assets/landing.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header wrap">
+    <a class="brand" href="./" aria-label="CodeShouldBehave home">CodeShouldBehave</a>
+    <nav aria-label="Main navigation">
+      <a class="nav-detail" href="#how-it-works">How it works</a>
+      <a class="nav-detail" href="#setup">Setup</a>
+      <a href="https://github.com/SSC-SDE/CodeShouldBehave">GitHub</a>
+    </nav>
+  </header>
+  <main id="main">
+    <section class="hero wrap" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <p class="eyebrow">Rust pull request review</p>
+        <h1 id="hero-title">See beyond the diff.</h1>
+        <p class="hero-description">Trace Rust pull requests from architecture changes to local behavior and the exact source behind them.</p>
+        <div class="hero-actions">
+          <a class="button" href="workspace/">Open workspace <span aria-hidden="true">↗</span></a>
+          <a class="text-link" href="#how-it-works">How it works <span aria-hidden="true">↓</span></a>
+        </div>
+      </div>
+      <a class="hero-visual" href="workspace/" aria-label="Open workspace to explore published architecture reviews">
+        <img src="assets/landing/architecture.webp" width="1320" height="560" fetchpriority="high" alt="Published architecture dependency map with unresolved relationships explicitly marked.">
+      </a>
+    </section>
+    <section class="facts wrap" aria-label="Project fundamentals">
+      <p>Rust-first analysis</p>
+      <p>Exact commit comparisons</p>
+      <p>Open source, MIT licensed</p>
+    </section>
+    <section class="walkthrough wrap" id="how-it-works" aria-labelledby="walkthrough-title">
+      <div class="section-heading">
+        <h2 id="walkthrough-title">Follow the evidence.</h2>
+        <p>Start with the system-level change. Open a component, inspect local behavior, then compare the exact source.</p>
+      </div>
+      <div class="evidence-grid">
+        <figure class="behavior-evidence">
+          <div class="image-surface"><img src="assets/landing/detail.webp" width="1320" height="900" loading="lazy" decoding="async" alt="Published retry_decision control-flow graph in the CodeShouldBehave low-level design view."></div>
+          <figcaption>
+            <h3>Inspect local behavior.</h3>
+            <p>Drill from a component into declarations, functions and the flow supported by the published analysis.</p>
+          </figcaption>
+        </figure>
+        <figure class="source-evidence">
+          <div class="image-surface"><img src="assets/landing/source.webp" width="1285" height="300" loading="lazy" decoding="async" alt="Actual proposal source for retry_decision from a published CodeShouldBehave review."></div>
+          <figcaption>
+            <h3>Read the exact source.</h3>
+            <p>Compare baseline and proposal code. Coverage gaps stay visible instead of becoming unsupported conclusions.</p>
+            <a class="text-link" href="https://github.com/SSC-SDE/CodeShouldBehave/blob/b312bbf3c3f01299d04745b73ca3b81d24582a40/src/retry_policy/src/lib.rs#L25-L51">View source <span aria-hidden="true">↗</span></a>
+          </figcaption>
+        </figure>
+      </div>
+      <p class="capture-note">Screenshots show published reviews of CodeShouldBehave itself. Explore available reports in the workspace.</p>
+    </section>
+    <section class="setup" id="setup" aria-labelledby="setup-title">
+      <div class="wrap">
+        <div class="section-heading">
+          <h2 id="setup-title">Start with a public repository.</h2>
+          <p>The Actions and Pages profile works on this repository. Other public repositories need reviewed setup and explicit activation.</p>
+        </div>
+        <div class="setup-grid">
+          <div class="setup-current">
+            <h3>GitHub Actions + Pages</h3>
+            <p>Confirm the source scope, pinned analyzer, Pages configuration and budget controls before enabling checks.</p>
+            <a class="button" href="https://github.com/SSC-SDE/CodeShouldBehave/blob/main/templates/public-ci/README.md">Read setup guide <span aria-hidden="true">↗</span></a>
+          </div>
+          <aside class="setup-future" aria-labelledby="app-title">
+            <h3 id="app-title">GitHub App</h3>
+            <p>In development. Installing the registered App does not enable checks. Hosted execution and fresh-repository acceptance remain gated.</p>
+            <a class="text-link" href="https://github.com/SSC-SDE/CodeShouldBehave/blob/main/docs/GITHUB_APP_ONBOARDING_PLAN.md">View App progress <span aria-hidden="true">↗</span></a>
+          </aside>
+        </div>
+        <p class="scope-note">Experimental and advisory. A completed Architecture check is not a merge approval. Published reports are public and require no sign-in.</p>
+      </div>
+    </section>
+  </main>
+  <footer class="site-footer wrap">
+    <p>CodeShouldBehave</p>
+    <nav aria-label="Project information">
+      <a href="LICENSE">MIT license</a>
+      <a href="THIRD_PARTY_NOTICES.md">Third-party notices</a>
+      <a href="https://github.com/SSC-SDE/CodeShouldBehave/blob/main/SECURITY.md">Security</a>
+    </nav>
+  </footer>
+</body>
+</html>

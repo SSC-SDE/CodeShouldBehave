@@ -147,10 +147,47 @@ python3 scripts/public_site.py verify --site /absolute/path/to/new-site
 python3 -m http.server 3220 --bind 127.0.0.1 --directory /absolute/path/to/new-site
 ```
 
-Open `http://127.0.0.1:3220/workspace/`. This last command is only a local preview;
-the accepted hosted report does not need a reviewer to keep a terminal open.
+Open `http://127.0.0.1:3220/` for the landing page and choose **Open workspace**,
+or visit `/workspace/` directly. This is only a local preview; the accepted hosted
+report does not need a reviewer to keep a terminal open.
 The site builder prints its manifest hash/bytes. A restore additionally requires
 the independently trusted previous-site hash and current withdrawal ledger.
+
+## Public landing page
+
+`src/landing.html` and `src/landing.css` supply the Pages root. The assembler
+copies an explicit image/favicon allowlist from `src/landing/` and inventories
+every file in the existing signed-publication boundary. Source/runtime packages
+carry those same assets. Project-prefixed workspace and immutable report routes
+do not change. Preview does not deploy; installation, publication and activation
+retain their existing approval gates.
+
+The page has no JavaScript, analytics, login or forms. It respects system
+light/dark and reduced-motion preferences and reuses the bundled SIL-OFL
+JetBrains Mono font. The favicon is the workspace's existing `[!]` text mark,
+not a new logo. Origin-wide crawler policy and production caching/compression
+remain hosting concerns, not settings changed by the project-page builder.
+
+### Screenshot provenance
+
+Images are genuine browser captures of the project's already-public
+[PR #24](https://github.com/SSC-SDE/CodeShouldBehave/pull/24) review, not generated
+product mockups or a claim of general hosted-App availability:
+
+- Public bundle: `4b0d25a5a53b9d0229a147a07a784f88ff3055a8b6003c518fd8dd6036abba1f`.
+- Analysis review: `44b9e156489685b68ed22c7c3ecf3423c94ed904dbf07d42cfcbad36709cb7fc`.
+- Baseline: `ed06b6c8d36ce382c55abbb697145981ac124b21`.
+- Proposal: `b312bbf3c3f01299d04745b73ca3b81d24582a40`.
+
+Actual Chrome captures at 1320x900, DPR 1, were cropped and encoded at WebP
+quality 88, without recoloring or content alteration. `architecture.webp` is
+the Focus HLD crop `(0,0,1320,560)` with unresolved dependency labels retained.
+`detail.webp` is the complete 1320x900 Focus LLD viewport for `retry_decision`
+at 80% diagram zoom; static-evidence and collapsed-value limits remain visible.
+`source.webp` is the code-only crop `(12,588,1285,300)`, linked on the page to
+[the exact proposal source](https://github.com/SSC-SDE/CodeShouldBehave/blob/b312bbf3c3f01299d04745b73ca3b81d24582a40/src/retry_policy/src/lib.rs#L25-L51).
+Its source blob is `621ad2ae5ebfb34e6f72aaf455575a61901f3f89`. Cropping does
+not imply the visible fragment is the full function or the full analysis.
 
 ## Scope, cost and recovery
 

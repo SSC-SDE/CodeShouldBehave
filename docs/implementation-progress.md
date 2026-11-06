@@ -20,6 +20,57 @@ fresh-repository acceptance. See the final dated entry and
 [execution contract](APP_EXECUTION_DEVELOPMENT.md).
 
 
+## 2026-11-06 - public landing page
+
+User selected the public landing page after invoking the frontend design skill.
+Resuming existing public `phase-6` / [draft PR #32](https://github.com/SSC-SDE/CodeShouldBehave/pull/32)
+from local documentation commit `b3d3020`. Remote PR head remains
+`6efe23e26118bcd7e5351b3946b7f7fdd49f9faf`; no new branch or PR is needed.
+
+Audit: deployed `/CodeShouldBehave/` is only a workspace redirect, with no
+description or social metadata. Preserve `/workspace/`, immutable report links,
+existing branding and the dark reviewer UI. Landing work uses native CSS,
+self-hosted JetBrains Mono, graphite/blue tokens and system light/dark preference.
+No framework or design-system migration, invented customer proof, App install
+CTA, deployment, activation, credentials, release pins or budget changes.
+
+Implemented: static product introduction, actual published PR24 HLD/LLD/source
+captures, existing `[!]` brand favicon, system light/dark and reduced-motion
+preferences, self-hosted type, accessible keyboard entry and explicit setup
+availability. Zero landing scripts or trackers. Site/source/runtime inventories
+include only the declared landing assets; unapproved neighboring files stay out
+of the published site. Workspace/report paths and release controls are unchanged.
+
+Local evidence:
+
+- 121 public Python regressions pass, no skips. Existing HTTPError cleanup
+  ResourceWarnings remain visible. New tests cover unapproved neighboring
+  assets and missing/symlinked/oversized landing inputs, not page wording.
+- Actual Chrome: widths 320, 390, 768, 1024 and 1440; both themes at desktop
+  and mobile. No horizontal overflow; desktop headline two lines, subtext at
+  most four, hero/CTA visible. All three image decodes observed. Keyboard skip,
+  section anchor, reduced-motion behavior, documentation/source/notices links
+  and landing-to-workspace navigation exercised. No page exceptions.
+- CTA also opened a locally assembled real published PR32 report, bundle
+  `a1f293a0cfc5bc0ab2e4dc3ef5d0186f6e419edc9291165af7ad5f65fb6cf7e3`.
+  All 235 files matched the public manifest and the native semantic verifier
+  accepted the complete bundle before assembly. Selecting its card retained
+  exact review/bundle identities. Provider freshness is intentionally unknown
+  because this preview did not invent a new GitHub observation.
+- Lighthouse 12.8.2 against local Python HTTP: desktop performance 100,
+  mobile 99, accessibility 100 and best practices 100 in both runs. LCP:
+  desktop 0.48s, simulated mobile 2.25s; CLS 0 and TBT 0. SEO 92 because the
+  preview origin has no valid root robots.txt. No origin-wide crawler policy,
+  cache or compression changes were made. These are local lab results, not
+  deployed field Core Web Vitals or an INP measurement.
+- Hero body contrast: 7.49:1 light, 9.06:1 dark. CTA contrast: 6.42:1 light,
+  8.92:1 dark. Final desktop/mobile captures and Lighthouse JSON are retained
+  under ignored `target/landing-final-*` and `target/landing-lighthouse-*-final.json`.
+
+Native release packaging smoke remains in progress. Image provenance and local
+preview commands are in [public usage](PUBLIC_MVP_USAGE.md#public-landing-page).
+No push, deployment, App activation, merge or launch is authorized by this work.
+
 ## 2026-10-24 — context finalized and drift verified
 
 - PR #3: https://github.com/SSC-SDE/CodeShouldBehave/pull/3 — merged

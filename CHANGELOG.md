@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased: public landing page
+
+- Replace the Pages root redirect with a responsive, system-themed product page.
+- Use actual published architecture, local-flow and source screenshots, with
+  the existing brand mark, self-hosted font and no landing JavaScript or trackers.
+- Preserve workspace/report paths and distinguish reviewed Actions/Pages setup
+  from the unavailable App installation route.
+- Include explicit landing assets in site integrity manifests and source/runtime
+  distributions. No deployment, activation or release-pin change.
+
 ## Unreleased: App execution continuation
 
 - Durable bounded initial PR discovery independently of webhooks, with fair,

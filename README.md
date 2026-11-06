@@ -46,6 +46,14 @@ development integration.
 See the [execution checkpoint](docs/APP_EXECUTION_DEVELOPMENT.md) and
 [$0 hosting assessment](docs/APP_HOSTING_OPTIONS.md) for current limits.
 
+## Public landing page
+
+New site builds open on a responsive product introduction, with system light/dark
+themes and real captures of a published PR review. **Open workspace** preserves
+the existing reviewer entry; exact report links are unchanged. Actions/Pages
+setup and the unavailable App route are clearly separated. This landing change
+is local development, not a deployment. See [preview and image provenance](docs/PUBLIC_MVP_USAGE.md#public-landing-page).
+
 ## Reviewer journey
 
 1. After repository activation, open **CodeShouldBehave / Architecture** on the

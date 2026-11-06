@@ -23,6 +23,11 @@ class PublicSiteTests(unittest.TestCase):
         (self.project / "src").mkdir(parents=True)
         (self.project / "docs/prototypes/vendor").mkdir(parents=True)
         (self.project / "src/workspace.html").write_text('<meta name="color-scheme" content="dark"><link href="/assets/workspace.css"><a href="/workspace">CSB</a><script src="/assets/workspace.js"></script>')
+        (self.project / "src/landing.html").write_text('<!doctype html><link href="assets/landing.css"><a href="workspace/">Workspace</a><img src="assets/landing/architecture.webp">')
+        (self.project / "src/landing.css").write_text("body { color: #bfc4ce; }")
+        (self.project / "src/landing").mkdir()
+        for name in ("architecture.webp", "detail.webp", "source.webp", "favicon.png"):
+            (self.project / "src/landing" / name).write_bytes(b"trusted image fixture: " + name.encode())
         for name in ("workspace.js", "workspace.css", "public-workspace.js", "workspace-preferences.js", "workspace-registry.json"):
             (self.project / "src" / name).write_text("/* trusted UI fixture */")
         (self.project / "src/fonts").mkdir()
@@ -78,6 +83,31 @@ class PublicSiteTests(unittest.TestCase):
         (output / "assets/workspace.js").write_text("tampered")
         with self.assertRaisesRegex(site.SiteError, "hash/length"):
             site.verify_site(output, result["site_sha256"])
+
+    def test_landing_does_not_publish_unapproved_neighboring_assets(self):
+        (self.project / "src/landing/unpublished.webp").write_bytes(b"not a public asset")
+        output, _ = self.build([])
+        self.assertFalse((output / "assets/landing/unpublished.webp").exists())
+
+    def test_landing_inputs_must_be_present_bounded_regular_files(self):
+        for source, limit in (("src/landing.html", 512 * 1024), ("src/landing.css", 4 * 1024 * 1024), ("src/landing/source.webp", 4 * 1024 * 1024)):
+            path = self.project / source
+            original = path.read_bytes()
+            for kind in ("missing", "symlink", "oversize"):
+                with self.subTest(source=source, kind=kind):
+                    path.unlink()
+                    if kind == "symlink":
+                        path.symlink_to(self.project / "LICENSE")
+                    elif kind == "oversize":
+                        with path.open("wb") as stream:
+                            stream.truncate(limit + 1)
+                    with self.assertRaises(site.SiteError):
+                        self.build([])
+                    self.assertFalse((self.root / "site").exists())
+                    self.assertFalse(list(self.root.glob(".csb-site-*")))
+                    if path.exists() or path.is_symlink():
+                        path.unlink()
+                    path.write_bytes(original)
 
     def test_private_input_extra_file_and_hash_change_rejected_before_output(self):
         bundle, _ = self.bundle()
