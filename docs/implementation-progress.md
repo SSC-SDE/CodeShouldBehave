@@ -153,8 +153,21 @@ retirement: the exact capacity failure reproduced. With only the approved two
 IDs: native verification and site integrity pass, six other existing reports
 remain and the seven-report site occupies 55,894,576 bytes. Local snapshot hash:
 `5db5d3da2e11e3e45180c48479865e97719112279636712ffcfcbe9d8b9b98c4`.
-No live report was removed by this replay. Trusted Linux release, pin promotion
-and actual deployment/readback remain required.
+No live report was removed by this replay.
+
+[Retirement PR #35](https://github.com/SSC-SDE/CodeShouldBehave/pull/35)
+merged at provider-confirmed `5fb135fb7f3f550cb4373df8830679927cd0ced1`.
+Trusted Linux [build and attestation 42292639339](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/42292639339)
+passed, including all 125 publication regressions on the actual builder.
+[Signed canary](https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-5fb135fb7f3f)
+published after both archive hashes and offline exact-source/signer verification.
+Runtime SHA-256:
+`6c950ebc099075508b76471fe1e6515340f5848a21b71bd767a97591695564fd`;
+offline proof SHA-256:
+`0864e8909be527495349f9a63e12e1f11aa28ada645e66f603e642ea9f127e17`.
+Production bootstrap from the published URLs passed. The next pin promotion
+changes only engine identity; runtime budget, scope, workflow and App state
+are unchanged. Native preflight and actual deployment/readback remain required.
 
 
 ## 2026-10-24 — context finalized and drift verified
