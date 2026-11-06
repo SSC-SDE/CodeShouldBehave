@@ -200,7 +200,8 @@ def build_native(files, source_commit, directory, requested_target=None):
     with (directory / "native-build.log").open("wb") as log:
         subprocess.run(command, cwd=source, check=True, stdout=log, stderr=subprocess.STDOUT, timeout=600, env=environment)
     binaries, identities = {}, []
-    for name in ("flowdiff", "csb-public-report", "csb-onboarding"):
+    for name in ("flowdiff", "csb-public-report", "csb-onboarding", "csb-app-preview",
+                 "csb-app-pr-worker", "csb-app-host", "csb-app-operator", "csb-app-recovery"):
         path = target_directory / target / "release" / name
         if path.is_symlink() or not path.is_file() or path.stat().st_size > 64 * 1024 * 1024:
             raise ValueError("Built runtime executable missing or oversized")
