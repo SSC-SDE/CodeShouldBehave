@@ -52,12 +52,16 @@ than removing a production check. These commands do not deploy or enroll a repo.
 
 `--features github-app` enables the HTTPS adapter and implies `server`. The
 factory workspace deliberately mounts only `disabled_router()` even with that
-feature. Tests construct `router(Arc<AppSetupHost<P>>)` explicitly. There is no
-production launcher or configuration switch that silently mounts active routes.
+feature. Tests construct `router(Arc<AppSetupHost<P>>)` explicitly. The optional
+`csb-app-host` composes setup routes and can now configure a separate report listener
+and paused dispatcher. No configuration switch grants repository publication
+consent; see [execution development](APP_EXECUTION_DEVELOPMENT.md).
 The browser screen is available at `/github-app/setup`; the factory host shows
 setup unavailable and makes no account-service calls beyond its capability check.
 The explicitly mounted router supports the picker and scope review after login.
-Production host composition and live OAuth qualification remain pending.
+The optional inactive host launcher, explicit source preview, architecture review
+and webhook inbox are described in [source preview](APP_SOURCE_PREVIEW.md).
+Live OAuth/host qualification and automatic check delivery remain pending.
 
 ## Browser setup and scope review
 
@@ -118,17 +122,19 @@ No unauthorized repository names are returned.
 
 ## Remaining work, in order
 
-1. Connect explicit **Preview selected paths** source-scan authorization to the
-   existing onboarding model and its isolated, bounded fetch/scan implementation.
-   The completed path-metadata review must not be presented as a source scan.
-2. Component/gap editing and exact architecture/publication consent. Preserve
-   saved path intent while requiring fresh evidence and an explicit later grant.
-3. Verified webhook inbox, durable jobs, revocation, isolated workers and resource
-   limits measured on an approved Linux host.
-4. App-specific signed publication receipts, safe recovery and App-owned checks
-   linking exact Focus reports; no simulated GitHub Actions provenance.
-5. Real fresh-repository browser acceptance, HLD/LLD/source traversal, withdrawal,
-   backup/restore and explicit operator activation approval.
+The source-preview and inactive architecture acceptance slice is now implemented;
+see [current boundaries and operator notes](APP_SOURCE_PREVIEW.md). Remaining:
+
+1. Qualified USD 0 Linux host, independently verified signed preview worker and
+   live OAuth/permission acceptance.
+2. Complete initial PR discovery and queued/failure check UX. Fair admission,
+   tracked-PR repair, owned-check rerequests, durable REST reservations and delivery
+   limits are now locally tested; see [execution checkpoint](APP_EXECUTION_DEVELOPMENT.md).
+3. Separately approved operator activation and trusted backup/restore operations.
+   Browser final consent, signed chain verification, expiry/withdrawal cleanup and
+   public hosting/readback are implemented locally; none are deployed or activated.
+4. Real fresh-repository browser acceptance, HLD/LLD/source traversal, withdrawal,
+   backup/restore and explicit activation approval.
 
 The owner has no existing server/cloud account. [Hosting qualification](APP_HOSTING_OPTIONS.md)
 is pending; no cloud resources, App permissions, callback URLs or secrets were
@@ -153,7 +159,7 @@ CSB_CHROMIUM_EXECUTABLE=/absolute/path/to/chrome \
 node scripts/app_setup_browser.cjs
 ```
 
-Expect ten passing UI scenarios and screenshots/result JSON in
+Expect thirteen passing UI scenarios and screenshots/result JSON in
 `target/app-setup-browser/`. Covers unavailable host, picker/path selection,
 confirmation invalidation, inactive save, reload, conflict, provider failure,
 mobile/focus, access revocation and logout. See

@@ -909,3 +909,135 @@ is claimed; deployed release still predates these fixes.
   state is open/non-draft, with no merge or activation performed. Committed source
   distribution scan: 355 files, zero secret-pattern findings; 27 local docs links
   verified. Dependency/license inventory is unchanged from APP-1.
+
+## 2026-11-06 IST — App source preview and architecture review
+
+- GitHub confirmed PR #31 merged at `c52b5527d8d480c5b9e62863fe3ff4e94cf4bab5`.
+  Continued the existing clean `phase-6` branch by fast-forward to merged main.
+- Starting explicit selected-source consent, isolated preview worker, architecture
+  review and durable inactive acceptance. Hosting/live OAuth and activation remain
+  gated; PR #24 is open/unmerged. No production settings changed.
+- Added opt-in exact-source preview, existing detector reuse through a new bounded
+  native worker protocol, and a digest-pinned Linux sandbox launcher. Browser users
+  review/correct component boundaries and explicitly accept gaps/defer connections;
+  accepted architecture remains inactive and non-exportable.
+- Added additive migrations 17/18, optional inactive loopback host composition,
+  authenticated durable webhook notifications and sticky removal/uninstall blocks.
+  Notification claiming does not enqueue analysis. Existing Actions/Pages ownership,
+  workflow settings, viewer, releases and PR #24 remain unchanged.
+- Local acceptance: 316 all-feature Rust tests, 119 core-only tests, 119 publication
+  regressions, four sandbox policy tests and 13 offline browser scenarios passed.
+  Native executable protocol passed synthetic success/hash-mismatch checks;
+  non-loopback host startup was refused. Strict Clippy in both configurations passed.
+- Evidence: [source preview](evidence/P6.app2/source-preview.md) and
+  [webhook inbox](evidence/P6.app3/inbox.md). Full APP-2/APP-3/APP-4 rollout remains
+  incomplete: no qualified host/live OAuth, installation-token reconciler, full PR
+  worker scheduler or App signed-publication/check writer. No activation claimed.
+- Implementation commit: `7373248ea3120861431aa86539a61021124edcdf`. Opened draft continuation
+  [PR #32](https://github.com/SSC-SDE/CodeShouldBehave/pull/32) from `phase-6` to
+  `main`; full automatic App check delivery remains pending. Committed distribution
+  boundary scan passed for 364 files with zero secret-pattern findings. No release
+  package was uploaded and no deployment/activation occurred.
+
+
+## 2026-11-06 IST — PR #32 execution and signed delivery primitives
+
+- Resumed existing draft [PR #32](https://github.com/SSC-SDE/CodeShouldBehave/pull/32)
+  on `phase-6` at `6349fb5479200e7b562d61d82fe41f4e8e3d1bb1`. PR #24 remains
+  open/unmerged; activation, App settings and existing deployments are unchanged.
+- Added repository-limited installation tokens with RS256 JWTs, fresh public
+  same-repository PR/merge-base resolution, durable notification-to-job transactions,
+  revision/consent/lease fencing, bounded claims and delayed retry limits.
+- Added migration 19 with no enabled grants, distinct Ed25519 App signed intents,
+  exact readback validation and completed-check outbox delivery. Unknown create
+  outcomes reconcile rather than duplicating checks. No production consent writer,
+  PR analyzer adapter, host drain loop or report publisher is mounted.
+- Contract, local commands and remaining APP-3/APP-4 gates:
+  [App execution development](APP_EXECUTION_DEVELOPMENT.md). Live host qualification,
+  activation and hosted onboarding acceptance remain incomplete.
+- Validation: 329 all-feature Rust tests, 119 core-only tests and 119 publication
+  regression tests passed. Strict Clippy passed for all targets with all features
+  and with default features disabled; formatting/whitespace and 18 local docs links
+  passed. The real HLD/LLD fixture retained exact baseline/proposal source bytes
+  through signed intent, readback and a captured check payload. No live GitHub
+  installation token, check write, public upload or browser E2E run is claimed.
+- Implementation commit: `cd0f8154fe1f01cb1973a849f65391ee6c48ba04`.
+  Committed source-distribution scan: 367 files, zero secret-pattern findings.
+  Dependency versions/license inventory are unchanged; `ring` is now an optional
+  direct dependency using its existing locked version. PR #32 remains draft;
+  this checkpoint does not claim full APP-3/APP-4 acceptance.
+
+## 2026-11-06 IST — PR #32 PR worker, dispatch and report hosting
+
+- Resumed draft [PR #32](https://github.com/SSC-SDE/CodeShouldBehave/pull/32) on
+  `phase-6` from `9dfb47744645020d8152fe2565ffd9cbb07ad829`. Provider confirmed
+  PR #24 remains open/unmerged. No main commit, merge, release or activation.
+- Added bounded installation-token Git object acquisition with exact hash checks
+  and authorized blob-only reads. New credential-free PR worker reuses the native
+  engine for HLD/LLD and exact source export. Linux launcher is pinned/networkless;
+  offline policy tests pass, actual Linux qualification remains pending.
+- Connected inbox → queue → worker → signed intent → report publication/readback
+  → App completed-check delivery. Host dispatch defaults paused; absent consent
+  performs no GitHub requests. Migration 20 creates only an empty report catalog.
+- Added separate cookie-free report listener using the approved workspace, atomic
+  immutable file staging, signed catalog recovery, seven-day expiry, irreversible
+  withdrawal and current-consent checks on each report read. Readback verifies all
+  chunks, exact catalog identity and viewer assets before check delivery.
+- Verified local notification-to-check composition with real native diffs and mock
+  GitHub writes; failing readback cannot post a completed check, retry posts once,
+  and consent revoked during analysis cannot stage a signed report. Actual loopback
+  HTTP readback passes. Recovery cannot undo withdrawal; tampered source is refused.
+- Validation: 338 all-feature Rust tests, 119 core-only Rust tests, 119 public Python
+  regressions (Python 3.13, no skips), eight sandbox policy tests, both strict Clippy
+  configurations and formatting passed. Existing browser UI was not changed; no
+  live App/HTTPS/browser or Linux sandbox acceptance is claimed by these tests.
+- Explicit limitations: 64 unique authorized blobs across the comparison,
+  reconstructable exact commits only, no fork adapter, pending final authenticated
+  publication consent, durable lifetime API/delivery budgets, fair scheduling,
+  missed-event/rerequest repair, queued/failure checks, cleanup and backup restore.
+  Details, resource caps and operator options: [execution checkpoint](APP_EXECUTION_DEVELOPMENT.md).
+- No protected credentials, production origin, host account, App setting, workflow,
+  existing Actions/Pages deployment, engine pin or paid resource changed. PR #32
+  remains draft pending the documented implementation and live qualification gates.
+- Implementation commit: `426547b896bdc4386c701ac3152c67f428a1ecae`.
+  Committed distribution scan: 377 files, zero secret-pattern findings; 25 local
+  documentation links resolve. Locked dependency versions and license inventory
+  are unchanged. Continued the same draft PR #32; no additional PR or release.
+
+## 2026-11-06 IST — PR #32 final consent and durable safeguards
+
+- Continued existing draft `phase-6` PR #32 from
+  `ecf79b97ff34677ea6577cd661a8df43c5b58edd`; provider confirmed PR #24 open/unmerged.
+- Added migration 21 and authenticated publication preview/confirm/status/revoke.
+  The browser displays exact scope, destination, engine and retention, with three
+  explicit permissions. Decisions bind numeric actor, scope/context, operator pins,
+  expected revision and expiry. Consent never enables a grant. Replacement/revocation
+  disables previous grants, cancels unfinished work and withdraws reports atomically.
+- Added atomic non-refundable REST reservations before dispatch IO, with actual
+  broker call enforcement. Bounds: 384 tickets/job, 50/notification identity,
+  2,000/installation/day and 10,000/App/day. Failed/crashed passes retain reservations.
+- Added persistent tenant turns, analysis/delivery alternation, three delivery
+  attempts and bounded delayed retry. Idle passes reconcile one tracked PR with a
+  durable ten-minute checkpoint; only previously delivered App checks can map
+  rerequests to a PR. Neither path resets exhausted attempts or duplicates checks.
+- Added per-App signed receipt-chain audit at store opening/maintenance, expiry and
+  revocation cleanup, and bounded old orphan collection. Withdrawal precedes deletion;
+  symlinks/special files are refused. Signed intents and active analysis leases keep
+  recoverable staging. Whole-database rollback still requires an independent trusted
+  backup anchor and remains an explicit operational gate.
+- Validation: 346 all-feature Rust tests and 119 core-only Rust tests passed; the
+  final orphan-cleanup increment additionally passed all 77 App tests. Publication
+  regression suite: 119 passed, no skips. Offline browser suite: 17 scenarios,
+  including final consent, reload, revocation and narrow screens. No live GitHub,
+  HTTPS host or Linux sandbox acceptance is claimed. Tests use isolated fixtures.
+- Remaining gates: approved operator activation transaction, qualified USD 0 host /
+  signed Linux worker, initial PR discovery, queued/failure check UX, exhausted-job
+  recovery decision, trusted backup/restore and live fresh-repository acceptance.
+  Updated [execution contract](APP_EXECUTION_DEVELOPMENT.md) and README accordingly.
+- Activation remains OFF. No credentials, App settings, release pins, deployments,
+  billing resources, existing Actions/Pages ownership or PR #24 merge changed.
+- Implementation commit: `3f8824e9c40fcec41250b38ee8e658fd3dbb0fc2`.
+  Committed source distribution: 380 files, zero secret-pattern findings. Strict
+  Clippy passes for all targets in all-feature and core-only configurations;
+  formatting/whitespace and 25 local documentation links pass. No dependency
+  versions or license inventory changed. Continued the existing draft PR #32.
