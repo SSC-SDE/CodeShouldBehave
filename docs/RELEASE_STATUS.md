@@ -247,3 +247,45 @@ is ready for merge; hosted demo acceptance follows its deployment.
 - PR #24 stays open/unmerged; its description now includes the verified check
   entry and a three-minute presenter walkthrough. This completes the requested
   live demo checkpoint, not broader beta readiness or universal runtime proof.
+
+## Landing page deployed and approved history retired
+
+Landing source PR #33 merged at `fbe4b73340778311965d6bbf24919beb969c1c71`.
+The first signed release passed its native gates, but the existing 63.1 MB
+report site plus new reports exceeded the unchanged 64 MiB cap.
+
+The owner explicitly approved retiring only the older-scope PR24 report
+`7519517202cfdf944deb441c07cfece712f3e8908ca4c23700b70ee80f07a02c`
+and superseded PR31 report
+`aa78ab56631a941bcd4b78ec3e7058615adf2fd5ae5af92637a578651906b46b`.
+[PR #35](https://github.com/SSC-SDE/CodeShouldBehave/pull/35) introduced the
+base-owned exact-ID authority and durable signed withdrawals at merge
+`5fb135fb7f3f550cb4373df8830679927cd0ced1`. All 125 publication tests and
+an actual native-verifier replay passed without changing capacity limits.
+
+[Trusted build 42292639339](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/42292639339)
+and exact-source hosted attestation passed. Published
+[canary-5fb135fb7f3f](https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-5fb135fb7f3f)
+passed offline provenance, production bootstrap and
+[native sandbox preflight 42295408429](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/42295408429).
+[Pin PR #36](https://github.com/SSC-SDE/CodeShouldBehave/pull/36) merged at
+`0c7da4cb8cf1b97e6c061490cce9915b642431dc`; scope, consent, runtime budget
+identity and App state are unchanged.
+
+[Controller 42309306519](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/42309306519)
+successfully published and read back the complete site, committed signed
+generation 12 / sequence 62, delivered checks and passed its REST audit.
+The earlier pass stopped on its REST ticket; limits and counters were not bypassed.
+Final site: 55,894,647 bytes, seven reports, manifest hash
+`8db9c0186d3ba946ac185c65c0b336862431b44a790a0776e80ee6a3283951d4`.
+The exact signed promotion receipt was cryptographically verified again locally.
+
+[The homepage is live](https://ssc-sde.github.io/CodeShouldBehave/).
+Desktop light/mobile dark, all image/font loading, the workspace CTA and the
+retained PR24 HLD/LLD/exact-source journey passed in Chrome. All six unselected
+original manifests remain byte-identical and accessible; exactly the two
+approved obsolete versions have expiry records and no longer serve source.
+Details and actual receipt identities are in
+[the progress tracker](implementation-progress.md#landing-page-deployed-and-approved-history-retired).
+App activation and broader beta launch remain separate, unpassed gates.
+

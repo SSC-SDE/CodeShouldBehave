@@ -165,9 +165,47 @@ Runtime SHA-256:
 `6c950ebc099075508b76471fe1e6515340f5848a21b71bd767a97591695564fd`;
 offline proof SHA-256:
 `0864e8909be527495349f9a63e12e1f11aa28ada645e66f603e642ea9f127e17`.
-Production bootstrap from the published URLs passed. The next pin promotion
-changes only engine identity; runtime budget, scope, workflow and App state
-are unchanged. Native preflight and actual deployment/readback remain required.
+Production bootstrap from the published URLs passed.
+
+## Landing page deployed and approved history retired
+
+- Replacement native preflight
+  [42295408429](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/42295408429)
+  passed on exact pin commit `ab523127b725dadca5b42e6ca9022f8b0d22b79f`.
+  The local watcher timed out; direct GitHub job verification confirmed success.
+- [Pin PR #36](https://github.com/SSC-SDE/CodeShouldBehave/pull/36) merged at
+  provider-confirmed `0c7da4cb8cf1b97e6c061490cce9915b642431dc`.
+- Controller 42307917844 exhausted its REST ticket during pre-deployment staging.
+  No request limit was increased or counter reset. The next automatic pass,
+  [42309306519](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/42309306519),
+  succeeded on the same source/config, including complete live readback,
+  durable receipt commit, check delivery and the fixed REST audit.
+- Signed intent record `7612878142` persisted both withdrawals at sequence 61.
+  Verified promotion record `7612888556` is sequence 62, site generation 12,
+  Pages deployment version `0c7da4cb8cf1b97e6c061490cce9915b642431dc`.
+  The production cryptographic verifier accepted exact repository, source,
+  workflow, main ref, hosted runner and invocation identity.
+- Live site manifest SHA-256
+  `8db9c0186d3ba946ac185c65c0b336862431b44a790a0776e80ee6a3283951d4`
+  matches that signed receipt. Inventory: 1,737 files, 55,894,647 total bytes,
+  seven reports and exactly the two approved expiry records.
+- HTTP verification: all six other original report manifests return 200 and
+  match their previous SHA-256 identities. Both retired report manifests return
+  404 and their source-free expiry records say `withdrawn`. No other report
+  was retired. The 64 MiB site, 172 MiB artifact and 100-call pass limits remain.
+- Actual deployed Chrome smoke: desktop 1440 light and mobile 390 dark render
+  all three images and self-hosted font, no overflow, visible hero/CTA and zero
+  landing scripts. Primary CTA opens the seven-report workspace. Screenshots
+  retained under ignored `target/live-landing-*` in the acceptance worktree.
+- The retained exact PR24 link opens Focus/HLD, Zoom to LLD and `retry_decision`.
+  Selecting function entry opens source with exact proposal
+  `b312bbf3c3f01299d04745b73ca3b81d24582a40` and blob
+  `621ad2ae5ebfb34e6f72aaf455575a61901f3f89`. A first source wait was placed
+  before selecting a node and lost its browser tab; the correct interaction
+  was then exercised successfully. No source data or guard was changed.
+- App PR #32 remains separate and activation remains off. This is landing/Pages
+  deployment acceptance, not hosted App or broader beta qualification.
+
 
 
 ## 2026-10-24 — context finalized and drift verified
