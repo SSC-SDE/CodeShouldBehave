@@ -26,6 +26,13 @@ This correction restores the exact previously activated budget configuration;
 no state reset or guard bypass is performed. A subsequent controller run is
 required before claiming live canary acceptance.
 
+PR #42 was provider-confirmed merged into `main` at
+`958a764ec19bd492039b568b8d31387842adfd4e`. Corrected controller run
+[42489119517](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/42489119517)
+was dispatched from that merge; its final acceptance result is not recorded
+until the provider run completes.
+
+
 
 ## 2026-11-06 - public landing page
 
