@@ -288,4 +288,3 @@ approved obsolete versions have expiry records and no longer serve source.
 Details and actual receipt identities are in
 [the progress tracker](implementation-progress.md#landing-page-deployed-and-approved-history-retired).
 App activation and broader beta launch remain separate, unpassed gates.
-

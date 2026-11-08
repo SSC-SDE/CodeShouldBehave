@@ -208,6 +208,90 @@ Production bootstrap from the published URLs passed.
 
 
 
+## Current continuation — local, not pushed
+
+PR #32 was inspected at `6efe23e26118bcd7e5351b3946b7f7fdd49f9faf`.
+Implementation is locally committed on `phase-6` at
+`14012713ee3a505dd1f1d45bb7b33a049126183c`, followed by App runtime distribution
+`6edfc70c1129b4f23b6c384fad3d91e571a2cd3b` and progress-quota fairness correction
+`f041715cb9a2498b603fcac412d026dedd511cf9`. None has been pushed; remote CI,
+review and merge are not inferred.
+
+Discovery, operator activation validation, check lifecycle UX and exact offline
+recovery have passed local checks. Real App activation remains OFF. Remaining:
+qualified USD 0 Linux host/HTTPS/key stores, freshly signed worker qualification,
+independently fresh recovery authority/fencing, remote PR gates and live
+fresh-repository acceptance. See the final dated entry and
+[execution contract](APP_EXECUTION_DEVELOPMENT.md).
+
+
+## 2026-11-06 - public landing page
+
+User selected the public landing page after invoking the frontend design skill.
+Resuming existing public `phase-6` / [draft PR #32](https://github.com/SSC-SDE/CodeShouldBehave/pull/32)
+from local documentation commit `b3d3020`. Remote PR head remains
+`6efe23e26118bcd7e5351b3946b7f7fdd49f9faf`; no new branch or PR is needed.
+
+Audit: deployed `/CodeShouldBehave/` is only a workspace redirect, with no
+description or social metadata. Preserve `/workspace/`, immutable report links,
+existing branding and the dark reviewer UI. Landing work uses native CSS,
+self-hosted JetBrains Mono, graphite/blue tokens and system light/dark preference.
+No framework or design-system migration, invented customer proof, App install
+CTA, deployment, activation, credentials, release pins or budget changes.
+
+Implemented: static product introduction, actual published PR24 HLD/LLD/source
+captures, existing `[!]` brand favicon, system light/dark and reduced-motion
+preferences, self-hosted type, accessible keyboard entry and explicit setup
+availability. Zero landing scripts or trackers. Site/source/runtime inventories
+include only the declared landing assets; unapproved neighboring files stay out
+of the published site. Workspace/report paths and release controls are unchanged.
+
+Local evidence:
+
+- 121 public Python regressions pass, no skips. Existing HTTPError cleanup
+  ResourceWarnings remain visible. New tests cover unapproved neighboring
+  assets and missing/symlinked/oversized landing inputs, not page wording.
+- Actual Chrome: widths 320, 390, 768, 1024 and 1440; both themes at desktop
+  and mobile. No horizontal overflow; desktop headline two lines, subtext at
+  most four, hero/CTA visible. All three image decodes observed. Keyboard skip,
+  section anchor, reduced-motion behavior, documentation/source/notices links
+  and landing-to-workspace navigation exercised. No page exceptions.
+- CTA also opened a locally assembled real published PR32 report, bundle
+  `a1f293a0cfc5bc0ab2e4dc3ef5d0186f6e419edc9291165af7ad5f65fb6cf7e3`.
+  All 235 files matched the public manifest and the native semantic verifier
+  accepted the complete bundle before assembly. Selecting its card retained
+  exact review/bundle identities. Provider freshness is intentionally unknown
+  because this preview did not invent a new GitHub observation.
+- Lighthouse 12.8.2 against local Python HTTP: desktop performance 100,
+  mobile 99, accessibility 100 and best practices 100 in both runs. LCP:
+  desktop 0.48s, simulated mobile 2.25s; CLS 0 and TBT 0. SEO 92 because the
+  preview origin has no valid root robots.txt. No origin-wide crawler policy,
+  cache or compression changes were made. These are local lab results, not
+  deployed field Core Web Vitals or an INP measurement.
+- Hero body contrast: 7.49:1 light, 9.06:1 dark. CTA contrast: 6.42:1 light,
+  8.92:1 dark. Final desktop/mobile captures and Lighthouse JSON are retained
+  under ignored `target/landing-final-*` and `target/landing-lighthouse-*-final.json`.
+
+Implementation and native package smoke passed at exact local commit
+`5df2e62d128c2507ab65da76c729839c723db825`. The isolated Rust 1.87 release build
+produced all eight binaries for `aarch64-apple-darwin`. Source archive SHA-256:
+`0ca1182a8ab47779f136f21366a3f6c779b33a2d1f13afe92db2cc9cd69b1c47`;
+runtime archive SHA-256:
+`0f97b63a15eaf97ed99326122116455d231120a4e6a9aba58c6dc27b3cc4ef47`.
+Archives and manifests are retained in ignored `target/landing-runtime-5df2e62/`.
+The package inventory retains 108 locked license packages and reports zero
+findings under its declared credential-pattern rules, not exhaustive detection.
+
+The extracted runtime's own native verifier and Python assembler accepted the
+real 235-file public bundle and generated an integrity-verified 11,403,352-byte
+site. Actual Chrome loaded all three images and the font from that packaged
+site, then followed the primary CTA and selected the exact PR32 review/bundle
+successfully, with no page exceptions. This is local macOS packaging proof,
+not signed Linux, hosted App, deployment or beta qualification. Temporary raw
+capture files were removed. Image provenance and preview commands are in
+[public usage](PUBLIC_MVP_USAGE.md#public-landing-page).
+No push, deployment, App activation, merge or launch is authorized by this work.
+
 ## 2026-10-24 — context finalized and drift verified
 
 - PR #3: https://github.com/SSC-SDE/CodeShouldBehave/pull/3 — merged
@@ -909,3 +993,216 @@ is claimed; deployed release still predates these fixes.
   state is open/non-draft, with no merge or activation performed. Committed source
   distribution scan: 355 files, zero secret-pattern findings; 27 local docs links
   verified. Dependency/license inventory is unchanged from APP-1.
+
+## 2026-11-06 IST — App source preview and architecture review
+
+- GitHub confirmed PR #31 merged at `c52b5527d8d480c5b9e62863fe3ff4e94cf4bab5`.
+  Continued the existing clean `phase-6` branch by fast-forward to merged main.
+- Starting explicit selected-source consent, isolated preview worker, architecture
+  review and durable inactive acceptance. Hosting/live OAuth and activation remain
+  gated; PR #24 is open/unmerged. No production settings changed.
+- Added opt-in exact-source preview, existing detector reuse through a new bounded
+  native worker protocol, and a digest-pinned Linux sandbox launcher. Browser users
+  review/correct component boundaries and explicitly accept gaps/defer connections;
+  accepted architecture remains inactive and non-exportable.
+- Added additive migrations 17/18, optional inactive loopback host composition,
+  authenticated durable webhook notifications and sticky removal/uninstall blocks.
+  Notification claiming does not enqueue analysis. Existing Actions/Pages ownership,
+  workflow settings, viewer, releases and PR #24 remain unchanged.
+- Local acceptance: 316 all-feature Rust tests, 119 core-only tests, 119 publication
+  regressions, four sandbox policy tests and 13 offline browser scenarios passed.
+  Native executable protocol passed synthetic success/hash-mismatch checks;
+  non-loopback host startup was refused. Strict Clippy in both configurations passed.
+- Evidence: [source preview](evidence/P6.app2/source-preview.md) and
+  [webhook inbox](evidence/P6.app3/inbox.md). Full APP-2/APP-3/APP-4 rollout remains
+  incomplete: no qualified host/live OAuth, installation-token reconciler, full PR
+  worker scheduler or App signed-publication/check writer. No activation claimed.
+- Implementation commit: `7373248ea3120861431aa86539a61021124edcdf`. Opened draft continuation
+  [PR #32](https://github.com/SSC-SDE/CodeShouldBehave/pull/32) from `phase-6` to
+  `main`; full automatic App check delivery remains pending. Committed distribution
+  boundary scan passed for 364 files with zero secret-pattern findings. No release
+  package was uploaded and no deployment/activation occurred.
+
+
+## 2026-11-06 IST — PR #32 execution and signed delivery primitives
+
+- Resumed existing draft [PR #32](https://github.com/SSC-SDE/CodeShouldBehave/pull/32)
+  on `phase-6` at `6349fb5479200e7b562d61d82fe41f4e8e3d1bb1`. PR #24 remains
+  open/unmerged; activation, App settings and existing deployments are unchanged.
+- Added repository-limited installation tokens with RS256 JWTs, fresh public
+  same-repository PR/merge-base resolution, durable notification-to-job transactions,
+  revision/consent/lease fencing, bounded claims and delayed retry limits.
+- Added migration 19 with no enabled grants, distinct Ed25519 App signed intents,
+  exact readback validation and completed-check outbox delivery. Unknown create
+  outcomes reconcile rather than duplicating checks. No production consent writer,
+  PR analyzer adapter, host drain loop or report publisher is mounted.
+- Contract, local commands and remaining APP-3/APP-4 gates:
+  [App execution development](APP_EXECUTION_DEVELOPMENT.md). Live host qualification,
+  activation and hosted onboarding acceptance remain incomplete.
+- Validation: 329 all-feature Rust tests, 119 core-only tests and 119 publication
+  regression tests passed. Strict Clippy passed for all targets with all features
+  and with default features disabled; formatting/whitespace and 18 local docs links
+  passed. The real HLD/LLD fixture retained exact baseline/proposal source bytes
+  through signed intent, readback and a captured check payload. No live GitHub
+  installation token, check write, public upload or browser E2E run is claimed.
+- Implementation commit: `cd0f8154fe1f01cb1973a849f65391ee6c48ba04`.
+  Committed source-distribution scan: 367 files, zero secret-pattern findings.
+  Dependency versions/license inventory are unchanged; `ring` is now an optional
+  direct dependency using its existing locked version. PR #32 remains draft;
+  this checkpoint does not claim full APP-3/APP-4 acceptance.
+
+## 2026-11-06 IST — PR #32 PR worker, dispatch and report hosting
+
+- Resumed draft [PR #32](https://github.com/SSC-SDE/CodeShouldBehave/pull/32) on
+  `phase-6` from `9dfb47744645020d8152fe2565ffd9cbb07ad829`. Provider confirmed
+  PR #24 remains open/unmerged. No main commit, merge, release or activation.
+- Added bounded installation-token Git object acquisition with exact hash checks
+  and authorized blob-only reads. New credential-free PR worker reuses the native
+  engine for HLD/LLD and exact source export. Linux launcher is pinned/networkless;
+  offline policy tests pass, actual Linux qualification remains pending.
+- Connected inbox → queue → worker → signed intent → report publication/readback
+  → App completed-check delivery. Host dispatch defaults paused; absent consent
+  performs no GitHub requests. Migration 20 creates only an empty report catalog.
+- Added separate cookie-free report listener using the approved workspace, atomic
+  immutable file staging, signed catalog recovery, seven-day expiry, irreversible
+  withdrawal and current-consent checks on each report read. Readback verifies all
+  chunks, exact catalog identity and viewer assets before check delivery.
+- Verified local notification-to-check composition with real native diffs and mock
+  GitHub writes; failing readback cannot post a completed check, retry posts once,
+  and consent revoked during analysis cannot stage a signed report. Actual loopback
+  HTTP readback passes. Recovery cannot undo withdrawal; tampered source is refused.
+- Validation: 338 all-feature Rust tests, 119 core-only Rust tests, 119 public Python
+  regressions (Python 3.13, no skips), eight sandbox policy tests, both strict Clippy
+  configurations and formatting passed. Existing browser UI was not changed; no
+  live App/HTTPS/browser or Linux sandbox acceptance is claimed by these tests.
+- Explicit limitations: 64 unique authorized blobs across the comparison,
+  reconstructable exact commits only, no fork adapter, pending final authenticated
+  publication consent, durable lifetime API/delivery budgets, fair scheduling,
+  missed-event/rerequest repair, queued/failure checks, cleanup and backup restore.
+  Details, resource caps and operator options: [execution checkpoint](APP_EXECUTION_DEVELOPMENT.md).
+- No protected credentials, production origin, host account, App setting, workflow,
+  existing Actions/Pages deployment, engine pin or paid resource changed. PR #32
+  remains draft pending the documented implementation and live qualification gates.
+- Implementation commit: `426547b896bdc4386c701ac3152c67f428a1ecae`.
+  Committed distribution scan: 377 files, zero secret-pattern findings; 25 local
+  documentation links resolve. Locked dependency versions and license inventory
+  are unchanged. Continued the same draft PR #32; no additional PR or release.
+
+## 2026-11-06 IST — PR #32 final consent and durable safeguards
+
+- Continued existing draft `phase-6` PR #32 from
+  `ecf79b97ff34677ea6577cd661a8df43c5b58edd`; provider confirmed PR #24 open/unmerged.
+- Added migration 21 and authenticated publication preview/confirm/status/revoke.
+  The browser displays exact scope, destination, engine and retention, with three
+  explicit permissions. Decisions bind numeric actor, scope/context, operator pins,
+  expected revision and expiry. Consent never enables a grant. Replacement/revocation
+  disables previous grants, cancels unfinished work and withdraws reports atomically.
+- Added atomic non-refundable REST reservations before dispatch IO, with actual
+  broker call enforcement. Bounds: 384 tickets/job, 50/notification identity,
+  2,000/installation/day and 10,000/App/day. Failed/crashed passes retain reservations.
+- Added persistent tenant turns, analysis/delivery alternation, three delivery
+  attempts and bounded delayed retry. Idle passes reconcile one tracked PR with a
+  durable ten-minute checkpoint; only previously delivered App checks can map
+  rerequests to a PR. Neither path resets exhausted attempts or duplicates checks.
+- Added per-App signed receipt-chain audit at store opening/maintenance, expiry and
+  revocation cleanup, and bounded old orphan collection. Withdrawal precedes deletion;
+  symlinks/special files are refused. Signed intents and active analysis leases keep
+  recoverable staging. Whole-database rollback still requires an independent trusted
+  backup anchor and remains an explicit operational gate.
+- Validation: 346 all-feature Rust tests and 119 core-only Rust tests passed; the
+  final orphan-cleanup increment additionally passed all 77 App tests. Publication
+  regression suite: 119 passed, no skips. Offline browser suite: 17 scenarios,
+  including final consent, reload, revocation and narrow screens. No live GitHub,
+  HTTPS host or Linux sandbox acceptance is claimed. Tests use isolated fixtures.
+- Remaining gates: approved operator activation transaction, qualified USD 0 host /
+  signed Linux worker, initial PR discovery, queued/failure check UX, exhausted-job
+  recovery decision, trusted backup/restore and live fresh-repository acceptance.
+  Updated [execution contract](APP_EXECUTION_DEVELOPMENT.md) and README accordingly.
+- Activation remains OFF. No credentials, App settings, release pins, deployments,
+  billing resources, existing Actions/Pages ownership or PR #24 merge changed.
+- Implementation commit: `3f8824e9c40fcec41250b38ee8e658fd3dbb0fc2`.
+  Committed source distribution: 380 files, zero secret-pattern findings. Strict
+  Clippy passes for all targets in all-feature and core-only configurations;
+  formatting/whitespace and 25 local documentation links pass. No dependency
+  versions or license inventory changed. Continued the existing draft PR #32.
+
+## 2026-11-07 — bounded App completion, local verification and distribution
+
+- Continued the public `phase-6` checkout from inspected PR #32 head
+  `6efe23e26118bcd7e5351b3946b7f7fdd49f9faf`, separately from the preserved
+  private-repository working tree. Implementation commit:
+  `14012713ee3a505dd1f1d45bb7b33a049126183c`; packaging commit:
+  `6edfc70c1129b4f23b6c384fad3d91e571a2cd3b`; final progress-quota correction:
+  `f041715cb9a2498b603fcac412d026dedd511cf9`. No remote update or merge.
+- Migrations 22–25 add durable initial discovery, explicit signed activation audit,
+  terminal recovery decisions/monotonic lifetime history and check progress.
+  Discovery admits one page or pending PR per tick, including already-open PRs
+  with no webhook. Leases, pending capacity, failed-page retention, rotating turns
+  and hourly repeated walks survive restart. Known exact-authority jobs stay with
+  tracked repair. Pagination is not a snapshot-completeness claim; forks remain
+  unsupported by the worker.
+- The same immutable App-owned Architecture check transitions through queued,
+  running/publishing and failure. Only validated full readback can produce a
+  completed result/Focus link. A lost queued POST is reconciled from its original
+  durable payload; PATCH checks exact App/head/job ownership. Progress writes have
+  bounded retries and consume existing nonrefundable lifetime/daily budgets.
+  A lifetime-budget or credential refusal before provider admission also persists
+  a ten-minute delay, so a blocked first check cannot starve other pending checks.
+  The regression verifies selection and unchanged spent tickets across restart.
+- Added `csb-app-operator` preview/approve/commit/offline-evidence workflow with
+  three independent Ed25519 roots, exact consent/scope/context/pins, fresh public
+  admin/installation access, ten-minute approvals and atomic revision fences.
+  Runtime grants bind canonical admin consent, not a synthetic policy hash.
+  Browser consent never activates; the setup screen distinguishes recorded
+  operator authority from unknown runtime availability. Logout is not revocation.
+- Added `csb-app-recovery` exact offline backup/verify/new-copy tooling and explicit
+  exhausted/unknown-job reconciliation/abandonment APIs. They cannot POST a
+  replacement check, reset attempts/reservations or restore withdrawn reports.
+  Host import verifies before migrations/listeners, requires a latest-committed/
+  quiesced authority acknowledgement, boots paused and disables imported grants.
+  Independent external freshness remains a deployment qualification gate: an old
+  periodic backup cannot prove no later revocations or spent budgets existed.
+- Initial integration checks exposed digest-format incompatibility, an immutable
+  test-fixture mutation, a mismatched consented test origin and an oversized API
+  parameter list. Actual CLI smoke also exposed standard PKCS#8 v1 rejection;
+  v1/v2 now derive and match the independently configured operator public root.
+  These failures were corrected before the implementation commit; they are not
+  represented as successful earlier runs.
+- Verified on macOS arm64 with Rust 1.87 and Python 3.14:
+  `cargo +1.87.0 test --locked --all-features` — **387 passed**;
+  `cargo +1.87.0 test --locked --no-default-features` — **119 passed**;
+  strict all-target Clippy in both configurations passed.
+  `/opt/homebrew/bin/python3 -m unittest discover -s tests -p 'public*test.py'`
+  — **119 passed, no skips**; the corresponding `app_*sandbox_test.py` suite
+  — **8 passed**. Sandbox policy checks do not qualify a Linux host.
+- The no-first-webhook dispatcher regression runs inventory → current comparison
+  → real native HLD/LLD → signed delivery with fixture GitHub writes. The actual
+  recovery executable passed backup/anchor/verify/new-copy and foreign-App/
+  no-overwrite smoke. Actual operator commands verified ephemeral fixture
+  signatures, signed a standard PKCS#8 v1 approval, rejected tampering and left
+  database/artifact paths absent. No production credentials or network authority
+  were supplied.
+- Actual Chrome rendered the operator-authorized setup state with synthetic App
+  API responses, then exercised revocation and logout. Desktop and 390px pages
+  displayed unknown runtime availability, no horizontal overflow, no page errors
+  and no browser credential storage. Local visual evidence:
+  `target/operator-status-desktop.png`, `target/operator-status-mobile.png`.
+  This is local browser evidence, not live OAuth/App acceptance.
+- `scripts/build_public_release.py --output target/app-continuation-runtime-f041715
+  --revision f041715cb9a2498b603fcac412d026dedd511cf9 --build-runtime`
+  built exact committed source in an isolated offline tree. Local
+  `aarch64-apple-darwin` package contains all eight binaries, including the App
+  host, preview/PR workers and operator/recovery tools. Clean extraction passed
+  recovery self-test, operator help and invalid-worker-input rejection.
+  Manifest: 449 files including notices, 108 locked registry-license packages,
+  zero findings under the declared three-rule pattern scan (not exhaustive secret
+  detection). Runtime archive SHA-256:
+  `0260ba4595823f87fb4a38306ea75f37cb998121199fdc2db4f80c8cebebbe4c`.
+  Artifacts remain local under `target/app-continuation-runtime-f041715`; no upload,
+  hosted attestation, signed Linux release or engine-pin update is claimed.
+- Remaining external gates: qualified USD 0 Linux/HTTPS/key-storage service and
+  independent qualification roots; signed workers on that host; latest-committed
+  recovery authority/fencing; PR CI/review/merge; explicit real operator activation;
+  and live fresh-repository check → Focus → HLD → LLD → source plus revocation/
+  cost/restart/recovery acceptance. Existing Actions/Pages deployment, PR #24,
+  billing and App settings remain unchanged. Beta is not launched.

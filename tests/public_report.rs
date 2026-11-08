@@ -32,6 +32,22 @@ impl Fixture {
         Self::with_inventory(proposed_source, "")
     }
     fn with_inventory(proposed_source: &str, unchanged_source: &str) -> Self {
+        Self::with_scope(
+            proposed_source,
+            unchanged_source,
+            "PRIVATE_SCOPE_VERSION_SENTINEL",
+        )
+    }
+    fn with_scope(proposed_source: &str, unchanged_source: &str, scope_version: &str) -> Self {
+        Self::with_scope_from_baseline(proposed_source, unchanged_source, |_| {
+            scope_version.to_owned()
+        })
+    }
+    fn with_scope_from_baseline(
+        proposed_source: &str,
+        unchanged_source: &str,
+        scope_version: impl FnOnce(&str) -> String,
+    ) -> Self {
         let root = std::env::temp_dir().join(format!(
             "csb-public-{}-{}",
             std::process::id(),
@@ -79,6 +95,7 @@ impl Fixture {
         git(&["add", "."]);
         git(&["commit", "-qm", "baseline"]);
         let baseline = git(&["rev-parse", "HEAD"]);
+        let scope_version = scope_version(&baseline);
         fs::write(root.join("src/lib.rs"), proposed_source).unwrap();
         git(&["add", "."]);
         git(&["commit", "--allow-empty", "-qm", "proposal"]);
@@ -91,7 +108,7 @@ impl Fixture {
         )
         .unwrap();
         let scope = ScopeRecord {
-            version: ScopeVersion::new("PRIVATE_SCOPE_VERSION_SENTINEL").unwrap(),
+            version: ScopeVersion::new(scope_version.as_str()).unwrap(),
             primary_repository: repository,
             primary_paths: PathScope::new(vec![".".into()], vec!["private".into()]).unwrap(),
             contexts: vec![],
@@ -659,4 +676,137 @@ fn modified_public_counterpart_keeps_first_detail_and_both_source_sides() {
     }
     assert!(bundle.manifest.coverage.deferred_details > 0);
     bundle.validate().unwrap();
+}
+
+#[cfg(feature = "github-app")]
+#[test]
+fn app_signed_delivery_preserves_real_hld_lld_and_exact_source_routes() {
+    use flowdiff::github_app_setup::{
+        AppCheckDelivery, AppExecutionProvider, AppExecutionQueue, AppReceiptSigner,
+        CurrentPullRequest, SetupError,
+    };
+    use std::cell::RefCell;
+    let policy:PublicPolicy=serde_json::from_value(json!({"schema_version":"csb-public-policy-v1","repository":{"id":42,"owner":"fixture","name":"public"},"public":true,"publication_consent":true,"include":["."],"exclude":["private"],"baseline_mode":"merge_base","max_details":100})).unwrap();
+    let metadata = json!({"package":"flowdiff","version":env!("CARGO_PKG_VERSION"),"hld_generator":flowdiff::design::HLD_GENERATOR_VERSION,"lld_generator":flowdiff::lld::LLD_GENERATOR_VERSION,"lld_parser":flowdiff::lld::LLD_IR_VERSION,"public_projection":flowdiff::public_report::PUBLIC_SCHEMA});
+    let mut consent_document = Value::Null;
+    let mut consent = String::new();
+    let mut f = Fixture::with_scope_from_baseline(
+        "pub fn guard(n:i32)->i32 { if n > 5 { return 3; } 0 }\n",
+        "",
+        |baseline| {
+            consent_document = json!({"schema":"csb-app-publication-consent-v1","app_id":1,"installation_id":2,"repository_id":42,"actor_id":4,"scope_revision":1,"scope_commit":baseline,"context_digest":sha256(b"{}"),"operator":{"report_origin":"https://reports.example.test","engine_digest":"c".repeat(64),"engine_metadata_digest":sha256(&canonical_json(&metadata).unwrap())},"policy":policy});
+            consent = sha256(&canonical_json(&consent_document).unwrap());
+            format!("app-scope-v1:1:2:42:1:{consent}")
+        },
+    );
+    f.policy = policy.clone();
+    let bundle = export_public_report(&f.artifact, &f.policy, &f.expected).unwrap();
+    assert!(bundle.manifest.routes.hld.is_some());
+    assert!(bundle.manifest.routes.lld_catalog.is_some());
+    assert!(!bundle.manifest.routes.lld_details.is_empty());
+    assert!(!bundle.manifest.routes.sources.is_empty());
+    let storage =
+        flowdiff::Storage::open(&f.root.join("app.db"), &f.root.join("app-artifacts")).unwrap();
+    // Explicit test-only activation. Production onboarding has no grant writer.
+    let conn = rusqlite::Connection::open(f.root.join("app.db")).unwrap();
+    conn.execute("INSERT INTO app_setup_repositories(app_id,installation_id,repository_id,owner,name,selected_by_user_id,selected_at_s) VALUES(1,2,42,'fixture','public',4,1)",[]).unwrap();
+    let scope = json!({"schema":"csb-app-scope-v1","installation_id":2,"repository_id":42,"commit":f.expected.baseline,"tree":"a".repeat(40),"default_branch":"main","include":["."],"exclude":["private"],"files":["src/lib.rs"],"rust_candidates":1,"unsupported_files":0,"automatically_excluded":1,"inventory_fingerprint":"b".repeat(64),"sensitive_path_policy":"v1","source_scanned":false,"architecture_confirmed":false,"publication_consent":false});
+    conn.execute("INSERT INTO app_setup_scopes(app_id,installation_id,repository_id,revision,actor_id,confirmed_at_s,document) VALUES(1,2,42,1,4,1,?1)",[scope.to_string()]).unwrap();
+    conn.execute("INSERT INTO app_architecture_acceptances(app_id,installation_id,repository_id,scope_revision,actor_id,accepted_at_s,context) VALUES(1,2,42,1,4,1,'{}')",[]).unwrap();
+    conn.execute("INSERT INTO app_publication_consents(app_id,installation_id,repository_id,revision,actor_id,created_at,document,digest) VALUES(1,2,42,1,4,1,?1,?2)",rusqlite::params![consent_document.to_string(),consent]).unwrap();
+    conn.execute("INSERT INTO app_execution_grants(app_id,installation_id,repository_id,scope_revision,consent_digest,engine_digest,engine_metadata_digest,policy,enabled) VALUES(1,2,42,1,?1,?2,?3,?4,1)",rusqlite::params![consent,"c".repeat(64),sha256(&canonical_json(&bundle.manifest.engine).unwrap()),serde_json::to_string(&policy).unwrap()]).unwrap();
+    struct Provider(CurrentPullRequest);
+    impl AppExecutionProvider for Provider {
+        fn current_pr(&self, i: i64, r: i64, p: i64) -> Result<CurrentPullRequest, SetupError> {
+            assert_eq!((i, r, p), (2, 42, 7));
+            Ok(self.0.clone())
+        }
+    }
+    struct Writer(RefCell<Option<Value>>);
+    impl AppCheckDelivery for Writer {
+        fn find(&self, _: i64, _: &str, _: &Value) -> Result<Option<i64>, SetupError> {
+            Ok(None)
+        }
+        fn create(&self, _: i64, payload: &Value) -> Result<i64, SetupError> {
+            self.0.replace(Some(payload.clone()));
+            Ok(99)
+        }
+        fn update(&self, _: i64, id: i64, payload: &Value) -> Result<i64, SetupError> {
+            if id != 99 {
+                return Err(SetupError::Conflict);
+            }
+            self.0.replace(Some(payload.clone()));
+            Ok(id)
+        }
+    }
+    let provider = Provider(CurrentPullRequest {
+        repository_id: 42,
+        number: 7,
+        selected_base: f.expected.selected_baseline.clone(),
+        merge_base: f.expected.baseline.clone(),
+        head: f.expected.proposal.clone(),
+        open: true,
+        draft: false,
+    });
+    let queue = AppExecutionQueue::new(storage, 1).unwrap();
+    let id = queue.reconcile(2, 42, 7, &provider).unwrap().unwrap();
+    let lease = queue.claim().unwrap().unwrap();
+    assert_eq!(
+        lease.input.scope_version(),
+        format!("app-scope-v1:1:2:42:1:{consent}")
+    );
+    let key = AppReceiptSigner::from_pkcs8(
+        ring::signature::Ed25519KeyPair::generate_pkcs8(&ring::rand::SystemRandom::new())
+            .unwrap()
+            .as_ref(),
+    )
+    .unwrap();
+    let signed = queue
+        .stage(
+            &lease,
+            &bundle,
+            &bundle.manifest.engine,
+            "https://reports.example.test",
+            &key,
+            &provider,
+        )
+        .unwrap();
+    let directory = f.root.join("published");
+    write_bundle(&bundle, &directory).unwrap();
+    verify_bundle(&directory).unwrap();
+    // Simulate independent readback bytes. Actual HTTP publication remains unmounted.
+    let mut readback = bundle.clone();
+    for (path, bytes) in &mut readback.files {
+        *bytes = fs::read(directory.join(path)).unwrap();
+    }
+    let url = queue
+        .confirm_readback(&id, key.public_key(), &readback, &provider)
+        .unwrap();
+    assert_eq!(url, signed.focus_url());
+    let writer = Writer(RefCell::new(None));
+    assert_eq!(
+        queue
+            .deliver(&id, key.public_key(), &provider, &writer)
+            .unwrap(),
+        99
+    );
+    let sent = writer.0.borrow();
+    let sent = sent.as_ref().unwrap();
+    assert_eq!(sent["head_sha"], f.expected.proposal);
+    assert_eq!(sent["details_url"], url);
+    assert_eq!(sent["conclusion"], "neutral");
+    assert!(url.contains("mode=focus&design=hld"));
+    assert!(url.contains(&bundle.manifest.public_report_id));
+    assert_eq!(bundle.manifest.routes.file_sources.len(), 2);
+    for source in &bundle.manifest.routes.file_sources {
+        let evidence: Value = serde_json::from_slice(&readback.files[&source.path]).unwrap();
+        assert_eq!(evidence["path"], "src/lib.rs");
+        let (commit, text) = if source.side == "baseline" {
+            (&f.expected.baseline, "n > 1")
+        } else {
+            (&f.expected.proposal, "n > 5")
+        };
+        assert_eq!(evidence["commit"], *commit);
+        assert!(evidence["text"].as_str().unwrap().contains(text));
+    }
 }

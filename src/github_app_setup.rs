@@ -1,7 +1,10 @@
 //! Inactive-by-default App onboarding identity boundary.
 //!
-//! This module saves inactive scope intent; it does not fetch file content,
-//! grant analysis access, schedule jobs or publish.
+//! This module saves inactive scope/context and supports explicit bounded source
+//! preview with an operator-configured isolated worker. The optional execution
+//! integration supplies an opt-in paused host dispatcher and separate report
+//! listener. Browser consent never enables a grant; only the separately authorized
+//! operator process can do so after verifying independent qualification evidence.
 //! A host must explicitly supply a trusted GitHub web-auth provider to mount it.
 //! The existing local device-login broker is not a hosted identity authority.
 use crate::Storage;
@@ -15,14 +18,65 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+mod architecture_preview;
+#[cfg(feature = "github-app")]
+mod budget;
+#[cfg(feature = "github-app")]
+mod consent;
+#[cfg(feature = "github-app")]
+pub use budget::AppRequestBudget;
+#[cfg(feature = "github-app")]
+pub use consent::{PublicationConsentInput, PublicationOperatorPolicy};
 mod http;
+mod scan_worker;
 mod scope;
+mod webhook;
+pub use architecture_preview::{
+    ArchitectureConfirmation, ArchitectureDecision, ArchitecturePreview, ScanInput,
+};
+pub use scan_worker::{
+    AppScanWorker, PreviewFile, SandboxPreviewWorker, ScanRequest, ScanResult, analyze_preview,
+};
 pub use scope::{
     InventoryEntry, SavedScope, ScopeDocument, ScopeInput, ScopeInventory, ScopePreview,
 };
+pub use webhook::{AppWebhookInbox, WebhookNotification, WebhookReceipt, webhook_router};
+#[cfg(feature = "github-app")]
+mod dispatch;
+#[cfg(feature = "github-app")]
+mod execution;
+#[cfg(feature = "github-app")]
+mod pr_worker;
+#[cfg(feature = "github-app")]
+mod report_host;
+#[cfg(feature = "github-app")]
+pub use dispatch::{AppDispatchConfig, AppDispatcher, DispatchOutcome};
+#[cfg(feature = "github-app")]
+pub use pr_worker::{
+    AppPrWorker, GitObject, PrWorkerOutput, PrWorkerRequest, SandboxPrWorker, analyze_pr_objects,
+};
+#[cfg(feature = "github-app")]
+pub use report_host::{AppReportReadback, AppReportStore, HttpsReportReadback, app_report_router};
+#[cfg(feature = "github-app")]
+mod installation;
 #[cfg(feature = "github-app")]
 mod provider;
+#[cfg(feature = "github-app")]
+pub use execution::activation::*;
+#[cfg(feature = "github-app")]
+pub use execution::recovery::*;
+#[cfg(feature = "github-app")]
+pub use execution::{
+    AnalysisInput, AnalysisLease, AppCheckDelivery, AppExecutionProvider, AppExecutionQueue,
+    AppReceiptSigner, SignedAppReceipt,
+};
 pub use http::{disabled_router, router};
+#[cfg(feature = "github-app")]
+pub use installation::activation::BrokerActivationProvider;
+#[cfg(feature = "github-app")]
+pub use installation::{
+    CurrentPullRequest, GitHubInstallationBroker, InstallationCredential, InstallationSession,
+};
 #[cfg(feature = "github-app")]
 pub use provider::GitHubWebProvider;
 
@@ -139,6 +193,16 @@ pub trait GitHubSetupProvider: Send + Sync + 'static {
     /// App ID and suspension, and obtain current admin permission from GitHub.
     /// Bounded pagination must fail if incomplete, never treat a partial page as complete.
     fn current_access(&self, credential: &UserCredential) -> Result<AccessSnapshot>;
+    /// Explicit scan consent must be verified by the host before calling this.
+    /// Only these immutable file entries may be read; never enumerate more paths.
+    fn scoped_sources(
+        &self,
+        _credential: &UserCredential,
+        _repository: &RepositoryChoice,
+        _files: &[InventoryEntry],
+    ) -> Result<Vec<PreviewFile>> {
+        Err(SetupError::Unavailable)
+    }
     /// Metadata only: exact default-branch commit/tree and a complete bounded
     /// path inventory. Never fetch blob content or execute repository code.
     fn scope_inventory(
@@ -178,6 +242,10 @@ pub struct AppSetupHost<P> {
     provider: P,
     config: SetupConfig,
     sessions: Mutex<BTreeMap<String, Session>>,
+    scan_admission: Mutex<()>,
+    scan_worker: Option<std::sync::Arc<dyn AppScanWorker>>,
+    #[cfg(feature = "github-app")]
+    publication_policy: Option<PublicationOperatorPolicy>,
 }
 impl<P: GitHubSetupProvider> AppSetupHost<P> {
     pub fn new(storage: Storage, provider: P, config: SetupConfig) -> Self {
@@ -186,7 +254,28 @@ impl<P: GitHubSetupProvider> AppSetupHost<P> {
             provider,
             config,
             sessions: Mutex::new(BTreeMap::new()),
+            scan_worker: None,
+            #[cfg(feature = "github-app")]
+            publication_policy: None,
+            scan_admission: Mutex::new(()),
         }
+    }
+    pub fn with_scan_worker(mut self, worker: std::sync::Arc<dyn AppScanWorker>) -> Self {
+        self.scan_worker = Some(worker);
+        self
+    }
+    pub fn publication_consent_available(&self) -> bool {
+        #[cfg(feature = "github-app")]
+        {
+            self.publication_policy.is_some()
+        }
+        #[cfg(not(feature = "github-app"))]
+        {
+            false
+        }
+    }
+    pub fn scan_available(&self) -> bool {
+        self.scan_worker.is_some()
     }
     /// A post-install hint is bound to state, but never trusted as authorization.
     pub fn begin_login(&self, installation_hint: Option<i64>) -> Result<LoginStart> {
@@ -384,7 +473,21 @@ impl<P: GitHubSetupProvider> AppSetupHost<P> {
             self.provider.current_access(&session.credential)?,
         )?;
         self.session(token, at.max(now()?))?; // Fence logout during provider access.
-        Ok(result)
+        let storage = self.storage.lock().map_err(|_| SetupError::Unavailable)?;
+        let mut allowed = Vec::new();
+        for choice in result {
+            match scope::unblocked(
+                &storage.connection,
+                self.config.app_id,
+                choice.installation_id,
+                choice.repository_id,
+            ) {
+                Ok(()) => allowed.push(choice),
+                Err(SetupError::Denied) => {}
+                Err(e) => return Err(e),
+            }
+        }
+        Ok(allowed)
     }
     pub fn select_repository(
         &self,
@@ -417,6 +520,12 @@ impl<P: GitHubSetupProvider> AppSetupHost<P> {
             return Err(SetupError::Authentication);
         }
         let storage = self.storage.lock().map_err(|_| SetupError::Unavailable)?;
+        scope::unblocked(
+            &storage.connection,
+            self.config.app_id,
+            installation,
+            repository,
+        )?;
         storage.connection.execute("INSERT INTO app_setup_repositories(app_id,installation_id,repository_id,owner,name,selected_by_user_id,selected_at_s) VALUES(?1,?2,?3,?4,?5,?6,?7) ON CONFLICT(app_id,installation_id,repository_id) DO UPDATE SET owner=excluded.owner,name=excluded.name,selected_by_user_id=excluded.selected_by_user_id,selected_at_s=excluded.selected_at_s",params![self.config.app_id,installation,repository,r.owner,r.name,session.credential.user_id,at]).map_err(db)?;
         Ok(r)
     }
@@ -500,3 +609,6 @@ fn encode(s: &str) -> String {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(all(test, feature = "github-app"))]
+mod pipeline_tests;

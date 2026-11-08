@@ -34,9 +34,16 @@ defines the simpler target and its hosted-service, scope, security and cost gate
 The existing public CI profile needs no reviewer terminal, API key or local server.
 
 The App implementation includes OAuth/PKCE, a browser repository picker and
-versioned path-scope confirmation with checks off. Source scanning, architecture
-acceptance and automatic App checks are not yet connected or activated.
-See the [development checkpoint](docs/APP_ONBOARDING_DEVELOPMENT.md) and
+versioned path-scope confirmation, opt-in isolated source preview and inactive
+architecture acceptance. The PR worker, host dispatcher, signed report server and
+check delivery are connected and tested locally. Bounded PR discovery, queued/
+running/failure check states, signed operator approval and exact offline recovery
+tools are implemented on the local `phase-6` continuation; they have not been
+pushed to PR #32. Dispatch defaults paused, and browser consent never activates it.
+Qualified hosting, signed Linux workers, externally fresh recovery authority and
+live App acceptance remain required. Installing the App does not activate this
+development integration.
+See the [execution checkpoint](docs/APP_EXECUTION_DEVELOPMENT.md) and
 [$0 hosting assessment](docs/APP_HOSTING_OPTIONS.md) for current limits.
 
 ## Public landing page
@@ -49,6 +56,7 @@ versions were retired, with expiry records. Actions/Pages setup and the
 unavailable App route stay separate.
 See [deployment evidence](docs/RELEASE_STATUS.md#landing-page-deployed-and-approved-history-retired)
 and [image provenance](docs/PUBLIC_MVP_USAGE.md#public-landing-page).
+
 
 ## Reviewer journey
 

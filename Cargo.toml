@@ -15,7 +15,7 @@ panic = "abort"
 
 [features]
 default = []
-github-app = ["server", "dep:ureq"]
+github-app = ["server", "dep:ureq", "dep:base64", "dep:ring"]
 server = ["dep:axum", "dep:serde", "dep:serde_json", "dep:tokio", "dep:toml"]
 
 [[example]]
@@ -28,6 +28,8 @@ path = "src/bin/csb_public_report.rs"
 required-features = ["server"]
 
 [dependencies]
+ring = { version = "=0.17.14", optional = true }
+base64 = { version = "=0.23.1", optional = true }
 ureq = { version = "=3.5.0", default-features = false, features = ["rustls"], optional = true }
 sha2 = { version = "=0.11.0", default-features = false }
 rusqlite = { version = "=0.40.2", default-features = false, features = ["bundled", "backup"] }
@@ -36,7 +38,7 @@ tree-sitter-rust = "=0.24.2"
 axum = { version = "=0.8.9", default-features = false, features = ["http1", "json", "query", "tokio"], optional = true }
 serde = { version = "=1.0.229", features = ["derive"], optional = true }
 serde_json = { version = "=1.0.151", optional = true }
-tokio = { version = "~1.51", default-features = false, features = ["macros", "net", "rt-multi-thread"], optional = true }
+tokio = { version = "~1.51", default-features = false, features = ["macros", "net", "rt-multi-thread", "time"], optional = true }
 toml = { version = "=0.9.8", default-features = false, features = ["parse", "serde", "std"], optional = true }
 
 [dev-dependencies]
@@ -47,3 +49,28 @@ tower = { version = "=0.5.3", default-features = false, features = ["util"] }
 name = "csb-onboarding"
 path = "src/bin/csb_onboarding.rs"
 required-features = ["server"]
+
+[[bin]]
+name = "csb-app-preview"
+path = "src/bin/csb_app_preview.rs"
+required-features = ["server"]
+
+[[bin]]
+name = "csb-app-host"
+path = "src/bin/csb_app_host.rs"
+required-features = ["github-app"]
+
+[[bin]]
+name = "csb-app-pr-worker"
+path = "src/bin/csb_app_pr_worker.rs"
+required-features = ["github-app"]
+
+[[bin]]
+name = "csb-app-operator"
+path = "src/bin/csb_app_operator.rs"
+required-features = ["github-app"]
+
+[[bin]]
+name = "csb-app-recovery"
+path = "src/bin/csb_app_recovery.rs"
+required-features = ["github-app"]

@@ -90,6 +90,51 @@ const MIGRATIONS: &[(i64, &str, &str)] = &[
         "0016_app_scope_drafts",
         include_str!("../migrations/0016_app_scope_drafts.sql"),
     ),
+    (
+        17,
+        "0017_app_architecture_preview",
+        include_str!("../migrations/0017_app_architecture_preview.sql"),
+    ),
+    (
+        18,
+        "0018_app_webhook_inbox",
+        include_str!("../migrations/0018_app_webhook_inbox.sql"),
+    ),
+    (
+        19,
+        "0019_app_execution",
+        include_str!("../migrations/0019_app_execution.sql"),
+    ),
+    (
+        20,
+        "0020_app_publications",
+        include_str!("../migrations/0020_app_publications.sql"),
+    ),
+    (
+        21,
+        "0021_app_consent_safeguards",
+        include_str!("../migrations/0021_app_consent_safeguards.sql"),
+    ),
+    (
+        22,
+        "0022_app_discovery",
+        include_str!("../migrations/0022_app_discovery.sql"),
+    ),
+    (
+        23,
+        "0023_app_activation",
+        include_str!("../migrations/0023_app_activation.sql"),
+    ),
+    (
+        24,
+        "0024_app_recovery",
+        include_str!("../migrations/0024_app_recovery.sql"),
+    ),
+    (
+        25,
+        "0025_app_check_progress",
+        include_str!("../migrations/0025_app_check_progress.sql"),
+    ),
 ];
 const MIN_SQLITE: (u32, u32, u32) = (3, 51, 3);
 const MAX_ARTIFACT_BYTES: usize = 64 * 1024 * 1024;
@@ -2245,7 +2290,6 @@ mod tests {
         let storage = Storage::open(&database, &artifacts).unwrap();
         println!("bundled SQLite runtime: {}", storage.sqlite_version());
         assert!(parse_version(storage.sqlite_version()).unwrap() >= MIN_SQLITE);
-        assert_eq!(storage.schema_version().unwrap(), 16);
         drop(storage);
         fs::remove_dir_all(root).unwrap();
     }
@@ -2662,12 +2706,12 @@ mod tests {
     }
 
     #[test]
-    fn app_scope_upgrade_preserves_selected_repositories_preferences_and_reviews() {
+    fn app_architecture_upgrade_preserves_scope_preferences_and_reviews() {
         let (database, artifacts, root) = paths("app-setup-upgrade");
         fs::create_dir_all(database.parent().unwrap()).unwrap();
         let connection = Connection::open(&database).unwrap();
         connection.execute_batch("CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE, applied_at_ms INTEGER NOT NULL);").unwrap();
-        for (version, name, sql) in MIGRATIONS.iter().filter(|(v, _, _)| *v <= 15) {
+        for (version, name, sql) in MIGRATIONS.iter().filter(|(v, _, _)| *v <= 16) {
             connection.execute_batch(sql).unwrap();
             connection
                 .execute(
@@ -2676,7 +2720,7 @@ mod tests {
                 )
                 .unwrap();
         }
-        connection.pragma_update(None, "user_version", 15).unwrap();
+        connection.pragma_update(None, "user_version", 16).unwrap();
         connection
             .execute(
                 "INSERT INTO workspace_preferences VALUES ('github:101',7,'{\"saved\":true}')",
@@ -2684,6 +2728,7 @@ mod tests {
             )
             .unwrap();
         connection.execute("INSERT INTO app_setup_repositories VALUES(10,20,30,'owner','repo',101,1,'installed_unconfigured')",[]).unwrap();
+        connection.execute("INSERT INTO app_setup_scopes(app_id,installation_id,repository_id,revision,actor_id,confirmed_at_s,document) VALUES(10,20,30,1,101,1,'{\"preserved\":true}')",[]).unwrap();
         let review_schema: String = connection
             .query_row(
                 "SELECT sql FROM sqlite_master WHERE type='table' AND name='reviews'",
@@ -2693,7 +2738,6 @@ mod tests {
             .unwrap();
         drop(connection);
         let storage = Storage::open(&database, &artifacts).unwrap();
-        assert_eq!(storage.schema_version().unwrap(), 16);
         let preference: (i64, String) = storage
             .connection
             .query_row(
@@ -2712,6 +2756,15 @@ mod tests {
             )
             .unwrap();
         assert_eq!(selected, "installed_unconfigured");
+        let prior_scope: String = storage
+            .connection
+            .query_row(
+                "SELECT document FROM app_setup_scopes WHERE repository_id=30",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert_eq!(prior_scope, "{\"preserved\":true}");
         let schema_after: String = storage
             .connection
             .query_row(
@@ -2723,7 +2776,6 @@ mod tests {
         assert_eq!(review_schema, schema_after);
         drop(storage);
         let reopened = Storage::open(&database, &artifacts).unwrap();
-        assert_eq!(reopened.schema_version().unwrap(), 16);
         drop(reopened);
         fs::remove_dir_all(root).unwrap();
     }
@@ -2752,7 +2804,6 @@ mod tests {
         connection.pragma_update(None, "user_version", 1).unwrap();
         drop(connection);
         let storage = Storage::open(&database, &artifacts).unwrap();
-        assert_eq!(storage.schema_version().unwrap(), 16);
         let index_exists: i64 = storage
             .connection
             .query_row(

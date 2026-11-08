@@ -18,6 +18,8 @@ struct FakeProvider {
     hold: Arc<Mutex<Option<Arc<Hold>>>>,
     inventory: Arc<Mutex<ScopeInventory>>,
     inventory_calls: Arc<AtomicUsize>,
+    sources: Arc<Mutex<BTreeMap<String, String>>>,
+    source_reads: Arc<Mutex<Vec<String>>>,
 }
 struct Hold {
     entered: std::sync::Barrier,
@@ -39,6 +41,25 @@ impl GitHubSetupProvider for FakeProvider {
     fn scope_inventory(&self, _: &UserCredential, _: &RepositoryChoice) -> Result<ScopeInventory> {
         self.inventory_calls.fetch_add(1, Ordering::SeqCst);
         Ok(self.inventory.lock().unwrap().clone())
+    }
+    fn scoped_sources(
+        &self,
+        _: &UserCredential,
+        _: &RepositoryChoice,
+        entries: &[InventoryEntry],
+    ) -> Result<Vec<PreviewFile>> {
+        let sources = self.sources.lock().unwrap();
+        entries
+            .iter()
+            .map(|f| {
+                self.source_reads.lock().unwrap().push(f.path.clone());
+                Ok(PreviewFile {
+                    path: f.path.clone(),
+                    oid: f.oid.clone(),
+                    content: Some(sources.get(&f.path).ok_or(SetupError::Unavailable)?.clone()),
+                })
+            })
+            .collect()
     }
     fn current_access(&self, _: &UserCredential) -> Result<AccessSnapshot> {
         let hold = self.hold.lock().unwrap().take();
@@ -70,6 +91,8 @@ impl Fixture {
             hold: Arc::new(Mutex::new(None)),
             inventory: Arc::new(Mutex::new(sample_inventory())),
             inventory_calls: Arc::new(AtomicUsize::new(0)),
+            sources: Arc::new(Mutex::new(BTreeMap::new())),
+            source_reads: Arc::new(Mutex::new(vec![])),
         };
         let host = Arc::new(AppSetupHost::new(
             Storage::open(&root.join("state.db"), &root.join("artifacts")).unwrap(),
@@ -986,4 +1009,771 @@ async fn setup_page_and_scope_http_journey_preserve_off_boundary() {
         .unwrap();
     assert_eq!(saved.status(), StatusCode::OK);
     assert!(body(saved).await.contains("\"activation\":\"off\""));
+}
+
+struct FixtureScanWorker;
+impl AppScanWorker for FixtureScanWorker {
+    fn preview(&self, request: &ScanRequest) -> Result<ScanResult> {
+        analyze_preview(
+            request,
+            &std::env::temp_dir().join(format!("csb-fixture-worker-{}", secret()?)),
+        )
+    }
+}
+fn git_blob(source: &str) -> String {
+    use std::io::Write;
+    let mut p = std::process::Command::new("git")
+        .args(["hash-object", "--stdin"])
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    p.stdin
+        .take()
+        .unwrap()
+        .write_all(source.as_bytes())
+        .unwrap();
+    String::from_utf8(p.wait_with_output().unwrap().stdout)
+        .unwrap()
+        .trim()
+        .into()
+}
+fn scanning_fixture() -> (Fixture, String) {
+    let mut f = Fixture::new();
+    Arc::get_mut(&mut f.host).unwrap().scan_worker = Some(Arc::new(FixtureScanWorker));
+    let contents: BTreeMap<String, String> = BTreeMap::from([
+        (
+            "Cargo.toml".into(),
+            "[package]\nname=\"demo\"\nversion=\"0.1.0\"\n".into(),
+        ),
+        (
+            "src/lib.rs".into(),
+            "// SOURCE_CONTENT_SENTINEL\nuse axum::Router;\npub fn service() {}\n".into(),
+        ),
+    ]);
+    for entry in &mut f.provider.inventory.lock().unwrap().entries {
+        if let Some(source) = contents.get(&entry.path) {
+            entry.oid = git_blob(source);
+        }
+    }
+    *f.provider.sources.lock().unwrap() = contents;
+    let token = selected(&f);
+    let preview = f.host.preview_scope(&token, input(0)).unwrap();
+    f.host
+        .confirm_scope(&token, 20, 30, &preview.preview_id, 0, true)
+        .unwrap();
+    (f, token)
+}
+fn scan_input() -> ScanInput {
+    ScanInput {
+        installation_id: 20,
+        repository_id: 30,
+        scope_revision: 1,
+        allow_selected_source_scan: true,
+    }
+}
+fn architecture_input(preview: &ArchitecturePreview) -> ArchitectureConfirmation {
+    ArchitectureConfirmation {
+        installation_id: 20,
+        repository_id: 30,
+        scope_revision: 1,
+        preview_id: preview.preview_id.clone(),
+        components: preview
+            .result
+            .components
+            .iter()
+            .map(|c| ArchitectureDecision {
+                id: c.id.clone(),
+                name: c.name.clone(),
+                roots: c.roots.clone(),
+                decision: crate::ComponentDecision::Confirmed,
+            })
+            .collect(),
+        accept_known_gaps: true,
+        defer_integrations: true,
+    }
+}
+#[test]
+fn source_preview_uses_existing_detectors_and_accepts_inactive_context_without_source_storage() {
+    let (f, token) = scanning_fixture();
+    let preview = f.host.preview_architecture(&token, scan_input()).unwrap();
+    assert_eq!(preview.result.components.len(), 1);
+    assert!(
+        preview.result.components[0]
+            .stack_candidates
+            .iter()
+            .any(|s| s.contains("Axum"))
+    );
+    assert_eq!(
+        *f.provider.source_reads.lock().unwrap(),
+        vec!["Cargo.toml", "src/lib.rs"]
+    );
+    let encoded: String = f
+        .host
+        .storage
+        .lock()
+        .unwrap()
+        .connection
+        .query_row("SELECT document FROM app_architecture_previews", [], |r| {
+            r.get(0)
+        })
+        .unwrap();
+    assert!(!encoded.contains("SOURCE_CONTENT_SENTINEL"));
+    let result = f
+        .host
+        .confirm_architecture(&token, architecture_input(&preview))
+        .unwrap();
+    assert_eq!(result["activation"], "off");
+    assert_eq!(result["publication_consent"], false);
+    assert_eq!(result["context"]["usable"], true);
+    assert_eq!(
+        result["context"]["confirmation"]["actor"],
+        "github-user-101"
+    );
+    assert!(f.host.architecture_status(&token, 20, 30).unwrap()["architecture_confirmed"] == true);
+    assert_eq!(
+        f.host
+            .confirm_architecture(&token, architecture_input(&preview))
+            .err(),
+        Some(SetupError::Conflict)
+    );
+    let dbh = f.host.storage.lock().unwrap();
+    let (off, no_export): (String, i64) = dbh
+        .connection
+        .query_row(
+            "SELECT activation,publication_consent FROM app_architecture_acceptances",
+            [],
+            |r| Ok((r.get(0)?, r.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!((off.as_str(), no_export), ("off", 0));
+}
+#[test]
+fn scans_require_explicit_consent_current_scope_access_and_configured_worker() {
+    let (mut f, token) = scanning_fixture();
+    let mut request = scan_input();
+    request.allow_selected_source_scan = false;
+    assert_eq!(
+        f.host.preview_architecture(&token, request).err(),
+        Some(SetupError::Invalid)
+    );
+    let mut request = scan_input();
+    request.scope_revision = 99;
+    assert_eq!(
+        f.host.preview_architecture(&token, request).err(),
+        Some(SetupError::Conflict)
+    );
+    f.provider.access.lock().unwrap().repositories[0].administrator = false;
+    assert_eq!(
+        f.host.preview_architecture(&token, scan_input()).err(),
+        Some(SetupError::Denied)
+    );
+    f.provider.access.lock().unwrap().repositories[0].administrator = true;
+    Arc::get_mut(&mut f.host).unwrap().scan_worker = None;
+    assert_eq!(
+        f.host.preview_architecture(&token, scan_input()).err(),
+        Some(SetupError::Unavailable)
+    );
+    assert!(f.provider.source_reads.lock().unwrap().is_empty());
+}
+#[test]
+fn architecture_rejects_outside_roots_missing_gap_choices_and_stale_or_foreign_previews() {
+    let (f, token) = scanning_fixture();
+    let preview = f.host.preview_architecture(&token, scan_input()).unwrap();
+    let mut invalid = architecture_input(&preview);
+    invalid.components[0].roots = vec!["absent".into()];
+    invalid.components[0].decision = crate::ComponentDecision::Corrected;
+    assert_eq!(
+        f.host.confirm_architecture(&token, invalid).err(),
+        Some(SetupError::Invalid)
+    );
+    let mut invalid = architecture_input(&preview);
+    invalid.accept_known_gaps = false;
+    assert_eq!(
+        f.host.confirm_architecture(&token, invalid).err(),
+        Some(SetupError::Invalid)
+    );
+    let mut invalid = architecture_input(&preview);
+    invalid.defer_integrations = false;
+    assert_eq!(
+        f.host.confirm_architecture(&token, invalid).err(),
+        Some(SetupError::Invalid)
+    );
+    let mut invalid = architecture_input(&preview);
+    invalid.repository_id = 999;
+    assert_eq!(
+        f.host.confirm_architecture(&token, invalid).err(),
+        Some(SetupError::Conflict)
+    );
+    f.provider.inventory.lock().unwrap().commit = "d".repeat(40);
+    assert_eq!(
+        f.host
+            .confirm_architecture(&token, architecture_input(&preview))
+            .err(),
+        Some(SetupError::Conflict)
+    );
+}
+#[test]
+fn preview_hash_mismatch_cannot_publish_architecture() {
+    let (f, token) = scanning_fixture();
+    f.provider
+        .sources
+        .lock()
+        .unwrap()
+        .insert("src/lib.rs".into(), "pub fn changed(){}".into());
+    assert_eq!(
+        f.host.preview_architecture(&token, scan_input()).err(),
+        Some(SetupError::Invalid)
+    );
+    let count: i64 = f
+        .host
+        .storage
+        .lock()
+        .unwrap()
+        .connection
+        .query_row("SELECT count(*) FROM app_architecture_previews", [], |r| {
+            r.get(0)
+        })
+        .unwrap();
+    assert_eq!(count, 0);
+}
+#[test]
+fn architecture_confirm_rechecks_revocation_replacement_scope_and_expiry() {
+    let (f, token) = scanning_fixture();
+    let first = f.host.preview_architecture(&token, scan_input()).unwrap();
+    let second = f.host.preview_architecture(&token, scan_input()).unwrap();
+    assert_eq!(
+        f.host
+            .confirm_architecture(&token, architecture_input(&first))
+            .err(),
+        Some(SetupError::Conflict)
+    );
+    f.provider.access.lock().unwrap().repositories[0].public = false;
+    assert_eq!(
+        f.host
+            .confirm_architecture(&token, architecture_input(&second))
+            .err(),
+        Some(SetupError::Denied)
+    );
+    f.provider.access.lock().unwrap().repositories[0].public = true;
+    f.host
+        .storage
+        .lock()
+        .unwrap()
+        .connection
+        .execute("UPDATE app_architecture_previews SET expires_at_s=0", [])
+        .unwrap();
+    assert_eq!(
+        f.host
+            .confirm_architecture(&token, architecture_input(&second))
+            .err(),
+        Some(SetupError::Conflict)
+    );
+    let third = f.host.preview_architecture(&token, scan_input()).unwrap();
+    let scope = f.host.preview_scope(&token, input(1)).unwrap();
+    f.host
+        .confirm_scope(&token, 20, 30, &scope.preview_id, 1, true)
+        .unwrap();
+    assert_eq!(
+        f.host
+            .confirm_architecture(&token, architecture_input(&third))
+            .err(),
+        Some(SetupError::Conflict)
+    );
+}
+
+#[tokio::test]
+async fn architecture_routes_require_origin_and_consent_and_return_inactive_status() {
+    let (f, token) = scanning_fixture();
+    let app = router(f.host.clone());
+    let send = |path: &str, value: serde_json::Value, origin: &str| {
+        Request::builder()
+            .method("POST")
+            .uri(path)
+            .header("content-type", "application/json")
+            .header("origin", origin)
+            .header("cookie", format!("__Host-csb-app-session={token}"))
+            .body(Body::from(value.to_string()))
+            .unwrap()
+    };
+    let body = serde_json::json!({"installation_id":20,"repository_id":30,"scope_revision":1,"allow_selected_source_scan":true});
+    let denied = app
+        .clone()
+        .oneshot(send(
+            "/v1/github-app/architecture/preview",
+            body.clone(),
+            "https://wrong.test",
+        ))
+        .await
+        .unwrap();
+    assert_eq!(denied.status(), StatusCode::FORBIDDEN);
+    assert!(f.provider.source_reads.lock().unwrap().is_empty());
+    let response = app
+        .clone()
+        .oneshot(send(
+            "/v1/github-app/architecture/preview",
+            body,
+            "https://setup.example.test",
+        ))
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    let value: serde_json::Value =
+        serde_json::from_slice(&response.into_body().collect().await.unwrap().to_bytes()).unwrap();
+    let components=value["result"]["components"].as_array().unwrap().iter().map(|c|serde_json::json!({"id":c["id"],"name":c["name"],"roots":c["roots"],"decision":"confirmed"})).collect::<Vec<_>>();
+    let mut confirm = serde_json::json!({"installation_id":20,"repository_id":30,"scope_revision":1,"preview_id":value["preview_id"],"components":components,"accept_known_gaps":true,"defer_integrations":true,"activate":true});
+    assert_eq!(
+        app.clone()
+            .oneshot(send(
+                "/v1/github-app/architecture/confirm",
+                confirm.clone(),
+                "https://setup.example.test"
+            ))
+            .await
+            .unwrap()
+            .status(),
+        StatusCode::UNPROCESSABLE_ENTITY
+    );
+    confirm.as_object_mut().unwrap().remove("activate");
+    let result = app
+        .oneshot(send(
+            "/v1/github-app/architecture/confirm",
+            confirm,
+            "https://setup.example.test",
+        ))
+        .await
+        .unwrap();
+    assert_eq!(result.status(), StatusCode::OK);
+    let output: serde_json::Value =
+        serde_json::from_slice(&result.into_body().collect().await.unwrap().to_bytes()).unwrap();
+    assert_eq!(output["activation"], "off");
+    assert_eq!(output["publication_consent"], false);
+}
+
+fn inbox(f: &Fixture) -> AppWebhookInbox {
+    AppWebhookInbox::new(
+        Storage::open(&f.root.join("state.db"), &f.root.join("artifacts")).unwrap(),
+        10,
+        vec![9; 32],
+    )
+    .unwrap()
+}
+fn signed(value: &serde_json::Value) -> (Vec<u8>, String) {
+    let body = serde_json::to_vec(value).unwrap();
+    let signature = format!(
+        "sha256={}",
+        crate::provider::hmac_sha256(&[9; 32], &body)
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect::<String>()
+    );
+    (body, signature)
+}
+fn webhook_pr() -> serde_json::Value {
+    serde_json::json!({"action":"opened","installation":{"id":20},"repository":{"id":30},"number":24,"pull_request":{"number":24,"body":"DO_NOT_STORE_PR_BODY","head":{"sha":"a".repeat(40)}}})
+}
+#[test]
+fn signed_inbox_is_idempotent_restartable_and_does_not_create_analysis() {
+    let f = Fixture::new();
+    selected(&f);
+    let queue = inbox(&f);
+    let (body, signature) = signed(&webhook_pr());
+    let id = "00000000-0000-0000-0000-000000000001";
+    assert_eq!(
+        queue.accept(id, "pull_request", "sha256=00", &body).err(),
+        Some(SetupError::Authentication)
+    );
+    assert!(
+        !queue
+            .accept(id, "pull_request", &signature, &body)
+            .unwrap()
+            .duplicate
+    );
+    assert!(
+        queue
+            .accept(id, "pull_request", &signature, &body)
+            .unwrap()
+            .duplicate
+    );
+    let mut altered = webhook_pr();
+    altered["action"] = serde_json::json!("closed");
+    let (bad, sig) = signed(&altered);
+    assert_eq!(
+        queue.accept(id, "pull_request", &sig, &bad).err(),
+        Some(SetupError::Conflict)
+    );
+    drop(queue);
+    let queue = inbox(&f);
+    let notification = queue.claim().unwrap().unwrap();
+    assert_eq!(notification.pr_number, Some(24));
+    assert!(queue.claim().unwrap().is_none());
+    queue.finish(&notification).unwrap();
+    assert_eq!(
+        queue.finish(&notification).err(),
+        Some(SetupError::Conflict)
+    );
+    let dbh = f.host.storage.lock().unwrap();
+    let count: i64 = dbh
+        .connection
+        .query_row("SELECT count(*) FROM jobs", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(count, 0);
+    let digest: String = dbh
+        .connection
+        .query_row("SELECT body_digest FROM app_webhook_inbox", [], |r| {
+            r.get(0)
+        })
+        .unwrap();
+    assert_eq!(digest.len(), 64);
+    assert!(f.provider.source_reads.lock().unwrap().is_empty());
+}
+#[test]
+fn uninstall_fences_leases_source_and_cached_context_even_if_provider_is_delayed() {
+    let (f, token) = scanning_fixture();
+    let queue = inbox(&f);
+    let (body, signature) = signed(&webhook_pr());
+    queue
+        .accept(
+            "00000000-0000-0000-0000-000000000001",
+            "pull_request",
+            &signature,
+            &body,
+        )
+        .unwrap();
+    let lease = queue.claim().unwrap().unwrap();
+    let (body, signature) =
+        signed(&serde_json::json!({"action":"deleted","installation":{"id":20,"app_id":10}}));
+    queue
+        .accept(
+            "00000000-0000-0000-0000-000000000002",
+            "installation",
+            &signature,
+            &body,
+        )
+        .unwrap();
+    assert_eq!(queue.finish(&lease).err(), Some(SetupError::Conflict));
+    assert!(queue.claim().unwrap().is_none());
+    assert!(f.host.repositories(&token).unwrap().is_empty());
+    assert_eq!(
+        f.host.preview_architecture(&token, scan_input()).err(),
+        Some(SetupError::Denied)
+    );
+    assert_eq!(
+        f.host.architecture_status(&token, 20, 30).err(),
+        Some(SetupError::Denied)
+    );
+    assert!(f.provider.source_reads.lock().unwrap().is_empty());
+    let (body, signature) =
+        signed(&serde_json::json!({"action":"unsuspend","installation":{"id":20,"app_id":10}}));
+    queue
+        .accept(
+            "00000000-0000-0000-0000-000000000003",
+            "installation",
+            &signature,
+            &body,
+        )
+        .unwrap();
+    assert!(f.host.repositories(&token).unwrap().is_empty());
+}
+#[test]
+fn removal_is_repository_scoped_and_expired_notification_leases_are_fenced() {
+    let f = Fixture::new();
+    let token = selected(&f);
+    let queue = inbox(&f);
+    let (body, signature) = signed(&webhook_pr());
+    queue
+        .accept(
+            "00000000-0000-0000-0000-000000000001",
+            "pull_request",
+            &signature,
+            &body,
+        )
+        .unwrap();
+    let first = queue.claim().unwrap().unwrap();
+    f.host
+        .storage
+        .lock()
+        .unwrap()
+        .connection
+        .execute("UPDATE app_webhook_inbox SET lease_expires_at_s=0", [])
+        .unwrap();
+    let replacement = queue.claim().unwrap().unwrap();
+    assert_ne!(first.lease_id, replacement.lease_id);
+    assert_eq!(queue.finish(&first).err(), Some(SetupError::Conflict));
+    let (body, signature) = signed(
+        &serde_json::json!({"action":"removed","installation":{"id":20},"repositories_removed":[{"id":30}]}),
+    );
+    queue
+        .accept(
+            "00000000-0000-0000-0000-000000000002",
+            "installation_repositories",
+            &signature,
+            &body,
+        )
+        .unwrap();
+    assert_eq!(queue.finish(&replacement).err(), Some(SetupError::Conflict));
+    assert_eq!(
+        f.host.select_repository(&token, 20, 30).err(),
+        Some(SetupError::Denied)
+    );
+}
+#[test]
+fn foreign_app_unknown_installation_and_wrong_check_owner_are_rejected() {
+    let f = Fixture::new();
+    selected(&f);
+    let queue = inbox(&f);
+    for payload in [
+        serde_json::json!({"action":"created","installation":{"id":20,"app_id":99}}),
+        serde_json::json!({"action":"created","installation":{"id":99,"app_id":10}}),
+    ] {
+        let (body, signature) = signed(&payload);
+        assert_eq!(
+            queue
+                .accept(
+                    "00000000-0000-0000-0000-000000000001",
+                    "installation",
+                    &signature,
+                    &body
+                )
+                .err(),
+            Some(SetupError::Denied)
+        );
+    }
+    let (body, signature) = signed(
+        &serde_json::json!({"action":"rerequested","installation":{"id":20},"repository":{"id":30},"check_run":{"app":{"id":99}}}),
+    );
+    assert_eq!(
+        queue
+            .accept(
+                "00000000-0000-0000-0000-000000000001",
+                "check_run",
+                &signature,
+                &body
+            )
+            .err(),
+        Some(SetupError::Denied)
+    );
+}
+
+#[test]
+fn inbox_capacity_does_not_prevent_durable_uninstall_block() {
+    let f = Fixture::new();
+    let token = selected(&f);
+    let queue = inbox(&f);
+    f.host.storage.lock().unwrap().connection.execute("WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i+1 FROM n WHERE i<1000) INSERT INTO app_webhook_inbox(app_id,delivery_id,event,body_digest,installation_id,action,received_at_s) SELECT 10,printf('fixture-%d',i),'pull_request',printf('%064d',i),20,'opened',0 FROM n",[]).unwrap();
+    let (body, signature) =
+        signed(&serde_json::json!({"action":"deleted","installation":{"id":20,"app_id":10}}));
+    assert_eq!(
+        queue
+            .accept(
+                "00000000-0000-0000-0000-000000000001",
+                "installation",
+                &signature,
+                &body
+            )
+            .err(),
+        Some(SetupError::Capacity)
+    );
+    assert!(f.host.repositories(&token).unwrap().is_empty());
+    assert!(queue.claim().unwrap().is_none());
+}
+#[tokio::test]
+async fn webhook_http_validates_raw_signature_and_duplicate_headers() {
+    let f = Fixture::new();
+    selected(&f);
+    let app = webhook_router(Arc::new(inbox(&f)));
+    let (body, signature) = signed(&webhook_pr());
+    let request = |duplicate: bool| {
+        let mut b = Request::builder()
+            .method("POST")
+            .uri("/v1/github-app/webhook")
+            .header("x-github-delivery", "00000000-0000-0000-0000-000000000001")
+            .header("x-github-event", "pull_request")
+            .header("x-hub-signature-256", &signature);
+        if duplicate {
+            b = b.header("x-github-event", "installation");
+        }
+        b.body(Body::from(body.clone())).unwrap()
+    };
+    assert_eq!(
+        app.clone().oneshot(request(true)).await.unwrap().status(),
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(
+        app.oneshot(request(false)).await.unwrap().status(),
+        StatusCode::ACCEPTED
+    );
+}
+
+#[cfg(feature = "github-app")]
+fn consent_fixture() -> (Fixture, String) {
+    let (mut f, token) = scanning_fixture();
+    Arc::get_mut(&mut f.host).unwrap().publication_policy = Some(
+        PublicationOperatorPolicy::new(
+            "https://reports.example.test".into(),
+            "a".repeat(64),
+            "b".repeat(64),
+        )
+        .unwrap(),
+    );
+    let preview = f.host.preview_architecture(&token, scan_input()).unwrap();
+    f.host
+        .confirm_architecture(&token, architecture_input(&preview))
+        .unwrap();
+    (f, token)
+}
+#[cfg(feature = "github-app")]
+fn publication_input(p: &serde_json::Value) -> PublicationConsentInput {
+    PublicationConsentInput {
+        installation_id: 20,
+        repository_id: 30,
+        expected_revision: p["document"]["expected_revision"].as_i64().unwrap(),
+        expires_at: p["document"]["expires_at"].as_i64().unwrap(),
+        document_digest: p["document_digest"].as_str().unwrap().into(),
+        allow_automatic_analysis: true,
+        allow_public_source: true,
+        allow_checks: true,
+    }
+}
+#[cfg(feature = "github-app")]
+#[test]
+fn final_consent_is_explicit_revision_bound_inactive_and_irreversibly_revocable() {
+    let (f, t) = consent_fixture();
+    let p = f.host.preview_publication_consent(&t, 20, 30).unwrap();
+    let mut bad = publication_input(&p);
+    bad.allow_public_source = false;
+    assert_eq!(
+        f.host.confirm_publication_consent(&t, bad).unwrap_err(),
+        SetupError::Invalid
+    );
+    let mut bad = publication_input(&p);
+    bad.document_digest = "f".repeat(64);
+    assert_eq!(
+        f.host.confirm_publication_consent(&t, bad).unwrap_err(),
+        SetupError::Conflict
+    );
+    let saved = f
+        .host
+        .confirm_publication_consent(&t, publication_input(&p))
+        .unwrap();
+    assert_eq!(saved["activation"], "off");
+    assert_eq!(saved["consent_revision"], 1);
+    assert_eq!(
+        f.host
+            .confirm_publication_consent(&t, publication_input(&p))
+            .unwrap_err(),
+        SetupError::Conflict
+    );
+    {
+        let s = f.host.storage.lock().unwrap();
+        assert_eq!(
+            s.connection
+                .query_row("SELECT count(*) FROM app_execution_grants", [], |r| r
+                    .get::<_, i64>(0))
+                .unwrap(),
+            0
+        );
+    }
+    assert_eq!(
+        f.host.publication_consent_status(&t, 20, 30).unwrap()["publication_consent"],
+        true
+    );
+    f.host.revoke_publication_consent(&t, 20, 30).unwrap();
+    assert_eq!(
+        f.host.publication_consent_status(&t, 20, 30).unwrap()["publication_consent"],
+        false
+    );
+    {
+        let s = f.host.storage.lock().unwrap();
+        assert!(
+            s.connection
+                .execute("UPDATE app_publication_consents SET revoked=0", [])
+                .is_err()
+        );
+    }
+    let next = f.host.preview_publication_consent(&t, 20, 30).unwrap();
+    assert_eq!(next["document"]["expected_revision"], 1);
+    f.host.logout(&t).unwrap();
+    assert!(
+        f.host
+            .confirm_publication_consent(&t, publication_input(&next))
+            .is_err()
+    );
+}
+#[cfg(feature = "github-app")]
+#[test]
+fn final_consent_rechecks_expiry_scope_provider_and_operator_pins() {
+    let (mut f, t) = consent_fixture();
+    let p = f.host.preview_publication_consent(&t, 20, 30).unwrap();
+    let mut bad = publication_input(&p);
+    bad.expires_at = 1;
+    assert_eq!(
+        f.host.confirm_publication_consent(&t, bad).unwrap_err(),
+        SetupError::Invalid
+    );
+    Arc::get_mut(&mut f.host)
+        .unwrap()
+        .publication_policy
+        .as_mut()
+        .unwrap()
+        .engine_digest = "c".repeat(64);
+    assert_eq!(
+        f.host
+            .confirm_publication_consent(&t, publication_input(&p))
+            .unwrap_err(),
+        SetupError::Conflict
+    );
+    f.provider.access.lock().unwrap().repositories[0].administrator = false;
+    assert!(
+        f.host
+            .confirm_publication_consent(&t, publication_input(&p))
+            .is_err()
+    );
+    f.provider.access.lock().unwrap().repositories[0].administrator = true;
+    f.provider.inventory.lock().unwrap().commit = "f".repeat(40);
+    assert_eq!(
+        f.host.preview_publication_consent(&t, 20, 30).unwrap_err(),
+        SetupError::Conflict
+    );
+}
+#[cfg(feature = "github-app")]
+#[tokio::test]
+async fn final_consent_routes_require_exact_origin_and_session() {
+    let (f, t) = consent_fixture();
+    let app = router(f.host.clone());
+    for origin in [None, Some("https://evil.example.test")] {
+        let mut request = Request::builder()
+            .method("POST")
+            .uri("/v1/github-app/publication/preview")
+            .header("cookie", format!("__Host-csb-app-session={t}"))
+            .header("content-type", "application/json");
+        if let Some(origin) = origin {
+            request = request.header("origin", origin);
+        }
+        assert_eq!(
+            app.clone()
+                .oneshot(
+                    request
+                        .body(Body::from(r#"{"installation_id":20,"repository_id":30}"#))
+                        .unwrap()
+                )
+                .await
+                .unwrap()
+                .status(),
+            StatusCode::FORBIDDEN
+        );
+    }
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/github-app/publication/preview")
+                .header("origin", "https://setup.example.test")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"installation_id":20,"repository_id":30}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 }

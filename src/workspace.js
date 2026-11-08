@@ -2332,7 +2332,9 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
     const payload = state.hld, loading = state.loading.has('hld');
     if(payload && hldMode==='accepted'&&!payload.accepted)hldMode='combined';
     $('hld-reload').disabled=loading;
-    $('hld-summary').textContent = loading ? 'Loading commit-bound HLD evidence…' : state.hldError ? `HLD unavailable: ${state.hldError}. Reload after confirming repository context.` : !payload ? 'No generated HLD for this review. Reload after confirming repository context.' : hldOutcome(payload.delta);
+    const hldChanges=payload?.delta?.changes||[], hldComponents=new Set(hldChanges.map(change=>change.element_id).filter(Boolean));
+    const hldOutcomeText=payload ? hldOutcome(payload.delta) : '';
+    $('hld-summary').textContent = loading ? 'Loading commit-bound HLD evidence…' : state.hldError ? `HLD unavailable: ${state.hldError}. Reload after confirming repository context.` : !payload ? 'No generated HLD for this review. Reload after confirming repository context.' : `${hldOutcomeText}. ${hldChanges.length} design change${hldChanges.length===1?'':'s'} across ${hldComponents.size} affected element${hldComponents.size===1?'':'s'}. Start with the map, then inspect a selected element.`;
     $('hld-accepted').disabled=!payload?.accepted;
     const exportAllowed=hldExportAllowed(payload,hldMode);
     $('hld-source').disabled=!exportAllowed;
@@ -2397,7 +2399,7 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
       const renderer=await ensureMermaid(); if (generation!==architectureGeneration || designLevel!=='hld') return;
       for (const item of sources) {
         await renderer.parse(item.source); const rendered=await renderer.render(`csb-hld-${generation}-${item.mode}`,item.source); if (generation!==architectureGeneration || designLevel!=='hld') return;
-        const frame=node('section','architecture-frame'); frame.append(node('h4','',item.mode==='combined'?'Architecture changes · dependencies, not execution order':item.mode+' architecture'));
+        const frame=node('section','architecture-frame'); frame.append(node('h4','',item.mode==='combined'?'What changed in the system map':item.mode==='baseline'?'Baseline architecture':'Proposal architecture'));
         const host=node('div','architecture-svg'); host.innerHTML=rendered.svg; frame.append(host); container.append(frame);
         const svg=host.querySelector('svg'); if(svg)svg.setAttribute('aria-label',`${item.mode} high-level design diagram`);
         mountDiagramViewport(frame,host,svg,{initialMode:'overview'});
