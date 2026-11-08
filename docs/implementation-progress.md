@@ -2,6 +2,211 @@
 
 This tracks the public Phase 6 continuation; private historical records are not
 copied into this repository. Branch: `phase-6`; PR base: `main`.
+The standalone landing-page publication below uses `codex/public-landing`;
+it does not advance, merge or activate the Phase 6 App implementation.
+
+## 2026-11-06 - public landing page
+
+User requested pushing and deploying the landing page. Its implementation was
+isolated from `5df2e62d128c2507ab65da76c729839c723db825` onto current public
+`main`, `c52b5527d8d480c5b9e62863fe3ff4e94cf4bab5`, in a separate worktree.
+Branch: `codex/public-landing`. The four local App/backend continuation commits
+and the existing [draft PR #32](https://github.com/SSC-SDE/CodeShouldBehave/pull/32)
+remain unchanged. This is a standalone marketing-site release, not a new phase
+or an alternative Phase 6 integration PR.
+
+Audit: deployed `/CodeShouldBehave/` is only a workspace redirect, with no
+description or social metadata. Preserve `/workspace/`, immutable report links,
+existing branding and the dark reviewer UI. Landing work uses native CSS,
+self-hosted JetBrains Mono, graphite/blue tokens and system light/dark preference.
+No framework or design-system migration, invented customer proof, App install
+CTA, deployment, activation, credentials, release pins or budget changes.
+
+Implemented: static product introduction, actual published PR24 HLD/LLD/source
+captures, existing `[!]` brand favicon, system light/dark and reduced-motion
+preferences, self-hosted type, accessible keyboard entry and explicit setup
+availability. Zero landing scripts or trackers. Site/source/runtime inventories
+include only the declared landing assets; unapproved neighboring files stay out
+of the published site. Workspace/report paths and release controls are unchanged.
+
+Original UI evidence at `5df2e62` (retained in `CodeShouldBehave-public/target/`):
+
+- 121 public Python regressions pass, no skips. Existing HTTPError cleanup
+  ResourceWarnings remain visible. New tests cover unapproved neighboring
+  assets and missing/symlinked/oversized landing inputs, not page wording.
+- Actual Chrome: widths 320, 390, 768, 1024 and 1440; both themes at desktop
+  and mobile. No horizontal overflow; desktop headline two lines, subtext at
+  most four, hero/CTA visible. All three image decodes observed. Keyboard skip,
+  section anchor, reduced-motion behavior, documentation/source/notices links
+  and landing-to-workspace navigation exercised. No page exceptions.
+- CTA also opened a locally assembled real published PR32 report, bundle
+  `a1f293a0cfc5bc0ab2e4dc3ef5d0186f6e419edc9291165af7ad5f65fb6cf7e3`.
+  All 235 files matched the public manifest and the native semantic verifier
+  accepted the complete bundle before assembly. Selecting its card retained
+  exact review/bundle identities. Provider freshness is intentionally unknown
+  because this preview did not invent a new GitHub observation.
+- Lighthouse 12.8.2 against local Python HTTP: desktop performance 100,
+  mobile 99, accessibility 100 and best practices 100 in both runs. LCP:
+  desktop 0.48s, simulated mobile 2.25s; CLS 0 and TBT 0. SEO 92 because the
+  preview origin has no valid root robots.txt. No origin-wide crawler policy,
+  cache or compression changes were made. These are local lab results, not
+  deployed field Core Web Vitals or an INP measurement.
+- Hero body contrast: 7.49:1 light, 9.06:1 dark. CTA contrast: 6.42:1 light,
+  8.92:1 dark. Final desktop/mobile captures and Lighthouse JSON are retained
+  under ignored `target/landing-final-*` and `target/landing-lighthouse-*-final.json`.
+
+Landing-only publication evidence:
+
+- Pushed implementation commit `914254fc727980eb345ef756524e1858d13dd476`
+  to `codex/public-landing`; GitHub's ref API confirmed that exact identity.
+  No App continuation commits were pushed and PR #32 remains unchanged.
+- Re-ran all 121 public Python tests on the isolated main-based tree: pass,
+  no skips. Existing HTTPError cleanup ResourceWarnings remain visible.
+- A clean-source Rust 1.87 macOS release build produced the existing three
+  public-profile binaries, with 108 locked license packages and zero findings
+  under the declared credential-pattern rules (not exhaustive detection).
+  Local source archive SHA-256:
+  `d42bd32c8e578cc21c105d64c0750904460fb56bb518f956f794cc0369b4d656`;
+  runtime archive SHA-256:
+  `5ce59502034480ee147417c14fd5889592f2cd520a81bdc355de97cff2b66f0c`.
+- The extracted landing-only runtime's verifier and site assembler accepted the
+  real 235-file published report and generated an integrity-verified
+  11,403,352-byte site. Actual Chrome loaded all images and the self-hosted
+  font, then opened its PR32 report through the primary CTA and selected card,
+  retaining exact review/bundle identities with no page exceptions.
+- These are local macOS artifacts, not uploaded releases or signed Linux
+  qualification. No remote CI, PR, deployment or merge was performed.
+
+Image provenance and preview commands:
+[public usage](PUBLIC_MVP_USAGE.md#public-landing-page).
+
+## 2026-11-06 - landing release deployment
+
+- User authorized landing push and deployment. Landing-only
+  [PR #33](https://github.com/SSC-SDE/CodeShouldBehave/pull/33) merged at
+  provider-confirmed `fbe4b73340778311965d6bbf24919beb969c1c71`.
+  Draft App PR #32 and its unpublished continuation remain separate.
+- Authenticated GitHub UI confirmed GitHub Free and account-wide Actions and
+  Packages USD 0 budgets with Usage blocked. Existing controls were not changed.
+  Fresh release proof observed at `2026-11-06T20:29:16.428Z`, expires
+  `2026-11-07T08:29:16.428Z`; the actual release guard accepted its exact bytes.
+  Only the existing release proof secret/digest and release source variable
+  were refreshed. Runtime budget identity and its historical observation remain
+  unchanged because they belong to the existing signed activation ledger.
+- Trusted Linux build and hosted attestation
+  [42288835561](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/42288835561)
+  passed from the exact merge source. Both archive checksums and offline
+  signature verification passed with exact source/signer commits and hosted
+  runners required.
+- [Canary release](https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-fbe4b7334077)
+  published. Linux runtime SHA-256:
+  `d780fc5cc5a44bf43fe1f7a76c04df95ffc88d5a5768e33526d9fdb7dc1b5870`;
+  offline proof SHA-256:
+  `691c557c7b9344da489c9fcd4f11a3e752079025605b4a9de3fb0b909c5028c9`.
+- Only engine identity changes in public-ci/engine-pins. Production bootstrap
+  from the published URLs passed signature/hash/ELF checks and extraction.
+  All 121 public Python regressions passed, no skips; existing ResourceWarnings
+  remain visible.
+- Native Linux sandbox [preflight 42289513084](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/42289513084)
+  passed on exact pin commit `40f12bcd99db2e7270333cf47c709c1438f42290`:
+  signed Ubuntu Bubblewrap, empty credential-free/networkless sandbox, pinned
+  release verification and actual ELF execution inside that sandbox.
+- [Pin PR #34](https://github.com/SSC-SDE/CodeShouldBehave/pull/34) merged at
+  provider-confirmed `134c895ef4baba5f50427906d432fc66a2bca462`.
+  Manual controller 42289665798 was cancelled as the normal shared concurrency
+  slot selected automatic run
+  [42289687915](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/42289687915)
+  on the same exact merge. Staging failed before deployment; local replay of
+  those exact inputs confirmed `Site cap exceeded; preserve previous generation`.
+  Earlier source-fbe4b73 controller refused after main advanced; its current
+  workflow/head checks were retained, not bypassed.
+- No App execution grant, policy, source scope, consent, workflow, runtime
+  budget identity, billing control or existing report has been changed.
+
+## 2026-11-06 - explicitly approved obsolete report retirement
+
+The user selected retirement rather than increasing capacity, then explicitly
+approved these two redundant versions:
+
+- PR24 older-scope bundle
+  `7519517202cfdf944deb441c07cfece712f3e8908ca4c23700b70ee80f07a02c`.
+- PR31 superseded-commit bundle
+  `aa78ab56631a941bcd4b78ec3e7058615adf2fd5ae5af92637a578651906b46b`.
+
+The current PR24 demo `4b0d25a5…` and current PR31 `3d77c185…` stay available.
+Authorization is a bounded, repository-bound, base-owned exact-ID document,
+not PR input or direct deletion. The publisher commits the existing monotonic
+withdrawal ledger in its signed intent before deployment, emits expiry records,
+and cancels any attempted successful check for a retired bundle. No source
+scope, budget identity, receipt validation or 64 MiB site bound was relaxed.
+
+Local verification: all 125 public Python regressions pass, no skips, including
+actual site-byte removal, unselected report preservation, repeated retirement,
+invalid/foreign/linked approval, signed intent retention and dead-link refusal.
+The former mocked scope-withdrawal forwarding test now exercises real site output.
+
+Exact failed-run replay used the digest-pinned previous Pages artifact from
+run 42179183640, both real handoffs from 42289687915 and the actual macOS native
+semantic verifier. The signed empty `.nojekyll` marker was reconstructed under
+the existing restore rule; no missing source file was fabricated. Without
+retirement: the exact capacity failure reproduced. With only the approved two
+IDs: native verification and site integrity pass, six other existing reports
+remain and the seven-report site occupies 55,894,576 bytes. Local snapshot hash:
+`5db5d3da2e11e3e45180c48479865e97719112279636712ffcfcbe9d8b9b98c4`.
+No live report was removed by this replay.
+
+[Retirement PR #35](https://github.com/SSC-SDE/CodeShouldBehave/pull/35)
+merged at provider-confirmed `5fb135fb7f3f550cb4373df8830679927cd0ced1`.
+Trusted Linux [build and attestation 42292639339](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/42292639339)
+passed, including all 125 publication regressions on the actual builder.
+[Signed canary](https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-5fb135fb7f3f)
+published after both archive hashes and offline exact-source/signer verification.
+Runtime SHA-256:
+`6c950ebc099075508b76471fe1e6515340f5848a21b71bd767a97591695564fd`;
+offline proof SHA-256:
+`0864e8909be527495349f9a63e12e1f11aa28ada645e66f603e642ea9f127e17`.
+Production bootstrap from the published URLs passed.
+
+## Landing page deployed and approved history retired
+
+- Replacement native preflight
+  [42295408429](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/42295408429)
+  passed on exact pin commit `ab523127b725dadca5b42e6ca9022f8b0d22b79f`.
+  The local watcher timed out; direct GitHub job verification confirmed success.
+- [Pin PR #36](https://github.com/SSC-SDE/CodeShouldBehave/pull/36) merged at
+  provider-confirmed `0c7da4cb8cf1b97e6c061490cce9915b642431dc`.
+- Controller 42307917844 exhausted its REST ticket during pre-deployment staging.
+  No request limit was increased or counter reset. The next automatic pass,
+  [42309306519](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/42309306519),
+  succeeded on the same source/config, including complete live readback,
+  durable receipt commit, check delivery and the fixed REST audit.
+- Signed intent record `7612878142` persisted both withdrawals at sequence 61.
+  Verified promotion record `7612888556` is sequence 62, site generation 12,
+  Pages deployment version `0c7da4cb8cf1b97e6c061490cce9915b642431dc`.
+  The production cryptographic verifier accepted exact repository, source,
+  workflow, main ref, hosted runner and invocation identity.
+- Live site manifest SHA-256
+  `8db9c0186d3ba946ac185c65c0b336862431b44a790a0776e80ee6a3283951d4`
+  matches that signed receipt. Inventory: 1,737 files, 55,894,647 total bytes,
+  seven reports and exactly the two approved expiry records.
+- HTTP verification: all six other original report manifests return 200 and
+  match their previous SHA-256 identities. Both retired report manifests return
+  404 and their source-free expiry records say `withdrawn`. No other report
+  was retired. The 64 MiB site, 172 MiB artifact and 100-call pass limits remain.
+- Actual deployed Chrome smoke: desktop 1440 light and mobile 390 dark render
+  all three images and self-hosted font, no overflow, visible hero/CTA and zero
+  landing scripts. Primary CTA opens the seven-report workspace. Screenshots
+  retained under ignored `target/live-landing-*` in the acceptance worktree.
+- The retained exact PR24 link opens Focus/HLD, Zoom to LLD and `retry_decision`.
+  Selecting function entry opens source with exact proposal
+  `b312bbf3c3f01299d04745b73ca3b81d24582a40` and blob
+  `621ad2ae5ebfb34e6f72aaf455575a61901f3f89`. A first source wait was placed
+  before selecting a node and lost its browser tab; the correct interaction
+  was then exercised successfully. No source data or guard was changed.
+- App PR #32 remains separate and activation remains off. This is landing/Pages
+  deployment acceptance, not hosted App or broader beta qualification.
+
+
 
 ## Current continuation — local, not pushed
 

@@ -354,7 +354,7 @@ def validate_state(value: Any, config: dict) -> dict:
         if "verdict" in item and item["conclusion"] != verdict_conclusion(item):
             raise Refusal("check conclusion differs from verdict")
         request = validate_ledger_request(item["request"], config)
-        if request["request_id"] in update_ids or item["conclusion"] not in ("success", "neutral", "failure", "cancelled") or item["reason"] not in ("", "analysis_unavailable", "superseded"):
+        if request["request_id"] in update_ids or item["conclusion"] not in ("success", "neutral", "failure", "cancelled") or item["reason"] not in ("", "analysis_unavailable", "superseded", "withdrawn"):
             raise Refusal("invalid or duplicate check repair identity")
         update_ids.add(request["request_id"])
         if item["public_report_id"] is not None:
@@ -1709,6 +1709,27 @@ def normalize_handoff_layout(plan_value: dict, handoffs: Path) -> None:
 
 
 
+def _authorized_report_retirements(config: dict, trusted_root: Path) -> list[str]:
+    """Read explicit repository-owner choices from the current trusted checkout."""
+    path = trusted_root / ".codeshouldbehave/report-retirements.json"
+    if path.parent.is_symlink() or path.is_symlink():
+        raise Refusal("linked report retirement authorization")
+    if not path.exists():
+        return []
+    value = read_json(path, MAX_CONFIG_BYTES)
+    object_fields(value, {"schema_version", "repository_id", "public_report_ids"}, name="report retirements")
+    if value["schema_version"] != "csb-public-report-retirements-v1" or integer(value["repository_id"], 1, 2**63 - 1, "retirement repository") != config["repository"]["id"]:
+        raise Refusal("report retirement authority differs")
+    identities = value["public_report_ids"]
+    if not isinstance(identities, list) or len(identities) > 1000:
+        raise Refusal("report retirement authorization exceeds ledger bounds")
+    for identity in identities:
+        text(identity, SHA256, "retired public report")
+    if len(set(identities)) != len(identities):
+        raise Refusal("duplicate report retirement")
+    return sorted(identities)
+
+
 def stage_publication(config: dict, plan_value: dict, handoffs: Path, output: Path, *,
                       provider: GitHub, project_root: Path, trusted_root: Path, verifier: Path, check_acks: dict | None = None, get: Callable = http_bytes) -> dict:
     if not config["operations"]["publication"]:
@@ -1750,16 +1771,26 @@ def stage_publication(config: dict, plan_value: dict, handoffs: Path, output: Pa
     normalize_handoff_layout(plan_value, handoffs)
     results, bundles, observations = [], [], []
     expected_policy = public_policy_digest(config, trusted_root)
+    retirements = _authorized_report_retirements(config, trusted_root)
+    known_reports = set()
     restored = restore_public_site(config, previous, output / "previous", get=get)
     if restored is not None:
         old_index = read_json(restored / "index.json", MAX_SITE_BYTES)
         for record in old_index.get("reports", []):
             public_id = text(record.get("public_report_id"), SHA256, "restored report id")
+            known_reports.add(public_id)
             old_manifest = read_json(restored / "reviews" / public_id / "manifest.json", MIB)
             if old_manifest.get("policy_digest") != expected_policy and public_id not in state["withdrawn"]:
                 state["withdrawn"].append(public_id)
                 state["consent_epoch"] += 1
         validate_state(state, config)
+    if set(retirements) - known_reports - set(previous["withdrawn"]):
+        raise Refusal("retirement must name an existing report or retained withdrawal")
+    for public_id in retirements:
+        if public_id not in state["withdrawn"]:
+            state["withdrawn"].append(public_id)
+            state["consent_epoch"] += 1
+    validate_state(state, config)
     for request_id, request in requests.items():
         directory = handoffs / ("csb-public-handoff-" + request_id)
         if not directory.exists():
@@ -1772,6 +1803,8 @@ def stage_publication(config: dict, plan_value: dict, handoffs: Path, output: Pa
             current_fence(config, request, fresh)
         except Refusal:
             result = dict(result, public_report_id=None, archive_sha256=None, conclusion="cancelled", reason="superseded")
+        if result["public_report_id"] in state["withdrawn"]:
+            result = dict(result, public_report_id=None, archive_sha256=None, conclusion="cancelled", reason="withdrawn")
         if result["public_report_id"] is not None:
             archive = directory / "handoff.tar.gz"
             if archive.is_symlink() or not archive.is_file() or archive.stat().st_size > MAX_REPORT_COMPRESSED or digest(archive.read_bytes()) != result["archive_sha256"]:
@@ -1816,6 +1849,8 @@ def begin_promotion(config: dict, publication: dict, artifact_id: int, *, now: s
     state = json.loads(canonical(previous))
     state["sequence"] += 1; state["previous_receipt_sha256"] = digest(canonical(previous))
     state["budget_activation"] = publication["state"]["budget_activation"]
+    state["withdrawn"] = list(publication["state"]["withdrawn"])
+    state["consent_epoch"] = publication["state"]["consent_epoch"]
     state["promotion_intent"] = {"site_generation": previous["site_generation"] + 1,
                                  "site_manifest_sha256": publication["site"]["site_sha256"],
                                  "artifact_id": integer(artifact_id, 1, 2**63 - 1, "site artifact"),

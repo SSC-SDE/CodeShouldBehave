@@ -19,7 +19,7 @@ was followed in-browser through HLD, LLD and exact baseline/proposal source diff
 passed publication and check delivery; its application REST audit used 71/100 calls.
 This is own-repository acceptance, not a general hosted-service or capacity claim.
 
-The deployed [signed Linux release](https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-c46c28a509b6)
+The deployed [signed Linux release](https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-5fb135fb7f3f)
 passed signature, checksum, production bootstrap and native sandbox verification.
 See [release evidence](docs/RELEASE_STATUS.md).
 
@@ -48,11 +48,15 @@ See the [execution checkpoint](docs/APP_EXECUTION_DEVELOPMENT.md) and
 
 ## Public landing page
 
-New site builds open on a responsive product introduction, with system light/dark
-themes and real captures of a published PR review. **Open workspace** preserves
-the existing reviewer entry; exact report links are unchanged. Actions/Pages
-setup and the unavailable App route are clearly separated. This landing change
-is local development, not a deployment. See [preview and image provenance](docs/PUBLIC_MVP_USAGE.md#public-landing-page).
+The [public homepage](https://ssc-sde.github.io/CodeShouldBehave/) is live, with
+system light/dark themes and real captures of a published PR review.
+**Open workspace** preserves reviewer entry. Six original reports remain
+byte-for-byte unchanged; only the two explicitly approved obsolete PR24/PR31
+versions were retired, with expiry records. Actions/Pages setup and the
+unavailable App route stay separate.
+See [deployment evidence](docs/RELEASE_STATUS.md#landing-page-deployed-and-approved-history-retired)
+and [image provenance](docs/PUBLIC_MVP_USAGE.md#public-landing-page).
+
 
 ## Reviewer journey
 

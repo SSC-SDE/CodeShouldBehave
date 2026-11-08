@@ -195,6 +195,32 @@ Static inventories are capped at 20,000 files and a 4 MiB manifest so every
 published generation remains within the restore reader’s bounds. New output
 that exceeds a cap is refused before publication.
 
+The complete site remains capped at 64 MiB. Capacity failure preserves the last
+published generation; it does not authorize automatic eviction.
+
+### Explicit historical report retirement
+
+A repository owner may commit `.codeshouldbehave/report-retirements.json` on the
+trusted default branch. Its exact fields are `schema_version` =
+`csb-public-report-retirements-v1`, the numeric `repository_id`, and
+`public_report_ids`, a unique list of at most 1,000 complete public bundle IDs.
+Unknown IDs, foreign repositories, malformed records and linked authorization
+files are refused. A PR's own version of this file cannot authorize publication.
+
+The publisher adds only those approved IDs to the existing irreversible
+withdrawal ledger and signs the changed ledger in its pre-deployment intent.
+The new site removes their source bytes and retains source-free expiry records.
+All other reports remain unchanged. Repeating an approved retirement does not
+advance consent again; deleting the authorization file cannot undo a committed
+withdrawal. Re-requesting a retired bundle cannot produce a successful report
+link. Restore must use the latest authoritative withdrawal state.
+
+Retirement uses the ordinary trusted build, pin, signed-intent, deployment and
+complete-readback sequence. Do not delete Pages files manually or increase
+resource limits to bypass a failed admission. Rollback runtimes must understand
+the retained withdrawal/check-repair state.
+
+
 Source is bounded to approved excerpts; the initial LLD detail budget is 100
 entries. Unpublished declared counterpart pairs and native design editing are
 unavailable in the static profile. Exported Markdown contains public evidence.
