@@ -26,6 +26,14 @@ This correction restores the exact previously activated budget configuration;
 no state reset or guard bypass is performed. A subsequent controller run is
 required before claiming live canary acceptance.
 
+The trusted Linux build then passed as run
+[42489528360](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/42489528360)
+for merged source `958a764ec19bd492039b568b8d31387842adfd4e`. Release
+`canary-958a764ec19b` contains the source/runtime archives, attestation,
+manifest and checksums. The follow-up config pin update is required before the
+controller can use the redesigned workspace; no Pages update is claimed yet.
+
+
 
 ## 2026-11-06 - public landing page
 
