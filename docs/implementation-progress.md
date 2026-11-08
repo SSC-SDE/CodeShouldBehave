@@ -5,6 +5,16 @@ copied into this repository. Branch: `phase-6`; PR base: `main`.
 The standalone landing-page publication below uses `codex/public-landing`;
 it does not advance, merge or activate the Phase 6 App implementation.
 
+## 2026-11-08 — public canary activation preparation
+
+Owner completed the local HLD/LLD review and authorized continuation of the
+bounded public canary. The current GitHub account budget page was observed with
+Actions and Packages at `$0.00 / $0.00`, `Usage blocked`, and Free plan status.
+The observation was refreshed in `.codeshouldbehave/budget-observation.json`;
+runtime config validation passed. The existing pinned controller/nudge files are
+already present on `main`; no beta launch is claimed.
+
+
 ## 2026-11-06 - public landing page
 
 User requested pushing and deploying the landing page. Its implementation was
