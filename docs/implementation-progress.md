@@ -1249,3 +1249,13 @@ is claimed; deployed release still predates these fixes.
 - The next signed canary must prove the immutable withdrawal ledger, source-free
   expiry record, complete site readback, redesigned workspace assets and report
   preservation for every non-retired report.
+
+## 2026-11-08 — approved historical HLD report retirement
+
+- The first approved stale-report retirement still left the exact redesigned
+  snapshot above the unchanged 64 MiB site bound because the active canary pass
+  admitted one new report bundle.
+- The owner approved retiring the second superseded PR32 report
+  `a1f293a0cfc5bc0ab2e4dc3ef5d0186f6e419edc9291165af7ad5f65fb6cf7e3`.
+  This is the historical PR32 HLD bundle; the exact ID was added to the trusted
+  retirement ledger. Capacity limits and report admission rules remain unchanged.
