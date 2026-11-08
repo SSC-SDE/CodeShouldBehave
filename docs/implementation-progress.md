@@ -15,6 +15,15 @@ reading path, component filtering, and responsive map/inventory/inspector layout
 No deployment or activation occurred; the Pages controller remains an inactive
 release template.
 
+## 2026-11-08 — public canary continuation selected
+
+Owner selected the bounded public-canary workflow. Preparation is authorized, but
+activation remains blocked until the owner completes the local HLD/LLD review in
+`docs/LOCAL_FEATURE_REVIEW.md` and explicitly reports that review passed. No
+consumer workflow, Pages deployment, live Architecture check, or beta launch is
+claimed.
+
+
 
 ## 2026-11-06 - public landing page
 
