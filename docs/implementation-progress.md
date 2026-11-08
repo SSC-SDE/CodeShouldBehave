@@ -1236,3 +1236,16 @@ is claimed; deployed release still predates these fixes.
   and live fresh-repository check → Focus → HLD → LLD → source plus revocation/
   cost/restart/recovery acceptance. Existing Actions/Pages deployment, PR #24,
   billing and App settings remain unchanged. Beta is not launched.
+## 2026-11-08 — approved stale HLD report retirement for redesigned canary
+
+- The public canary publisher reached the unchanged 64 MiB site bound with the
+  redesigned signed engine: the live site measured 62,319,338 bytes before
+  admission, and the next snapshot added three neutral bookkeeping reports plus
+  the redesigned workspace assets.
+- The owner approved retiring the superseded draft PR32 report
+  `41abc15e14eb1edcd07489e7cadb826057e5865273622fd69d7b159bc198d301`.
+  The exact ID was added to the trusted `.codeshouldbehave/report-retirements.json`
+  ledger. No capacity limit was changed and no Pages files were deleted manually.
+- The next signed canary must prove the immutable withdrawal ledger, source-free
+  expiry record, complete site readback, redesigned workspace assets and report
+  preservation for every non-retired report.
