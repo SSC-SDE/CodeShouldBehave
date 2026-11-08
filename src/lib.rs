@@ -33,6 +33,7 @@ mod provider;
 #[cfg(feature = "server")]
 pub mod public_report;
 mod report;
+mod retry_policy;
 #[cfg(feature = "server")]
 mod review_artifact;
 mod rollout;
@@ -90,10 +91,11 @@ pub use provider::{
     AllowedRepository, CommandRestrictedFetcher, FetchLimits, FetchRequest, IntakeOutcome,
     ProviderEvent, ProviderIntake, RestrictedFetcher,
 };
+pub use retry_policy::{RetryClass, RetryDecision};
 pub use rollout::{
     FeatureSwitch, ObservationWindow, ReviewerSignals, RolloutControls, RolloutStage,
 };
-pub use scheduler::{ClaimedJob, JobLane, QueueStats, RetryClass, Scheduler};
+pub use scheduler::{ClaimedJob, JobLane, QueueStats, Scheduler};
 pub use service::{
     ChangedFilePage, ChangedFileSummary, ComparisonAccessProvider, ComparisonReceipt,
     ExactComparisonRequest, ExactSourceReader, ExportCommands, ExportReceipt, FindingPage,
