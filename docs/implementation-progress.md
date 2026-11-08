@@ -5,6 +5,17 @@ copied into this repository. Branch: `phase-6`; PR base: `main`.
 The standalone landing-page publication below uses `codex/public-landing`;
 it does not advance, merge or activate the Phase 6 App implementation.
 
+## 2026-11-08 — HLD view redesign merged
+
+Provider confirmed [PR #39](https://github.com/SSC-SDE/CodeShouldBehave/pull/39)
+merged into `main` at
+`b2b2e81e78c54df6d7a516df76aec92ce2259eb7`. The view-only follow-up preserves
+HLD/LLD routes and evidence behavior while adding the map → selection → evidence
+reading path, component filtering, and responsive map/inventory/inspector layout.
+No deployment or activation occurred; the Pages controller remains an inactive
+release template.
+
+
 ## 2026-11-06 - public landing page
 
 User requested pushing and deploying the landing page. Its implementation was
