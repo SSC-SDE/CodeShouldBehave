@@ -1259,3 +1259,22 @@ is claimed; deployed release still predates these fixes.
   `a1f293a0cfc5bc0ab2e4dc3ef5d0186f6e419edc9291165af7ad5f65fb6cf7e3`.
   This is the historical PR32 HLD bundle; the exact ID was added to the trusted
   retirement ledger. Capacity limits and report admission rules remain unchanged.
+
+## 2026-11-08 — redesigned public canary deployed
+
+- PR #45 merged at `5c6e48ec387c49f0a09b1b5861a98da76c53b069`; PR #46 merged at
+  `3c5882ad973187078278ce577d44dce267846fc0`.
+- Controller run
+  [42494668980](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/42494668980)
+  passed plan, native analysis, signed publication, Pages deployment, live
+  readback, receipt commit and Architecture-check delivery.
+- Live workspace:
+  https://ssc-sde.github.io/CodeShouldBehave/workspace/
+  serves the redesigned workspace CSS byte-for-byte:
+  `0fe1c422676f56f459367e77c5912b155e9425cea365b79109a8ba3aaee8391f`.
+  The verified site manifest is
+  `3aeb13fa55e3efb9d6a87ba144590b717477876d32f206e818e6a449c94fe795`,
+  with 1,551 files and 47,865,534 bytes.
+- The two approved stale PR32 report URLs return 404 and the live catalog retains
+  six non-retired reports. No site-cap or admission limit changed; beta remains
+  disabled.
