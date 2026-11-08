@@ -1,4 +1,4 @@
-use crate::Storage;
+use crate::{Storage, retry_policy};
 use rusqlite::{OptionalExtension, TransactionBehavior, params};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -16,12 +16,7 @@ impl JobLane {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum RetryClass {
-    Retryable,
-    Terminal,
-    Cancelled,
-}
+pub use retry_policy::RetryClass;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ClaimedJob {
@@ -417,16 +412,11 @@ impl<'a> Scheduler<'a> {
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(|error| format!("Cannot start failure transaction: {error}"))?;
         verify_lease(&transaction, job, worker, now)?;
-        let (state, available) = match class {
-            RetryClass::Retryable if job.attempt < 5 => {
-                let exponent = u32::try_from(job.attempt.saturating_sub(1))
-                    .unwrap_or(31)
-                    .min(6);
-                let delay = 1_000_i64.saturating_mul(1_i64 << exponent).min(60_000);
-                ("retry", now.saturating_add(delay))
-            }
-            RetryClass::Retryable | RetryClass::Terminal => ("failed", now),
-            RetryClass::Cancelled => ("cancelled", now),
+        let decision = retry_policy::decide(class, job.attempt, now);
+        let (state, available) = match decision {
+            retry_policy::RetryDecision::Retry { available_at_ms } => ("retry", available_at_ms),
+            retry_policy::RetryDecision::Failed => ("failed", now),
+            retry_policy::RetryDecision::Cancelled => ("cancelled", now),
         };
         transaction.execute(
             "UPDATE jobs SET state=?1,available_at_ms=?2,lease_owner=NULL,lease_expires_at_ms=NULL,
