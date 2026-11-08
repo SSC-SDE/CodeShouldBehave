@@ -1118,6 +1118,7 @@ function clearHldEvidence(root) {
   const get=id=>root.getElementById(id);
   for(const id of ['hld-diagrams','hld-element-list','hld-inspector','hld-coverage','hld-corrections-list','hld-correction-element','hld-related-elements','hld-flow-source','hld-flow-target','hld-document-evidence','hld-correspondence-sources','hld-correspondence-targets'])get(id).replaceChildren();
   for(const id of ['hld-identity','hld-full-identity','hld-drift-status','hld-correspondence-source-identity','hld-correspondence-target-identity'])get(id).textContent='';
+  get('hld-element-filter').value='';
   for(const id of ['hld-responsibility','hld-boundary-paths'])get(id).value='';
   for(const id of ['hld-mermaid-source','hld-confirmation-preview']){get(id).hidden=true;get(id).firstElementChild.textContent='';}
   for(const id of ['hld-source','hld-export','hld-confirm','hld-accepted'])get(id).disabled=true;
@@ -2353,8 +2354,12 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
     renderHldCoverage(payload);
     const comparison=hldComparison(presentationFilter('changedHld')?focusHldPayload(payload):payload,hldMode==='compare'?'combined':hldMode), elements=comparison.elements;
     if (!elements.some(element=>element.id===hldSelection)) hldSelection=elements[0]?.id || null;
+    const filter=($('hld-element-filter').value||'').trim().toLowerCase();
+    const visibleElements=filter?elements.filter(element=>`${element.name} ${element.kind} ${(element.roots||[]).join(' ')}`.toLowerCase().includes(filter)):elements;
+    $('hld-element-count').textContent=`${visibleElements.length} of ${elements.length}`;
     const list=$('hld-element-list'); list.replaceChildren();
-    for (const element of elements) { const button=node('button','hld-element'); button.type='button'; button.setAttribute('aria-current',String(element.id===hldSelection)); button.append(node('span','',element.name),node('span','badge',comparison.status.get(element.id)||element.kind)); button.addEventListener('click',()=>selectHldElement(element.id)); list.append(button); }
+    if(!visibleElements.length) list.append(node('p','status','No HLD elements match this filter.'));
+    for (const element of visibleElements) { const button=node('button','hld-element'); button.type='button'; button.setAttribute('aria-current',String(element.id===hldSelection)); button.append(node('span','',element.name),node('span','badge',comparison.status.get(element.id)||element.kind)); button.addEventListener('click',()=>selectHldElement(element.id)); list.append(button); }
     renderHldInspector(payload);
     updateHldConfirmationElements(payload);
     const modes=hldMode==='compare'?['baseline','proposal']:[hldMode];
@@ -2667,6 +2672,7 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
   $('lld-preview-acceptance').addEventListener('click',async()=>{const button=$('lld-preview-acceptance'),generation=workspace.generation,token=workspace.lldDetailGeneration;button.disabled=true;$('lld-confirm').disabled=true;try{const preview=await workspace.previewLld(lldConfirmationRequest());if(generation!==workspace.generation||token!==workspace.lldDetailGeneration)return;$('lld-confirmation-preview').firstElementChild.textContent=JSON.stringify(preview,null,2);$('lld-confirmation-preview').hidden=false;$('lld-confirmation-status').textContent='Review the exact implementation fingerprint and assertion. Acceptance requires your explicit action.';$('lld-confirm').disabled=false;}catch(error){if(generation===workspace.generation&&token===workspace.lldDetailGeneration)$('lld-confirmation-status').textContent=`Assertion preview unavailable: ${error.message}`;}finally{if(generation===workspace.generation&&token===workspace.lldDetailGeneration)button.disabled=false;}});
   $('lld-confirm').addEventListener('click',async()=>{const generation=workspace.generation,token=workspace.lldDetailGeneration;$('lld-confirm').disabled=true;try{if(!$('lld-known-gaps').checked)throw new Error('Review and acknowledge the unresolved calls and local-flow gaps before accepting');await workspace.acceptLld(lldConfirmationRequest(),{knownGapsAccepted:true,activateDefault:$('lld-activate-default').checked});if(generation!==workspace.generation||token!==workspace.lldDetailGeneration)return;$('lld-confirmation-preview').hidden=true;$('lld-confirmation-status').textContent='Assertion accepted for this exact implementation and interpretation. Changed bodies require review again.';await workspace.loadLldDetail(lldElement,{baselineEntry:lldBaselineEntry,correspondenceKind:lldCorrespondence});}catch(error){if(generation===workspace.generation&&token===workspace.lldDetailGeneration){invalidateLldConfirmation();$('lld-confirmation-status').textContent=`LLD acceptance unavailable: ${error.message}`;}}});
   for(const mode of ['combined','compare','baseline','proposal','accepted'])$('hld-'+mode).addEventListener('click',()=>{hldMode=mode;lastHldKey='';++hldSourceGeneration;renderHld(workspace.state);rememberRoute();});
+  $('hld-element-filter').addEventListener('input',()=>renderHld(workspace.state));
   $('hld-reload').addEventListener('click',()=>{workspace.state.hldDraft=null;invalidateHldConfirmation();workspace.loadHld();});
   $('hld-source').addEventListener('click',()=>{if(!hldExportAllowed(workspace.state.hld,hldMode))return;$('hld-mermaid-source').hidden=!$('hld-mermaid-source').hidden;});
   $('hld-export').addEventListener('click',async()=>{
