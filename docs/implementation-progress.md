@@ -5,6 +5,17 @@ copied into this repository. Branch: `phase-6`; PR base: `main`.
 The standalone landing-page publication below uses `codex/public-landing`;
 it does not advance, merge or activate the Phase 6 App implementation.
 
+## 2026-11-08 — Phase 6 PR #32 merged
+
+Provider confirmed [PR #32](https://github.com/SSC-SDE/CodeShouldBehave/pull/32)
+merged into `main` at `4661c9d34f9ab613b1301d6e22544b0330960abd` after the
+conflict-resolution merge commit `f6eb564cca6d4a3623ddca7ef00a313430a048db`
+was pushed from `phase-6`. Local post-resolution gates passed: Rust
+format-check, 387 all-feature tests, strict all-target Clippy, 169 Node tests,
+and 125 public Python tests with 4 environment skips. No deployment, activation,
+or production credential change occurred.
+
+
 ## 2026-11-06 - public landing page
 
 User requested pushing and deploying the landing page. Its implementation was
