@@ -15,6 +15,18 @@ runtime config validation passed. The existing pinned controller/nudge files are
 already present on `main`; no beta launch is claimed.
 
 
+## 2026-11-08 — canary budget identity preserved
+
+The first controller run after PR #41 correctly refused before analysis with
+`budget policy changed; recent activation is required` (run
+[42488843241](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/42488843241)).
+The signed controller state binds the original budget policy and evidence
+identity, so the refreshed observation is not used to rewrite that identity.
+This correction restores the exact previously activated budget configuration;
+no state reset or guard bypass is performed. A subsequent controller run is
+required before claiming live canary acceptance.
+
+
 ## 2026-11-06 - public landing page
 
 User requested pushing and deploying the landing page. Its implementation was
