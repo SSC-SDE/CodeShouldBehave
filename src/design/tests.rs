@@ -114,11 +114,22 @@ fn generate(
     scope: &ScopeRecord,
     context: &ConfirmedDesignContext,
 ) -> DesignVersion {
+    generate_with_focus(fixture, commit, scope, context, &BTreeSet::new())
+}
+
+fn generate_with_focus(
+    fixture: &Fixture,
+    commit: &SnapshotId,
+    scope: &ScopeRecord,
+    context: &ConfirmedDesignContext,
+    focus: &BTreeSet<String>,
+) -> DesignVersion {
     generate_hld(
         &fixture.root,
         commit,
         scope,
         context,
+        focus,
         &Cancellation::default(),
     )
     .unwrap()
@@ -473,19 +484,15 @@ fn oversized_contract_inventory_preserves_dependency_diff_and_exact_evidence() {
     assert!(delta.changes.iter().any(|change| {
         change.kind == "added" && change.after_name.as_deref() == Some("lapin package")
     }));
-    assert!(
-        before
-            .coverage
-            .deferred_element_kinds
-            .iter()
-            .any(|kind| kind == "contract")
-    );
+    assert!(!before.coverage.deferred_paths.is_empty());
     assert!(!delta.coverage.complete);
+    // Asymmetric bounded trimming can still hide an untouched declaration, so
+    // the delta must keep those residual differences explicitly uncertain.
     assert!(
         delta
             .changes
             .iter()
-            .all(|change| matches!(change.kind.as_str(), "added" | "modified"))
+            .any(|change| change.kind == "uncertain")
     );
 }
 
@@ -911,6 +918,57 @@ fn scoped_deferrals_preserve_observable_additions() {
     assert!(unresolved.changes.iter().any(|change| {
         change.kind == "added" && change.after_name.as_deref() == Some("added_route")
     }));
+}
+
+/// Bounded storage must prefer the declarations the comparison touched.
+#[test]
+fn changed_path_contracts_survive_storage_trimming() {
+    let fixture = Fixture::new();
+    let source = fixture.simple();
+    let bulk = (0..900)
+        .map(|index| {
+            format!(
+                "pub struct Bulk{index} {{ pub payload: [u64; 32], pub metadata: [u8; 128] }}\n"
+            )
+        })
+        .collect::<String>();
+    let changed = (0..40)
+        .map(|index| {
+            format!(
+                "pub struct Changed{index} {{ pub payload: [u64; 32], pub metadata: [u8; 128] }}\n"
+            )
+        })
+        .collect::<String>();
+    fixture.write("src/lib.rs", &bulk);
+    fixture.write("src/changed.rs", &changed);
+    let snapshot = fixture.commit();
+    let scope = scope();
+    let context = context(&source);
+    let focus = BTreeSet::from(["src/changed.rs".to_string()]);
+    let version = generate_with_focus(&fixture, &snapshot, &scope, &context, &focus);
+    assert!(serde_json::to_vec(&version).unwrap().len() <= 900 * 1024);
+    assert!(version.coverage.deferred > 0);
+    assert!(
+        version.elements.iter().any(|element| {
+            element.kind == DesignElementKind::Contract && element.name.starts_with("Changed")
+        }),
+        "changed-path declarations must survive trimming"
+    );
+    assert!(
+        version
+            .coverage
+            .deferred_paths
+            .iter()
+            .any(|path| path == "src/lib.rs"),
+        "trimmed declarations must defer their own path"
+    );
+    assert!(
+        !version
+            .coverage
+            .deferred_paths
+            .iter()
+            .any(|path| path == "src/changed.rs")
+    );
 }
 
 /// A path that was never analyzed hides only inventory rooted in that path.

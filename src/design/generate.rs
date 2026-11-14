@@ -695,11 +695,15 @@ impl Builder<'_> {
     }
 }
 
+/// Generate one snapshot's HLD. `focus` names the comparison's changed paths;
+/// bounded storage trims inventory outside them first so a reviewer sees the
+/// declarations this change actually touches.
 pub fn generate_hld(
     repository: &Path,
     snapshot: &SnapshotId,
     scope: &ScopeRecord,
     context: &ConfirmedDesignContext,
+    focus: &BTreeSet<String>,
     cancellation: &Cancellation,
 ) -> Result<DesignVersion, String> {
     context.validate(scope)?;
@@ -1126,22 +1130,34 @@ pub fn generate_hld(
             DesignElementKind::Deployment => 3,
             DesignElementKind::Component => 4,
         };
-        let next_priority = version
+        // Evidence, not element identity, decides what the reviewer keeps.
+        // Inventory outside the changed paths is trimmed first; within that,
+        // the lowest-value class goes first. Component boundaries never trim.
+        let in_focus = |element: &DesignElement| {
+            element.roots.iter().any(|root| focus.contains(root))
+                || element
+                    .evidence_ids
+                    .iter()
+                    .filter_map(|id| version.evidence.iter().find(|item| &item.id == id))
+                    .any(|item| focus.contains(&item.path))
+        };
+        let mut candidates = version
             .elements
             .iter()
             .filter(|element| element.kind != DesignElementKind::Component)
-            .map(|element| priority(&element.kind))
-            .min();
-        let remove = version
-            .elements
-            .iter()
-            .rev()
-            .filter(|element| {
-                element.kind != DesignElementKind::Component
-                    && Some(priority(&element.kind)) == next_priority
+            .map(|element| {
+                (
+                    u8::from(in_focus(element)),
+                    priority(&element.kind),
+                    element.id.clone(),
+                )
             })
+            .collect::<Vec<_>>();
+        candidates.sort();
+        let remove = candidates
+            .into_iter()
             .take(50)
-            .map(|element| element.id.clone())
+            .map(|(_, _, id)| id)
             .collect::<BTreeSet<_>>();
         if remove.is_empty() {
             if version.document_candidates.is_empty() {
@@ -1156,17 +1172,55 @@ pub fn generate_hld(
             version.coverage.deferred += count;
         }
         version.coverage.deferred += remove.len();
+        // Deferral is recorded per observed path so a later snapshot can still
+        // prove an addition in a file that was fully analyzed. Only an element
+        // with no path at all falls back to a class-level deferral.
         for element in version
             .elements
             .iter()
             .filter(|element| remove.contains(&element.id))
         {
-            let name = element_kind_name(&element.kind).to_string();
-            if !version.coverage.deferred_element_kinds.contains(&name) {
-                version.coverage.deferred_element_kinds.push(name);
+            let mut paths = element
+                .evidence_ids
+                .iter()
+                .filter_map(|id| version.evidence.iter().find(|item| &item.id == id))
+                .map(|item| item.path.clone())
+                .collect::<Vec<_>>();
+            if paths.is_empty() {
+                paths = element.roots.clone();
+            }
+            if paths.is_empty() {
+                let name = element_kind_name(&element.kind).to_string();
+                if !version.coverage.deferred_element_kinds.contains(&name) {
+                    version.coverage.deferred_element_kinds.push(name);
+                }
+            }
+            for path in paths {
+                if version
+                    .coverage
+                    .deferred_paths
+                    .iter()
+                    .any(|item| item == &path)
+                {
+                    continue;
+                }
+                if version.coverage.deferred_paths.len() >= MAX_DEFERRED_PATHS {
+                    if !version
+                        .coverage
+                        .deferred_paths
+                        .iter()
+                        .any(|item| item == "*")
+                    {
+                        version.coverage.deferred_paths.push("*".into());
+                    }
+                    break;
+                }
+                version.coverage.deferred_paths.push(path);
             }
         }
         version.coverage.deferred_element_kinds.sort();
+        version.coverage.deferred_paths.sort();
+        version.coverage.deferred_paths.dedup();
         version
             .elements
             .retain(|element| !remove.contains(&element.id));
@@ -1859,8 +1913,15 @@ mod tests {
             integrations: vec![],
             gaps: vec![],
         };
-        let before =
-            generate_hld(&root, &snapshot, &scope, &context, &Cancellation::default()).unwrap();
+        let before = generate_hld(
+            &root,
+            &snapshot,
+            &scope,
+            &context,
+            &BTreeSet::new(),
+            &Cancellation::default(),
+        )
+        .unwrap();
         let doc = &before.document_candidates[0];
         let evidence = before
             .evidence
@@ -1884,8 +1945,15 @@ mod tests {
             "Different mutable worktree document\n",
         )
         .unwrap();
-        let after =
-            generate_hld(&root, &snapshot, &scope, &context, &Cancellation::default()).unwrap();
+        let after = generate_hld(
+            &root,
+            &snapshot,
+            &scope,
+            &context,
+            &BTreeSet::new(),
+            &Cancellation::default(),
+        )
+        .unwrap();
         assert_eq!(before, after);
         std::fs::remove_dir_all(root).unwrap();
     }
@@ -2033,6 +2101,7 @@ mod tests {
             &before_commit,
             &scope,
             &context,
+            &BTreeSet::new(),
             &Cancellation::default(),
         )
         .unwrap();
@@ -2044,6 +2113,7 @@ mod tests {
             &after_commit,
             &scope,
             &context,
+            &BTreeSet::new(),
             &Cancellation::default(),
         )
         .unwrap();
@@ -2069,8 +2139,8 @@ mod tests {
             compare_hld(&before, &after).unwrap().outcome,
             DesignOutcome::Incomplete
         );
-        assert_eq!(before.generator_version, "csb-hld-rust-static-v5");
-        // Reading immutable v2 history does not relabel it as the v5 profile.
+        assert_eq!(before.generator_version, "csb-hld-rust-static-v6");
+        // Reading immutable v2 history does not relabel it as the v6 profile.
         let mut legacy = before.clone();
         legacy.generator_version = "csb-hld-rust-static-v2".into();
         for evidence in &mut legacy.evidence {
