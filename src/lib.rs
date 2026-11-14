@@ -1,6 +1,7 @@
 mod ai;
 mod analysis;
 mod architecture;
+pub mod architecture_review;
 mod context;
 mod core;
 #[cfg(feature = "server")]
