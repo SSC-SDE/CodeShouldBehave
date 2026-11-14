@@ -33,7 +33,15 @@ measurement mismatch was corrected in trusted CSS so diagram labels are not clip
 Checks passed: 28 HLD/preferences tests, 142 initial related workspace tests,
 52 final LLD tests, two workspace asset tests and JavaScript syntax checks.
 The source-text-only new assertion was removed in favor of actual browser proof.
-Source merge and signed release promotion are pending. Demo PR53 remains draft.
+Source PR https://github.com/SSC-SDE/CodeShouldBehave/pull/60 merged at
+`34fe46947146f064862c5a902829a65522a168a8` after its provider check passed.
+Trusted release build https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/43624991641
+passed its hard-zero observation gate, public release contracts, native Linux build
+and hosted attestation. Release `canary-34fe46947146` passed both downloaded archive
+checksums and exact source/signer provenance verification with self-hosted runners
+denied. Production bootstrap from the actual release URLs passed. Both engine pin
+documents select this package; runtime budget, policy and scope remain unchanged.
+Native preflight and hosted promotion are pending. Demo PR53 remains draft.
 
 ## 2026-11-14 — HLD-first check entry correction
 
