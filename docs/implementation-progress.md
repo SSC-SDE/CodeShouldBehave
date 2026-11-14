@@ -1552,7 +1552,7 @@ is claimed; deployed release still predates these fixes.
 - The original checkout remains on `phase-7` with the five unrelated backend
   working-tree changes preserved and excluded from the merged PR.
 
-### HLD change-certainty and publication-diagnostic fixes merged
+### HLD change-certainty and publication-diagnostic fixes merged to `main`
 
 - **PR #66** (`fix/hld-scoped-change-soundness`, tip
   `693298bfe1b933a1dca405d025a7d60ae1add7e2`, base `d317058`) merged in
@@ -1576,10 +1576,13 @@ is claimed; deployed release still predates these fixes.
   non-refusal errors, and names retained versus new bytes when the site cap
   refuses. Verification: `python3 -m unittest discover -s tests -p "*test.py"`
   — 267 passed (6 skipped).
-- Both PRs are merged and nothing here authorizes deploying, changing the
-  release pin, or altering retention policy. Pre-flight publication admission
-  and automated retirement remain open; automating retirement changes consent
-  semantics and needs explicit authorization.
+- All three PRs are merged to `main`: #66 in
+  `0450aa57e5bc6c96c9f85fd6354e404ddda21b47`, #67 in
+  `ba60cec29db9fc7def3ea40c7d2d70b679a282c5`, and this #68 bookkeeping entry
+  itself in `bc2e96c3091950680bf95490fc4ab7bbb590474a`. Nothing here authorizes
+  deploying, changing the release pin, or altering retention policy. Pre-flight
+  publication admission and automated retirement remain open; automating
+  retirement changes consent semantics and needs explicit authorization.
 - Draft PR #63 is still unmerged. Its hosted report was produced by the pinned
   pre-fix engine; it will show the corrected boundaries only after a new
   attested engine release and report regeneration.
