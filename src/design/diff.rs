@@ -54,29 +54,38 @@ fn absent_element_is_sound(
         || (!coverage.defers_element_kind(&element.kind)
             && !element_paths(element, evidence).any(|path| coverage.defers_path(path)))
 }
-/// A relation is observable as absent only when both endpoints are and the
-/// relation's own evidence paths were analyzed.
+/// A relation is observable as absent only when the relation's own evidence
+/// paths were analyzed, and each endpoint that is also absent from the
+/// comparison side has an observable absence. An endpoint that already exists
+/// there needs no absence proof: its own inventory cannot explain why this
+/// relation's evidence was never emitted.
 fn absent_relation_is_sound(
     coverage: &DesignCoverage,
     relation: &DesignRelation,
     version: &DesignVersion,
+    other: &DesignVersion,
 ) -> bool {
     if coverage.complete {
         return true;
     }
-    let endpoints = [&relation.from, &relation.to]
+    if !relation
+        .evidence_ids
         .iter()
-        .filter_map(|id| version.elements.iter().find(|element| &element.id == *id))
-        .collect::<Vec<_>>();
-    endpoints.len() == 2
-        && endpoints
-            .iter()
-            .all(|element| absent_element_is_sound(coverage, element, &version.evidence))
-        && relation
-            .evidence_ids
-            .iter()
-            .filter_map(|id| version.evidence.iter().find(|item| &item.id == id))
-            .all(|item| !coverage.defers_path(&item.path))
+        .filter_map(|id| version.evidence.iter().find(|item| &item.id == id))
+        .all(|item| !coverage.defers_path(&item.path))
+    {
+        return false;
+    }
+    [&relation.from, &relation.to].iter().all(|id| {
+        other.elements.iter().any(|element| &element.id == *id)
+            || version
+                .elements
+                .iter()
+                .find(|element| &element.id == *id)
+                .is_some_and(|element| {
+                    absent_element_is_sound(coverage, element, &version.evidence)
+                })
+    })
 }
 fn proven_modification(
     before: &DesignElement,
@@ -322,14 +331,14 @@ pub fn compare_hld(
         }
         let kind = match (before, after) {
             (None, Some(after)) => {
-                if absent_relation_is_sound(&baseline.coverage, after, proposal) {
+                if absent_relation_is_sound(&baseline.coverage, after, proposal, baseline) {
                     "added"
                 } else {
                     "uncertain"
                 }
             }
             (Some(before), None) => {
-                if absent_relation_is_sound(&proposal.coverage, before, baseline) {
+                if absent_relation_is_sound(&proposal.coverage, before, baseline, proposal) {
                     "removed"
                 } else {
                     "uncertain"
