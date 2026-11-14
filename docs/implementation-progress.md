@@ -16,7 +16,20 @@ delivery acknowledgement. Browser entry with the corrected URL selected HLD with
 LLD hidden. Source PR https://github.com/SSC-SDE/CodeShouldBehave/pull/57 merged
 at `45479202f0292704a6aefdabcec0d79233f9c726`. Trusted Linux build and attestation
 https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/43608166283 passed.
-Signed release promotion and actual PR check refresh remain pending.
+Release `canary-45479202f029` passed downloaded source/runtime checksums, exact
+hosted source/signer provenance and actual-URL production bootstrap. Native
+networkless sandbox preflight43608866014 passed on the pin branch.
+Pin PR https://github.com/SSC-SDE/CodeShouldBehave/pull/58 merged at
+`b8a71e6a7cdb53c16949282e5414a97bed3e451d`. The manual publisher dispatch was
+cancelled before jobs by the newer automatic run43608992184 on that same merge.
+The site promotion committed successfully as receipt7789485117, sequence113,
+with no pending intent. The pass then exhausted its bounded REST ticket during
+check completion; no limits were raised. Ordinary repair pass43609451991 passed,
+including live readback, durable check delivery and all REST stage evidence.
+PR53 check132490890227 is completed/neutral, **Ready · Changes to review**, and its
+actual report link contains `design=hld&mode=focus`. Browser verification clicked
+that link on GitHub (not a hand-edited URL): HLD selected, LLD hidden, Moria loaded
+and visible. Existing explicit LLD links remain valid; fresh PR check entry is HLD.
 
 ## 2026-11-14 — hosted review desk release cutover
 
