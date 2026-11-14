@@ -20,8 +20,24 @@ Trusted Linux build: https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/43
 Build and hosted attestation passed. Downloaded source/runtime checksums and
 offline provenance passed with exact source/signer SHA and hosted runners required.
 Release: https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-60b46619aefa.
-Both engine pin documents now select that verified package. Native preflight and
-live publication evidence remain pending.
+Both engine pin documents select that verified package. Production bootstrap from
+the actual release URLs passed. Native sandbox preflight
+https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/43605900566 passed on pin
+commit `e3fc9d7796cab0c2de9526cf39198e3f546b5cd6`. All ten packaged Standard/Focus/
+Ring/Moria assets match the approved merged source byte-for-byte.
+Owner-authorized promotion PR https://github.com/SSC-SDE/CodeShouldBehave/pull/54
+merged at `8ea3ea349e85e42cbaa29cddb77460123dab1a27` on `2026-11-14T14:39:32Z`.
+Controller https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/43606023281
+deployed generation 17 and passed full live readback, then failed final attestation
+with provider `InternalError: error fetching tlog entry - (404) Not Found`.
+No verification or budget limit is relaxed. Existing exact-intent recovery is
+authorized only for cryptographically verified pending sequence 105,
+state `210bfb6394de21607c61b698aec86c7ba5dce5f85280d0020a79a438af22c586`,
+intent `c0c491a5b6266f3a2019aa75aad7e4d55d64b0c8c6ab43f236fb444a9ab07f08`,
+artifact `14118173958`, served manifest
+`8bb347edadc192ceda039365bf6fc61dc1b84014bf3cca06c8742cea7e606bd7`.
+It expires at `2026-11-15T02:00:00Z` and may only resume the same immutable bytes.
+Final promotion receipt and browser acceptance remain pending.
 
 ## 2026-11-14 - Standard Character desk implementation
 
