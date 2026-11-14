@@ -79,10 +79,14 @@ fn legacy_preferences() -> Value {
             .as_object_mut()
             .unwrap()
             .remove("focusBackdrop");
+        doc["modes"][name]["visibility"]
+            .as_object_mut()
+            .unwrap()
+            .remove("ringBackdrop");
         doc["modes"][name]["order"]["main"]
             .as_array_mut()
             .unwrap()
-            .retain(|id| id != "focusBackdrop");
+            .retain(|id| id != "focusBackdrop" && id != "ringBackdrop");
         doc["modes"][name]["order"]["main"]
             .as_array_mut()
             .unwrap()
@@ -103,9 +107,13 @@ fn legacy_backdrop_migration_preserves_preferences_and_order() {
             doc["modes"][name]["visibility"]["focusBackdrop"],
             name == "focus"
         );
+        assert_eq!(
+            doc["modes"][name]["visibility"]["ringBackdrop"],
+            name == "standard"
+        );
         let order = doc["modes"][name]["order"]["main"].as_array().unwrap();
         assert_eq!(
-            &order[..order.len() - 1],
+            &order[..order.len() - 2],
             legacy["modes"][name]["order"]["main"].as_array().unwrap()
         );
     }
@@ -115,6 +123,18 @@ fn legacy_backdrop_migration_preserves_preferences_and_order() {
     doc["modes"]["focus"]["visibility"]["focusBackdrop"] = json!(false);
     migrate(&mut doc);
     assert_eq!(doc["modes"]["focus"]["visibility"]["focusBackdrop"], false);
+    doc["modes"]["standard"]["visibility"]["ringBackdrop"] = json!(false);
+    doc["modes"]["focus"]["visibility"]["ringBackdrop"] = json!(true);
+    migrate(&mut doc);
+    assert_eq!(
+        doc["modes"]["standard"]["visibility"]["ringBackdrop"],
+        false
+    );
+    assert_eq!(doc["modes"]["focus"]["visibility"]["ringBackdrop"], true);
+    assert!(validate(&doc).is_ok());
+    doc["modes"]["standard"]["visibility"]["ringBackdrop"] = json!("yes");
+    assert!(validate(&doc).is_err());
+    doc["modes"]["standard"]["visibility"]["ringBackdrop"] = json!(false);
     doc["modes"]["standard"]["visibility"]
         .as_object_mut()
         .unwrap()
@@ -142,6 +162,10 @@ fn legacy_backdrop_documents_read_and_save_with_account_revision() {
         loaded["preferences"]["modes"]["focus"]["visibility"]["focusBackdrop"],
         true
     );
+    assert_eq!(
+        loaded["preferences"]["modes"]["standard"]["visibility"]["ringBackdrop"],
+        true
+    );
     let saved = write(
         &mut storage,
         &account,
@@ -152,6 +176,10 @@ fn legacy_backdrop_documents_read_and_save_with_account_revision() {
     assert_eq!(saved["preferences"]["theme"], "terminal");
     assert_eq!(
         saved["preferences"]["modes"]["standard"]["visibility"]["focusBackdrop"],
+        false
+    );
+    assert_eq!(
+        saved["preferences"]["modes"]["focus"]["visibility"]["ringBackdrop"],
         false
     );
     drop(storage);

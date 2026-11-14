@@ -1,4 +1,4 @@
-"""The loopback development host serves only the approved embedded Focus assets."""
+"""The loopback development host serves only approved embedded workspace assets."""
 import io
 from pathlib import Path
 import sys
@@ -22,8 +22,12 @@ class WorkspaceAssetsTests(unittest.TestCase):
         handler.do_GET()
         return responses, handler.wfile.getvalue()
 
-    def test_focus_assets_match_source_and_mime_without_api_authorization(self):
+    def test_workspace_assets_match_source_and_mime_without_api_authorization(self):
         for name, content_type in (
+            ("workspace-standard.js", "text/javascript; charset=utf-8"),
+            ("workspace-standard.css", "text/css; charset=utf-8"),
+            ("workspace-ring.js", "text/javascript; charset=utf-8"),
+            ("workspace-ring.css", "text/css; charset=utf-8"),
             ("workspace-focus-model.js", "text/javascript; charset=utf-8"),
             ("workspace-focus.js", "text/javascript; charset=utf-8"),
             ("workspace-focus.css", "text/css; charset=utf-8"),

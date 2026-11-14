@@ -1,0 +1,42 @@
+/* Artwork palette is isolated from the application's foreground theme tokens. */
+body.standard-desk-active { isolation:isolate; }
+#workspace-ring {
+ display:none;position:fixed;inset:0;z-index:-1;pointer-events:none;user-select:none;overflow:hidden;
+ --ring-gold:#ffe08a;--ring-ember:#ff4500;--ring-glow:#ffb238;--ring-etch:#fff1bf;
+ background:radial-gradient(ellipse at 72% 32%,#1c0d04 0,#100905 45%,#070504 85%);
+}
+body.standard-desk-active #workspace-ring:not(.preference-hidden):not([hidden]) { display:block; }
+.workspace-ring-stage { position:absolute;left:84%;top:26%;transform:translate(-50%,-50%) scale(.73);display:flex;align-items:center;flex-direction:column;width:max-content;opacity:.65; }
+.workspace-ring-surface { position:relative; }
+#workspace-ring .workspace-ring-text {
+ font:700 clamp(5px,.74vw,11px)/1.05 'Courier New',monospace;white-space:pre;margin:0;padding:0;border:0;background:none;letter-spacing:0;
+ color:var(--ring-gold);text-shadow:0 0 5px var(--ring-glow),0 0 18px #ff6a00,0 0 35px #ff45005c;
+ contain:layout style;animation:workspace-ring-forge 7s ease-in-out infinite;animation-play-state:paused;
+}
+#workspace-ring.workspace-ring-running .workspace-ring-text,
+#workspace-ring.workspace-ring-running .workspace-ring-verse { animation-play-state:running; }
+.workspace-ring-inscription { position:absolute;inset:0;pointer-events:none; }
+.workspace-ring-inscription span {
+ position:absolute;font:700 clamp(9px,1.05vw,16px)/1 'Courier New',monospace;color:var(--ring-etch);
+ text-shadow:0 1px 2px #070504,0 -1px 2px #070504,0 0 5px var(--ring-glow),0 0 11px var(--ring-ember);transform:translate(-50%,-50%);
+}
+#workspace-ring .workspace-ring-verse {
+ margin-top:-55px;text-align:center;color:var(--ring-gold);font-family:ui-monospace,monospace;text-transform:uppercase;
+ animation:workspace-ring-ember 9s ease-in-out infinite;animation-play-state:paused;
+}
+#workspace-ring .workspace-ring-verse strong { display:block;font-size:clamp(10px,1.1vw,16px);font-weight:500;letter-spacing:.23em;text-shadow:0 0 10px var(--ring-glow); }
+#workspace-ring .workspace-ring-verse p { font-size:clamp(8px,.72vw,11px);letter-spacing:.06em;max-width:70ch;line-height:2;margin:12px auto 0;color:var(--ring-gold);opacity:.72; }
+#workspace-ring-pause { display:none; }
+body.standard-desk-active #workspace-ring-pause:not(.preference-hidden):not([hidden]) { display:inline-flex; }
+@keyframes workspace-ring-forge {
+ 0%,100% { color:var(--ring-gold);text-shadow:0 0 4px var(--ring-glow),0 0 16px #ff8c00a6,0 0 35px #ff45004d; }
+ 50% { color:var(--ring-ember);text-shadow:0 0 5px var(--ring-ember),0 0 22px #ff4500a6,0 0 42px #ff450059; }
+}
+@keyframes workspace-ring-ember { 0%,100% { opacity:.9; } 50% { opacity:.55; } }
+@media(max-width:1100px) { .workspace-ring-stage { left:82%;opacity:.2; } }
+@media(max-width:700px) { .workspace-ring-stage { left:80%;top:24%;opacity:.14; } }
+@media(prefers-reduced-motion:reduce) { #workspace-ring .workspace-ring-text,#workspace-ring .workspace-ring-verse { animation:none; } }
+@media(forced-colors:active) {
+ body.standard-desk-active #workspace-ring:not(.preference-hidden):not([hidden]),
+ body.standard-desk-active #workspace-ring-pause:not(.preference-hidden):not([hidden]) { display:none; }
+}

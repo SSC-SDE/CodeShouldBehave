@@ -826,6 +826,13 @@ pub fn router(backend: Arc<dyn HttpBackend>) -> Router {
         .route("/workspace", get(workspace))
         .route("/assets/workspace.js", get(workspace_js))
         .route("/assets/workspace.css", get(workspace_css))
+        .route("/assets/workspace-standard.js", get(workspace_standard_js))
+        .route(
+            "/assets/workspace-standard.css",
+            get(workspace_standard_css),
+        )
+        .route("/assets/workspace-ring.js", get(workspace_ring_js))
+        .route("/assets/workspace-ring.css", get(workspace_ring_css))
         .route(
             "/assets/workspace-focus-model.js",
             get(workspace_focus_model_js),
@@ -962,6 +969,34 @@ async fn workspace_css() -> impl IntoResponse {
     (
         [(header::CONTENT_TYPE, "text/css; charset=utf-8")],
         include_str!("workspace.css"),
+    )
+}
+
+async fn workspace_standard_js() -> impl IntoResponse {
+    (
+        [(header::CONTENT_TYPE, "text/javascript; charset=utf-8")],
+        include_str!("workspace-standard.js"),
+    )
+}
+
+async fn workspace_standard_css() -> impl IntoResponse {
+    (
+        [(header::CONTENT_TYPE, "text/css; charset=utf-8")],
+        include_str!("workspace-standard.css"),
+    )
+}
+
+async fn workspace_ring_js() -> impl IntoResponse {
+    (
+        [(header::CONTENT_TYPE, "text/javascript; charset=utf-8")],
+        include_str!("workspace-ring.js"),
+    )
+}
+
+async fn workspace_ring_css() -> impl IntoResponse {
+    (
+        [(header::CONTENT_TYPE, "text/css; charset=utf-8")],
+        include_str!("workspace-ring.css"),
     )
 }
 
@@ -1456,8 +1491,28 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn workspace_serves_exact_focus_assets_with_typed_embedded_bodies() {
-        let assets: [(&str, &str, &[u8]); 7] = [
+    async fn workspace_serves_exact_presentation_assets_with_typed_embedded_bodies() {
+        let assets: [(&str, &str, &[u8]); 11] = [
+            (
+                "workspace-standard.js",
+                "text/javascript; charset=utf-8",
+                include_bytes!("workspace-standard.js"),
+            ),
+            (
+                "workspace-standard.css",
+                "text/css; charset=utf-8",
+                include_bytes!("workspace-standard.css"),
+            ),
+            (
+                "workspace-ring.js",
+                "text/javascript; charset=utf-8",
+                include_bytes!("workspace-ring.js"),
+            ),
+            (
+                "workspace-ring.css",
+                "text/css; charset=utf-8",
+                include_bytes!("workspace-ring.css"),
+            ),
             (
                 "workspace-focus-model.js",
                 "text/javascript; charset=utf-8",

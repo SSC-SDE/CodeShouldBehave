@@ -66,6 +66,29 @@ Graphite, Blueprint, Terminal and Contrast. **HLD appearance** offers Studio
 (the Focus default) and Classic (the Standard default). Studio changes HLD
 presentation only; it does not change LLD or analysis evidence.
 
+The unreleased **Standard Character desk** keeps the authorized PR queue visible
+while you review. Search the queue by repository or PR. **Changes** shows supplied
+design-delta records, or factual changed-file counts when no design delta is
+available; it does not infer an author's intent. Four summaries are shown at a
+time, with Previous/Next for the rest. The architecture overview shows at most
+five references from one origin; the boundary selector reaches every loaded
+boundary. An unverified observation is not an architectural addition/removal.
+
+Select a change or map boundary for **HLD**. Each baseline/proposal implementation
+action pins that exact HLD version and component before opening the existing,
+unchanged **LLD** inventory and flow. **Source** follows the selected HLD evidence
+or LLD declaration/operation, retaining its exact commit, path, blob and line span.
+An unmapped component or unavailable excerpt is shown as unavailable; another
+revision is never substituted. **Evidence & scope** discloses immutable identities,
+coverage gaps and any supplied review questions, without sample reviewer claims.
+
+Each PR keeps its section, selected boundary and source choice in page memory.
+Switching PRs reloads authorized evidence; reloading the page clears those positions.
+Focus retains its native layout. **Etched Ring backdrop (Standard only)** in Settings
+controls the optional artwork; **Pause Ring** stops its motion. Reduced motion
+uses a static frame, and forced colors suppress the decoration. Artwork is not
+analysis evidence and has no effect on authorization.
+
 The unreleased **Focus Review desk** places changed boundaries beside a compact
 Mermaid map and the selected element's commit-bound source evidence. **Overview**
 shows at most five boundaries from one source component; **Selected boundary**

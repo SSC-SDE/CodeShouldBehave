@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased: Standard Character review desk
+
+- Add the approved Character A+B Standard layout: persistent PR queue, larger
+  native sans typography, real design-delta summaries and bounded architecture maps.
+- Follow Changes → HLD → exact component LLD → commit-bound source, with
+  explicit evidence/scope disclosure and independent per-PR in-memory positions.
+- Keep native Focus and LLD presentation intact. Missing, uncertain and
+  unauthorized evidence never becomes a fabricated finding or source fallback.
+- Add the optional Standard Ring backdrop and pause control through existing
+  personal preferences. Local implementation only; no release or deployment.
+
 ## Unreleased: Focus Review desk
 
 - Replace Focus HLD with a searchable boundary list, bounded Mermaid maps,

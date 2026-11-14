@@ -34,6 +34,10 @@ PREFERENCES_JS = (ROOT / "src" / "workspace-preferences.js").read_bytes()
 PREFERENCES_REGISTRY = (ROOT / "src" / "workspace-registry.json").read_bytes()
 WORKSPACE_JS = (ROOT / "src" / "workspace.js").read_bytes()
 WORKSPACE_CSS = (ROOT / "src" / "workspace.css").read_bytes()
+WORKSPACE_STANDARD_JS = (ROOT / "src" / "workspace-standard.js").read_bytes()
+WORKSPACE_STANDARD_CSS = (ROOT / "src" / "workspace-standard.css").read_bytes()
+WORKSPACE_RING_JS = (ROOT / "src" / "workspace-ring.js").read_bytes()
+WORKSPACE_RING_CSS = (ROOT / "src" / "workspace-ring.css").read_bytes()
 WORKSPACE_FOCUS_MODEL_JS = (ROOT / "src" / "workspace-focus-model.js").read_bytes()
 WORKSPACE_FOCUS_JS = (ROOT / "src" / "workspace-focus.js").read_bytes()
 WORKSPACE_FOCUS_CSS = (ROOT / "src" / "workspace-focus.css").read_bytes()
@@ -1093,6 +1097,10 @@ def handler(state: State):
                 self.send_body_headers("text/html; charset=utf-8", len(body)); self.wfile.write(body); return
             assets = {"/assets/workspace-preferences.js":("text/javascript; charset=utf-8",PREFERENCES_JS),"/assets/workspace-registry.json":("application/json",PREFERENCES_REGISTRY),"/assets/onboarding.css":("text/css; charset=utf-8",ONBOARDING_CSS),"/assets/onboarding.js":("text/javascript; charset=utf-8",ONBOARDING_JS),"/assets/workspace.js":("text/javascript; charset=utf-8",WORKSPACE_JS),
                       "/assets/workspace.css":("text/css; charset=utf-8",WORKSPACE_CSS),
+                      "/assets/workspace-standard.js":("text/javascript; charset=utf-8",WORKSPACE_STANDARD_JS),
+                      "/assets/workspace-standard.css":("text/css; charset=utf-8",WORKSPACE_STANDARD_CSS),
+                      "/assets/workspace-ring.js":("text/javascript; charset=utf-8",WORKSPACE_RING_JS),
+                      "/assets/workspace-ring.css":("text/css; charset=utf-8",WORKSPACE_RING_CSS),
                       "/assets/workspace-focus-model.js":("text/javascript; charset=utf-8",WORKSPACE_FOCUS_MODEL_JS),
                       "/assets/workspace-focus.js":("text/javascript; charset=utf-8",WORKSPACE_FOCUS_JS),
                       "/assets/workspace-focus.css":("text/css; charset=utf-8",WORKSPACE_FOCUS_CSS),

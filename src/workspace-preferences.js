@@ -14,9 +14,9 @@ function validate(doc,registry){
  for(const name of ['standard','focus']){
   const mode=doc?.modes?.[name];if(!mode)continue;
   if(mode.hldAppearance===undefined)mode.hldAppearance=factory.modes[name].hldAppearance;
-  if(doc.version===1&&registry.some(item=>item.id==='focusBackdrop')){
-   if(mode.visibility&&typeof mode.visibility==='object'&&!Array.isArray(mode.visibility)&&!Object.hasOwn(mode.visibility,'focusBackdrop'))mode.visibility.focusBackdrop=factory.modes[name].visibility.focusBackdrop;
-   if(Array.isArray(mode.order?.main)&&!mode.order.main.includes('focusBackdrop'))mode.order.main.push('focusBackdrop');
+  for(const id of ['focusBackdrop','ringBackdrop'])if(doc.version===1&&registry.some(item=>item.id===id)){
+   if(mode.visibility&&typeof mode.visibility==='object'&&!Array.isArray(mode.visibility)&&!Object.hasOwn(mode.visibility,id))mode.visibility[id]=factory.modes[name].visibility[id];
+   if(Array.isArray(mode.order?.main)&&!mode.order.main.includes(id))mode.order.main.push(id);
   }
  }
  if(doc&&doc.theme===undefined)doc.theme='graphite';
