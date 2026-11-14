@@ -1583,6 +1583,41 @@ is claimed; deployed release still predates these fixes.
   deploying, changing the release pin, or altering retention policy. Pre-flight
   publication admission and automated retirement remain open; automating
   retirement changes consent semantics and needs explicit authorization.
-- Draft PR #63 is still unmerged. Its hosted report was produced by the pinned
-  pre-fix engine; it will show the corrected boundaries only after a new
-  attested engine release and report regeneration.
+- Demo PR #63 was closed as demo-only and never merged. Its hosted report was
+  produced by the pinned pre-fix engine; it will show the corrected boundaries
+  only after a new attested engine release and report regeneration.
+
+### Historical report retirement for demo report capacity
+
+- User explicitly authorized retiring an older nonprotected report instead of
+  raising the 64 MiB public site limit, after hosted staging refused demo PR #63
+  with the retained set at 62,204,005 expanded bytes.
+- GitHub confirmed [PR #64](https://github.com/SSC-SDE/CodeShouldBehave/pull/64)
+  merged into `main`. Final reviewed head was
+  `1e8f852c150930ee1a17d93632dfaf4dd6b331c7`; provider-reported squash merge is
+  `d31705814fce31099c82dd33b525a70adcdfda42`. The change only appended the PR #30
+  report id `23940ed622a6fb92ce4f1f99fedd3b05d18b430a81211a9e0787d7b56d6cdae5`
+  (6,834,645 bytes) to `.codeshouldbehave/report-retirements.json`; existing
+  retirements, runtime limits, consent state and workflows are unchanged.
+- Controller run
+  [43629729040](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/43629729040)
+  on `d3170581` planned and analyzed successfully, published the new site, and
+  committed the bounded state receipt (`Verified bounded public-ci-v1 state
+  receipt`, no pending work). Its final evidence step then exited 2 with
+  `deferred: application REST ticket exhausted or invalid`; no further evidence
+  is claimed from that step. A repeated dispatch is not a remedy.
+- Live verification after deployment: `index.json` lists eight reports, including
+  demo PR #63 as `9361992db51ac9822d5f3b6efe8ba5e61637fe820e13fd6e86ac20600cf83054`;
+  PR #30 is absent from reports and
+  `expired/23940ed6...json` records `reason: withdrawn` at
+  `2026-11-14T19:03:42Z`. PR #24, #48, #53 and the other retained reports remain.
+  `site-manifest.json` totals 62,877,610 expanded bytes, below the unchanged
+  64 MiB cap.
+- Draft demo [PR #63](https://github.com/SSC-SDE/CodeShouldBehave/pull/63) head
+  `3bc3def4dea8c0c6dfcb2db7d8f5c0c38ce9a1fc` carries 946 added lines over 12
+  files and 15 passing local tests. Its `CodeShouldBehave / Architecture` check
+  is `neutral` (check run 132554635451) and links to the Focus HLD, which shows
+  the newly observed `semver` package boundary as an unverified observation
+  difference rather than a confirmed addition.
+- PR #63 was later closed as demo-only and never merged. Nothing here
+  authorizes deploying product code or completing any phase.
