@@ -217,11 +217,20 @@ impl ReviewArtifact {
         result.authorize(crate::Action::Graph, grants, None)?;
         result.authorize(crate::Action::Source, grants, None)?;
         let context = ConfirmedDesignContext::from_accepted(confirmed, result.scope())?;
+        // Prefer retaining inventory on the files this comparison actually
+        // touches, so the bounded HLD still answers "what did this change?".
+        let focus = result
+            .review
+            .files
+            .iter()
+            .map(|file| file.path.clone())
+            .collect::<std::collections::BTreeSet<_>>();
         let baseline = generate_hld(
             repository,
             &result.baseline,
             result.scope(),
             &context,
+            &focus,
             cancellation,
         )?;
         let proposal = generate_hld(
@@ -229,6 +238,7 @@ impl ReviewArtifact {
             &result.proposal,
             result.scope(),
             &context,
+            &focus,
             cancellation,
         )?;
         let delta = compare_hld(&baseline, &proposal)?;

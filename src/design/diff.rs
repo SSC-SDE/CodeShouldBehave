@@ -28,6 +28,65 @@ fn fact_semantics(element: &DesignElement) -> BTreeMap<&str, BTreeSet<&str>> {
     }
     facts
 }
+/// Element paths that a partial snapshot could have used to emit this element:
+/// its declared roots plus the source locations of its evidence.
+fn element_paths<'a>(
+    element: &'a DesignElement,
+    evidence: &'a [DesignEvidence],
+) -> impl Iterator<Item = &'a str> {
+    element.roots.iter().map(String::as_str).chain(
+        element
+            .evidence_ids
+            .iter()
+            .filter_map(move |id| evidence.iter().find(|item| &item.id == id))
+            .map(|item| item.path.as_str()),
+    )
+}
+/// An element absent from a snapshot is observable only when neither its class
+/// was trimmed nor any of its paths was left unanalyzed. Incompleteness
+/// elsewhere in the snapshot must not erase a locally sound observation.
+fn absent_element_is_sound(
+    coverage: &DesignCoverage,
+    element: &DesignElement,
+    evidence: &[DesignEvidence],
+) -> bool {
+    coverage.complete
+        || (!coverage.defers_element_kind(&element.kind)
+            && !element_paths(element, evidence).any(|path| coverage.defers_path(path)))
+}
+/// A relation is observable as absent only when the relation's own evidence
+/// paths were analyzed, and each endpoint that is also absent from the
+/// comparison side has an observable absence. An endpoint that already exists
+/// there needs no absence proof: its own inventory cannot explain why this
+/// relation's evidence was never emitted.
+fn absent_relation_is_sound(
+    coverage: &DesignCoverage,
+    relation: &DesignRelation,
+    version: &DesignVersion,
+    other: &DesignVersion,
+) -> bool {
+    if coverage.complete {
+        return true;
+    }
+    if !relation
+        .evidence_ids
+        .iter()
+        .filter_map(|id| version.evidence.iter().find(|item| &item.id == id))
+        .all(|item| !coverage.defers_path(&item.path))
+    {
+        return false;
+    }
+    [&relation.from, &relation.to].iter().all(|id| {
+        other.elements.iter().any(|element| &element.id == *id)
+            || version
+                .elements
+                .iter()
+                .find(|element| &element.id == *id)
+                .is_some_and(|element| {
+                    absent_element_is_sound(coverage, element, &version.evidence)
+                })
+    })
+}
 fn proven_modification(
     before: &DesignElement,
     after: &DesignElement,
@@ -129,15 +188,15 @@ pub fn compare_hld(
         let before = old.get(id).copied();
         let after = new.get(id).copied();
         let kind = match (before, after) {
-            (None, Some(_)) => {
-                if baseline.coverage.complete {
+            (None, Some(after)) => {
+                if absent_element_is_sound(&baseline.coverage, after, &proposal.evidence) {
                     "added"
                 } else {
                     "uncertain"
                 }
             }
-            (Some(_), None) => {
-                if proposal.coverage.complete {
+            (Some(before), None) => {
+                if absent_element_is_sound(&proposal.coverage, before, &baseline.evidence) {
                     "removed"
                 } else {
                     "uncertain"
@@ -271,15 +330,15 @@ pub fn compare_hld(
             questions.insert("Relationship evidence resolution changed without a structural direction change; certainty is not an architectural modification".into());
         }
         let kind = match (before, after) {
-            (None, Some(_)) => {
-                if baseline.coverage.complete {
+            (None, Some(after)) => {
+                if absent_relation_is_sound(&baseline.coverage, after, proposal, baseline) {
                     "added"
                 } else {
                     "uncertain"
                 }
             }
-            (Some(_), None) => {
-                if proposal.coverage.complete {
+            (Some(before), None) => {
+                if absent_relation_is_sound(&proposal.coverage, before, baseline, proposal) {
                     "removed"
                 } else {
                     "uncertain"

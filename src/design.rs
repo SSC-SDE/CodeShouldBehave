@@ -16,7 +16,7 @@ pub use diff::{compare_hld, evaluate_hld_constraints};
 pub use generate::generate_hld;
 pub use render::{render_hld_markdown, render_hld_mermaid};
 
-pub const HLD_GENERATOR_VERSION: &str = "csb-hld-rust-static-v4";
+pub const HLD_GENERATOR_VERSION: &str = "csb-hld-rust-static-v6";
 pub const HLD_PROFILE: &str = "Rust public declarations, explicit package dependencies, schema artifacts and static deployment configuration; runtime behavior unverified";
 
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -135,6 +135,45 @@ pub struct DesignCoverage {
     pub deferred: usize,
     pub complete: bool,
     pub gaps: Vec<String>,
+    /// Element classes whose inventory this snapshot trimmed or never finished.
+    /// An element of such a class that is absent here is not observably absent,
+    /// so a later snapshot cannot establish its addition.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub deferred_element_kinds: Vec<String>,
+    /// Source paths left unanalyzed because they were unsupported, unparsed,
+    /// truncated or outside the bounded read budget. `*` marks an unbounded
+    /// unknown region, such as an unavailable pinned tree.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub deferred_paths: Vec<String>,
+}
+impl DesignCoverage {
+    pub fn defers_element_kind(&self, kind: &DesignElementKind) -> bool {
+        self.deferred_element_kinds
+            .iter()
+            .any(|name| name == element_kind_name(kind))
+    }
+    pub fn defers_path(&self, path: &str) -> bool {
+        self.deferred_paths
+            .iter()
+            .any(|deferred| deferred == "*" || path_intersects(deferred, path))
+    }
+}
+pub fn element_kind_name(kind: &DesignElementKind) -> &'static str {
+    match kind {
+        DesignElementKind::Component => "component",
+        DesignElementKind::Dependency => "dependency",
+        DesignElementKind::Contract => "contract",
+        DesignElementKind::Schema => "schema",
+        DesignElementKind::Deployment => "deployment",
+    }
+}
+/// Two paths intersect when they name the same entry or one contains the other.
+fn path_intersects(deferred: &str, path: &str) -> bool {
+    let left = deferred.trim_matches('/');
+    let right = path.trim_matches('/');
+    left == right
+        || right.starts_with(&format!("{left}/"))
+        || left.starts_with(&format!("{right}/"))
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]

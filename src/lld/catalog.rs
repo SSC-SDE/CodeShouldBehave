@@ -1319,6 +1319,8 @@ pub fn lld_detail_design(
             deferred: catalog.coverage.deferred + detail.graph.omitted_nodes,
             complete: detail.graph.complete && catalog.coverage.structure_complete,
             gaps: detail.coverage.gaps.clone(),
+            deferred_element_kinds: vec![],
+            deferred_paths: vec![],
         },
         constraints: vec![],
         correspondence: vec![],

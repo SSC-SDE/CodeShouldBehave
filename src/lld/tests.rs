@@ -132,6 +132,7 @@ impl Fixture {
             commit,
             &self.scope,
             &context,
+            &std::collections::BTreeSet::new(),
             &Cancellation::default(),
         )
         .unwrap();
