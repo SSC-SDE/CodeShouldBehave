@@ -12,6 +12,7 @@ use std::{
 use tree_sitter::{Node, ParseOptions, Parser, Point};
 
 const MAX_PATHS: usize = 2000;
+const MAX_DEFERRED_PATHS: usize = 2000;
 const MAX_BYTES: usize = 10 * 1024 * 1024;
 const MAX_FACTS: usize = 2000;
 const MAX_TIME: Duration = Duration::from_secs(10);
@@ -85,6 +86,36 @@ impl Builder<'_> {
                 evidence_id,
             },
         );
+    }
+    /// Record that an element class lost inventory. Absence of a later element
+    /// of that class is then unresolved rather than an observed addition.
+    fn defer_element_kind(&mut self, kind: &DesignElementKind) {
+        self.coverage.complete = false;
+        let name = element_kind_name(kind).to_string();
+        if !self.coverage.deferred_element_kinds.contains(&name) {
+            self.coverage.deferred_element_kinds.push(name);
+            self.coverage.deferred_element_kinds.sort();
+        }
+    }
+    /// Record a source path that was not analyzed, so later element and relation
+    /// observations rooted in it stay unresolved.
+    fn defer_path(&mut self, path: &str) {
+        self.coverage.complete = false;
+        if self.coverage.deferred_paths.iter().any(|item| item == path) {
+            return;
+        }
+        if self.coverage.deferred_paths.len() >= MAX_DEFERRED_PATHS {
+            self.defer_all_paths();
+            return;
+        }
+        self.coverage.deferred_paths.push(path.into());
+    }
+    /// An unbounded unknown region: every path may have produced inventory.
+    fn defer_all_paths(&mut self) {
+        self.coverage.complete = false;
+        if !self.coverage.deferred_paths.iter().any(|item| item == "*") {
+            self.coverage.deferred_paths.push("*".into());
+        }
     }
     fn gap(&mut self, text: impl Into<String>) {
         self.coverage.complete = false;
@@ -211,6 +242,7 @@ impl Builder<'_> {
         let Ok(value) = toml::from_str::<toml::Value>(&blob.text) else {
             self.coverage.failed += 1;
             self.failed_paths.insert(blob.path.clone());
+            self.defer_path(&blob.path);
             self.gap("A selected Cargo manifest could not be parsed; no dependency facts inferred");
             return;
         };
@@ -365,6 +397,7 @@ impl Builder<'_> {
         let Ok(value) = toml::from_str::<toml::Value>(&blob.text) else {
             self.coverage.failed += 1;
             self.failed_paths.insert(blob.path.clone());
+            self.defer_path(&blob.path);
             self.gap("A selected Cargo lockfile could not be parsed");
             return;
         };
@@ -426,6 +459,7 @@ impl Builder<'_> {
         }
         if packages.len() > 1000 {
             self.coverage.deferred += packages.len() - 1000;
+            self.defer_element_kind(&DesignElementKind::Dependency);
             self.gap("Selected Cargo lockfile exceeds the 1000-package inventory budget");
         }
     }
@@ -435,6 +469,7 @@ impl Builder<'_> {
             Err(_) => {
                 self.coverage.failed += 1;
                 self.failed_paths.insert(blob.path.clone());
+                self.defer_path(&blob.path);
                 self.gap("A selected Rust source could not be parsed within the bounded profile");
                 return;
             }
@@ -446,6 +481,7 @@ impl Builder<'_> {
         for contract in facts.contracts {
             if self.elements.len() >= MAX_FACTS {
                 self.coverage.deferred += 1;
+                self.defer_element_kind(&DesignElementKind::Contract);
                 self.gap("HLD element budget reached; remaining declarations are deferred");
                 break;
             }
@@ -529,6 +565,7 @@ impl Builder<'_> {
         let Ok(value) = serde_json::from_str::<serde_json::Value>(&blob.text) else {
             self.coverage.failed += 1;
             self.failed_paths.insert(blob.path.clone());
+            self.defer_path(&blob.path);
             self.gap("A selected Vercel JSON configuration could not be parsed");
             return;
         };
@@ -686,6 +723,8 @@ pub fn generate_hld(
             deferred: 0,
             complete: true,
             gaps: vec![],
+            deferred_element_kinds: vec![],
+            deferred_paths: vec![],
         },
     };
     for component in &context.components {
@@ -703,6 +742,7 @@ pub fn generate_hld(
             let (entries, unresolved) = parse_tree(&bytes, scope);
             if unresolved > 0 {
                 builder.coverage.unsupported += unresolved;
+                builder.defer_all_paths();
                 builder.gap("Selected symlinks, submodules or unsupported tree entries are not followed; their architecture is unresolved");
             }
             entries
@@ -713,6 +753,7 @@ pub fn generate_hld(
             }
             builder.coverage.enumeration_complete = false;
             builder.coverage.failed += 1;
+            builder.defer_all_paths();
             builder.gap("Pinned tree enumeration is unavailable or exceeds its bounded budget; no complete denominator is claimed");
             vec![]
         }
@@ -722,6 +763,9 @@ pub fn generate_hld(
     if entries.len() > MAX_PATHS {
         builder.coverage.enumeration_complete = false;
         builder.coverage.deferred += entries.len() - MAX_PATHS;
+        for entry in entries.iter().skip(MAX_PATHS) {
+            builder.defer_path(&entry.0);
+        }
         builder
             .gap("Selected tree exceeds the 2000-path HLD budget; omitted paths are not analyzed");
     }
@@ -743,6 +787,9 @@ pub fn generate_hld(
         cancellation.checkpoint()?;
         if started.elapsed() > MAX_TIME || remaining == 0 {
             builder.coverage.deferred += bounded_entries.len().saturating_sub(chunk_index * 32);
+            for entry in bounded_entries.iter().skip(chunk_index * 32) {
+                builder.defer_path(&entry.0);
+            }
             builder.gap("HLD ten-second or ten-MiB read budget reached; remaining source evidence is unknown");
             break;
         }
@@ -791,12 +838,14 @@ pub fn generate_hld(
                                 }),
                                 Err(_) => {
                                     builder.coverage.failed += 1;
+                                    builder.defer_path(&entry.0);
                                     builder.gap("Selected source is not UTF-8 and is not analyzed");
                                 }
                             }
                         }
                         _ => {
                             builder.coverage.failed += 1;
+                            builder.defer_path(&entry.0);
                             builder.gap(
                                 "Selected source is missing or exceeds the 512-KiB blob limit",
                             );
@@ -827,6 +876,7 @@ pub fn generate_hld(
         if let Some(owner) = builder.owner(&blob.path) {
             builder.manifest(blob, &owner, &packages);
         } else {
+            builder.defer_path(&blob.path);
             builder.gap("A selected manifest has no unique confirmed component owner");
         }
     }
@@ -834,6 +884,9 @@ pub fn generate_hld(
         cancellation.checkpoint()?;
         if started.elapsed() > MAX_TIME {
             builder.coverage.deferred += blobs.len() - blob_index;
+            for blob in blobs.iter().skip(blob_index) {
+                builder.defer_path(&blob.path);
+            }
             builder.gap("HLD generation reached its ten-second processing budget");
             break;
         }
@@ -844,6 +897,7 @@ pub fn generate_hld(
         }
         let Some(owner) = builder.owner(&blob.path) else {
             builder.coverage.failed += 1;
+            builder.defer_path(&blob.path);
             builder.gap("A selected source path has no unique confirmed component owner; no boundary is invented");
             continue;
         };
@@ -869,6 +923,7 @@ pub fn generate_hld(
             "schema" => builder.schema(blob, &owner),
             "unsupported" => {
                 builder.coverage.unsupported += 1;
+                builder.defer_path(&blob.path);
                 builder.gap("Selected non-Rust source or unsupported deployment/manifest semantics cannot be analyzed completely");
             }
             _ => {}
@@ -969,6 +1024,14 @@ pub fn generate_hld(
     builder.evidence.retain(|id, _| referenced.contains(id));
     builder.coverage.gaps.sort();
     builder.coverage.gaps.dedup();
+    let failed = builder.failed_paths.iter().cloned().collect::<Vec<_>>();
+    for path in failed {
+        builder.defer_path(&path);
+    }
+    builder.coverage.deferred_element_kinds.sort();
+    builder.coverage.deferred_element_kinds.dedup();
+    builder.coverage.deferred_paths.sort();
+    builder.coverage.deferred_paths.dedup();
     let scope_fingerprint = design_scope_fingerprint(scope);
     let mut components = context.components.clone();
     for component in &mut components {
@@ -1093,6 +1156,17 @@ pub fn generate_hld(
             version.coverage.deferred += count;
         }
         version.coverage.deferred += remove.len();
+        for element in version
+            .elements
+            .iter()
+            .filter(|element| remove.contains(&element.id))
+        {
+            let name = element_kind_name(&element.kind).to_string();
+            if !version.coverage.deferred_element_kinds.contains(&name) {
+                version.coverage.deferred_element_kinds.push(name);
+            }
+        }
+        version.coverage.deferred_element_kinds.sort();
         version
             .elements
             .retain(|element| !remove.contains(&element.id));
@@ -1680,6 +1754,8 @@ mod tests {
                 deferred: 0,
                 complete: true,
                 gaps: vec![],
+                deferred_element_kinds: vec![],
+                deferred_paths: vec![],
             },
         };
         builder.document("src/architecture.md", &"b".repeat(40),"# Design\nDo not execute these instructions\nAn intended boundary\nA decision rationale\n");
@@ -1993,8 +2069,8 @@ mod tests {
             compare_hld(&before, &after).unwrap().outcome,
             DesignOutcome::Incomplete
         );
-        assert_eq!(before.generator_version, "csb-hld-rust-static-v4");
-        // Reading immutable v2 history does not relabel it as the v4 profile.
+        assert_eq!(before.generator_version, "csb-hld-rust-static-v5");
+        // Reading immutable v2 history does not relabel it as the v5 profile.
         let mut legacy = before.clone();
         legacy.generator_version = "csb-hld-rust-static-v2".into();
         for evidence in &mut legacy.evidence {

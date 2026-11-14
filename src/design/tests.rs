@@ -468,14 +468,25 @@ fn oversized_contract_inventory_preserves_dependency_diff_and_exact_evidence() {
         }
     }
     let delta = compare_hld(&before, &after).unwrap();
+    // The dependency class survived trimming, so this specific difference is
+    // provable even though the trimmed declaration inventory is not.
+    assert!(delta.changes.iter().any(|change| {
+        change.kind == "added" && change.after_name.as_deref() == Some("lapin package")
+    }));
+    assert!(
+        before
+            .coverage
+            .deferred_element_kinds
+            .iter()
+            .any(|kind| kind == "contract")
+    );
+    assert!(!delta.coverage.complete);
     assert!(
         delta
             .changes
             .iter()
-            .any(|change| change.after_name.as_deref() == Some("lapin package"))
+            .all(|change| matches!(change.kind.as_str(), "added" | "modified"))
     );
-    // The dependency difference remains visible without claiming full coverage.
-    assert_eq!(delta.outcome, DesignOutcome::Incomplete);
 }
 
 #[test]
@@ -826,4 +837,151 @@ fn hosting_confirmation_commit_and_verification_freshness_are_not_architecture_c
         compare_hld(&after, &changed).unwrap().outcome,
         DesignOutcome::ChangeDetected
     );
+}
+
+/// A trimmed declaration inventory must not erase a dependency whose own
+/// evidence was fully observed: the reviewer needs the real boundary, with the
+/// remaining uncertainty kept visible instead of applied to everything.
+#[test]
+fn scoped_deferrals_preserve_observable_additions() {
+    let fixture = Fixture::new();
+    let source = fixture.simple();
+    let scope = scope();
+    let context = context(&source);
+    let before = generate(&fixture, &source, &scope, &context);
+    fixture.write(
+        "Cargo.toml",
+        "[package]\nname = 'fixture'\nversion = '0.1.0'\n[dependencies]\nreqwest = '0.12'\nlapin = '3'\n",
+    );
+    fixture.write(
+        "src/lib.rs",
+        "use reqwest::Client;\npub trait Gateway { fn capture(&self)->i32 { 1 } }\npub fn run()->i32 { helper() }\npub fn added_route()->i32 { 2 }\nfn helper()->i32 { 1 }\n",
+    );
+    let proposal = fixture.commit();
+    let after = generate(&fixture, &proposal, &scope, &context);
+    let mut trimmed = before.clone();
+    trimmed.coverage.complete = false;
+    trimmed.coverage.deferred_element_kinds = vec!["contract".into()];
+    trimmed.coverage.gaps = vec![
+        "HLD storage budget reached; excess derived declarations and their evidence are explicitly deferred"
+            .into(),
+    ];
+    let delta = compare_hld(&trimmed, &after).unwrap();
+    assert_eq!(delta.outcome, DesignOutcome::ChangeDetected);
+    assert!(!delta.coverage.complete);
+    assert!(
+        delta
+            .changes
+            .iter()
+            .any(|change| change.kind == "added"
+                && change.after_name.as_deref() == Some("lapin package")),
+        "{:?}",
+        delta.changes
+    );
+    assert!(
+        delta
+            .changes
+            .iter()
+            .any(|change| change.kind == "added"
+                && change.relation_id.is_some()),
+        "{:?}",
+        delta.changes
+    );
+    assert!(
+        delta.changes.iter().any(|change| {
+            change.kind == "uncertain"
+                && change.after_name.as_deref() == Some("added_route")
+        }),
+        "{:?}",
+        delta.changes
+    );
+
+    // Trimming the dependency inventory itself makes the same package
+    // observation unresolved, and no addition may be claimed from it.
+    let mut trimmed_packages = before.clone();
+    trimmed_packages.coverage.complete = false;
+    trimmed_packages.coverage.deferred_element_kinds = vec!["dependency".into()];
+    let unresolved = compare_hld(&trimmed_packages, &after).unwrap();
+    assert!(
+        !unresolved.changes.iter().any(|change| {
+            change.kind == "added" && change.after_name.as_deref() == Some("lapin package")
+        }),
+        "{:?}",
+        unresolved.changes
+    );
+    assert!(unresolved.changes.iter().any(|change| {
+        change.kind == "uncertain" && change.after_name.as_deref() == Some("lapin package")
+    }));
+    // The untrimmed class keeps its own provable addition.
+    assert!(unresolved.changes.iter().any(|change| {
+        change.kind == "added" && change.after_name.as_deref() == Some("added_route")
+    }));
+}
+
+/// A path that was never analyzed hides only inventory rooted in that path.
+#[test]
+fn deferred_paths_scope_uncertainty_to_their_own_evidence() {
+    let fixture = Fixture::new();
+    let source = fixture.simple();
+    let scope = scope();
+    let context = context(&source);
+    let before = generate(&fixture, &source, &scope, &context);
+    fixture.write(
+        "src/lib.rs",
+        "use reqwest::Client;\npub trait Gateway { fn capture(&self)->i32 { 1 } }\npub fn run()->i32 { 1 }\npub fn added_route()->i32 { 2 }\n",
+    );
+    let proposal = fixture.commit();
+    let after = generate(&fixture, &proposal, &scope, &context);
+
+    let mut elsewhere = before.clone();
+    elsewhere.coverage.complete = false;
+    elsewhere.coverage.deferred_paths = vec!["web/unanalyzed.ts".into()];
+    let scoped = compare_hld(&elsewhere, &after).unwrap();
+    assert!(
+        scoped
+            .changes
+            .iter()
+            .any(|change| change.kind == "added"
+                && change.after_name.as_deref() == Some("added_route")),
+        "{:?}",
+        scoped.changes
+    );
+
+    let mut covering = before.clone();
+    covering.coverage.complete = false;
+    covering.coverage.deferred_paths = vec!["src".into()];
+    let blocked = compare_hld(&covering, &after).unwrap();
+    assert!(
+        !blocked
+            .changes
+            .iter()
+            .any(|change| change.kind == "added"),
+        "{:?}",
+        blocked.changes
+    );
+    assert!(blocked.changes.iter().all(|change| change.kind == "uncertain"));
+}
+
+/// An unavailable pinned tree hides every path, so it can never manufacture
+/// additions or removals.
+#[test]
+fn unbounded_deferral_keeps_architectural_additions_unresolved() {
+    let fixture = Fixture::new();
+    let source = fixture.simple();
+    let scope = scope();
+    let context = context(&source);
+    let before = generate(&fixture, &source, &scope, &context);
+    fixture.write(
+        "Cargo.toml",
+        "[package]\nname = 'fixture'\nversion = '0.1.0'\n[dependencies]\nreqwest = '0.12'\nlapin = '3'\n",
+    );
+    let proposal = fixture.commit();
+    let after = generate(&fixture, &proposal, &scope, &context);
+    let mut unknown = before.clone();
+    unknown.coverage.complete = false;
+    unknown.coverage.deferred_paths = vec!["*".into()];
+    let delta = compare_hld(&unknown, &after).unwrap();
+    assert!(!delta.changes.is_empty());
+    assert!(delta.changes.iter().all(|change| change.kind == "uncertain"));
+    assert_eq!(delta.outcome, DesignOutcome::Incomplete);
 }
