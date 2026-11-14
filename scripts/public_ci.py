@@ -1859,12 +1859,35 @@ def begin_promotion(config: dict, publication: dict, artifact_id: int, *, now: s
     return receipt_subject(config, previous, state, publication["run"], kind="site_intent")
 
 
+def committed_state_deployment(provider: GitHub, config: dict, subject: dict) -> int:
+    """Return the durable record of an already committed state; never write."""
+    records = provider.api(f"{provider.prefix}/deployments?task={config['receipt']['task']}&environment={config['receipt']['environment']}&per_page=10")
+    if not isinstance(records, list):
+        raise Refusal("committed receipt record unavailable")
+    expected = digest(canonical(subject))
+    for record in records:
+        envelope = record.get("payload") if isinstance(record, dict) else None
+        if isinstance(envelope, str):
+            try:
+                envelope = json.loads(envelope)
+            except ValueError:
+                continue
+        if isinstance(envelope, dict) and envelope.get("subject_sha256") == expected:
+            return integer(record.get("id"), 1, 2**63 - 1, "state Deployment id")
+    raise Refusal("committed receipt record unavailable")
+
+
 def commit_receipt(config: dict, subject: dict, proof: dict, *, provider: GitHub) -> dict:
     if not config["operations"]["publication"] or not provider.allow_writes:
         raise Refusal("receipt writes have not been activated")
     provider.repository_info()
     previous = provider.restore_state()
     state = validate_state(subject["state"], config)
+    if canonical(previous) == canonical(state):
+        # A retry after a durable commit converges on the existing record; a
+        # second ticket write here only exhausts provider quota.
+        return {"state_deployment_id": committed_state_deployment(provider, config, subject),
+                "sequence": state["sequence"], "subject_sha256": digest(canonical(subject))}
     if state["previous_receipt_sha256"] != digest(canonical(previous)) or state["sequence"] != previous["sequence"] + 1:
         raise Refusal("newer receipt already exists; stale commit refused")
     run = provider.trusted_run(subject["run_id"], require_current=True)
@@ -2048,6 +2071,14 @@ def recv_exact(connection: socket.socket, size: int) -> bytes:
     return bytes(result)
 
 
+def failure_reason(exc: Exception) -> str:
+    """Refusals keep their text; other failures keep a bounded class and message."""
+    if isinstance(exc, Refusal):
+        return str(exc)
+    detail = " ".join(str(exc).split())
+    return f"{type(exc).__name__}: {detail[:200]}" if detail else type(exc).__name__
+
+
 def publisher_call(socket_path: Path, message: dict, *, wait: float = 20) -> dict:
     data = canonical(message)
     if len(data) > 8192:
@@ -2137,7 +2168,7 @@ def publisher_server(config: dict, plan_value: dict, manifest: dict, budget_dire
                             raise Refusal("publisher command is outside its exact phase")
                         response = {"ok": True, "result": result}
                     except (ValueError, KeyError, TypeError, OSError, subprocess.SubprocessError) as exc:
-                        response = {"ok": False, "reason": str(exc) if isinstance(exc, Refusal) else type(exc).__name__}
+                        response = {"ok": False, "reason": failure_reason(exc)}
                     encoded = canonical(response)
                     connection.sendall(len(encoded).to_bytes(4, "big") + encoded)
                 if stop:
