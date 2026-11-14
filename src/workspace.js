@@ -1294,6 +1294,33 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
   let preferences=null;
   const presentationFilter=name=>preferences?preferences.filters()[name]:reviewMode==='focus';
   let reviewMode='standard',standardView=null,focusCatalogSource=null,focusCatalogProjection=null;
+  let focusedHldBoundary=null,focusHldView=null,focusHldScopes=[];
+  let focusVisibility={componentDetails:true,hldSource:true};
+  const focusedHldNarrow=window.matchMedia('(max-width:700px)');
+  const focusDesk=window.WorkspaceFocusDesk.mount({
+    redraw:()=>{lastHldKey='';renderHld(workspace.state);},
+    scope:scope=>{const current=focusHldScopes.find(item=>item.key===scope.key);if(!current)return;focusedHldBoundary=current.key;hldSelection=current.target.id;++hldSourceGeneration;lastHldKey='';focusDesk.showInspector(true);renderHld(workspace.state);rememberRoute();},
+    element:id=>selectHldElement(id),
+    mode:mode=>$('hld-'+mode).click(),
+    evidence:open=>{
+      focusDesk.showInspector(open);
+      if(open){
+        preferences?.reveal(['componentDetails','hldSource']);
+        if($('hld-source-text')?.hidden){focusDesk.invalidateInspector();renderHld(workspace.state);}
+      }
+    }
+  });
+  function syncFocusDesk(){
+    const active=reviewMode==='focus'&&designLevel==='hld'&&layout==='architecture'&&!$('review-content').hidden&&document.body.dataset.view==='inspection';
+    if(focusDesk.active!==active)++hldSourceGeneration;
+    document.body.classList.toggle('focus-desk-active',active);
+    document.querySelector('.review-heading').classList.toggle('focus-desk-heading',active);
+    focusDesk.activate(active);
+    return active;
+  }
+  focusedHldNarrow.addEventListener('change',()=>{
+    if(reviewMode==='focus'&&designLevel==='hld'){focusDesk.narrow();lastHldKey='';renderHld(workspace.state);}
+  });
   const legend=$('focus-legend'),legendToggle=$('focus-legend-toggle'),legendPanel=$('focus-legend-panel');
   let legendPinned=false,legendDismissed=false;
   function showLegend(open){legendPanel.hidden=!open;legendToggle.setAttribute('aria-expanded',String(open));}
@@ -1309,16 +1336,18 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
   // Move the existing controls, preserving their handlers, IDs and restore positions.
   const focusHeaderHomes=new Map();
   function syncFocusHeader(){
-    const bar=document.querySelector('.topbar'),enabled=reviewMode==='focus'&&!$('review-content').hidden;
+    const bar=document.querySelector('.topbar'),enabled=reviewMode==='focus'&&!$('review-content').hidden,desk=syncFocusDesk();
+    const heading=document.querySelector('.review-heading'),essential=$('essential-review-status');
     const controls=document.querySelector(`#${designLevel==='lld'?'lld':'hld'}-review .architecture-controls`) || [...focusHeaderHomes.keys()].find(item=>item.getAttribute('aria-label')===`${designLevel==='lld'?'LLD':'HLD'} comparison mode`);
-    const wanted=enabled?[document.querySelector('.review-heading'),$('essential-review-status'),document.querySelector('.design-levels'),controls].filter(Boolean):[];
-    for(const [element,home] of focusHeaderHomes)if(!wanted.includes(element)&&element.parentNode!==home.parentNode)home.after(element);
+    const wanted=enabled?(desk?[document.querySelector('.design-levels')]:[heading,essential,document.querySelector('.design-levels'),controls]).filter(Boolean):[];
+    for(const [element,home] of focusHeaderHomes)if(!wanted.includes(element)&&!(desk&&element===essential)&&element.parentNode!==home.parentNode)home.after(element);
+    if(desk&&essential){if(!focusHeaderHomes.has(essential)){const home=document.createComment('Focus status home');essential.before(home);focusHeaderHomes.set(essential,home);}if(essential.parentNode!==heading)heading.append(essential);}
     for(const element of wanted){if(!focusHeaderHomes.has(element)){const home=document.createComment('Focus control home');element.before(home);focusHeaderHomes.set(element,home);}if(element.parentNode!==bar)bar.append(element);}
     bar.classList.toggle('focus-review-header',enabled);if(!enabled)closeLegend();
     const status=$('essential-review-status');if(status&&status.title!==status.textContent)status.title=status.textContent;
     if(status)status.dataset.short=/stale/i.test(status.textContent)?'Stale':/denied/i.test(status.textContent)?'Access denied':/error|failed/i.test(status.textContent)?'Error':/incomplete|unverified/i.test(status.textContent)?'Partial · static':'Static evidence';
   }
-  new MutationObserver(()=>syncFocusHeader()).observe(document.body,{childList:true,subtree:true});
+  new MutationObserver(()=>syncFocusHeader()).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['data-view']});
   function setReviewMode(next,{remember=true,restore=true}={}){
     const focus=next==='focus';if(remember)preferences?.clearReveal();
     if(focus&&reviewMode!=='focus')standardView={layout,designLevel,side:$('side').value};
@@ -2008,7 +2037,7 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
     return mermaidLoading;
   }
 
-  function mountDiagramViewport(frame, host, svg, {initialMode = 1,initialSelector = null,hint = 'Select a component to inspect code. Scroll the canvas to pan.'} = {}) {
+  function mountDiagramViewport(frame, host, svg, {initialMode = 1,initialSelector = null,hint = 'Select a component to inspect code. Scroll the canvas to pan.',maximumFitScale=Infinity} = {}) {
     if (!svg) return;
     const bounds = svg.viewBox.baseVal;
     if (!(bounds.width > 0 && bounds.height > 0)) return;
@@ -2022,7 +2051,7 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
     const apply = () => {
       if (!host.clientWidth) return;
       scale = mode === 'overview'
-        ? Math.min(diagramScale(bounds.width, host.clientWidth), diagramScale(bounds.height, host.clientHeight))
+        ? Math.min(maximumFitScale,diagramScale(bounds.width, host.clientWidth), diagramScale(bounds.height, host.clientHeight))
         : diagramScale(bounds.width, host.clientWidth, mode);
       svg.setAttribute('width', String(Math.round(bounds.width * scale)));
       svg.setAttribute('height', String(Math.round(bounds.height * scale)));
@@ -2320,7 +2349,7 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
     $('lld-confirm-side').querySelector('[value="baseline"]').disabled=!payload.baseline;$('lld-confirm-side').querySelector('[value="proposal"]').disabled=!payload.proposal;if(!payload[$('lld-confirm-side').value])$('lld-confirm-side').value=payload.proposal?'proposal':'baseline';
   }
 
-  function clearHldView() {++architectureGeneration;++hldSourceGeneration;lastHldKey='';hldCorrections=[];hldCorrectionDesignId=null;clearHldEvidence(document);}
+  function clearHldView() {++architectureGeneration;++hldSourceGeneration;lastHldKey='';hldCorrections=[];hldCorrectionDesignId=null;focusedHldBoundary=null;focusHldScopes=[];focusHldView=null;clearHldEvidence(document);focusDesk.empty(workspace.state.loading.has('hld')?'Loading commit-bound HLD evidence…':workspace.state.hldError?`HLD unavailable: ${workspace.state.hldError}`:'No authorized HLD evidence loaded.');}
 
   function clearLldView() {
     ++architectureGeneration;++lldSourceRequest;clearTimeout(lldSourceTimer);lastLldKey='';lastLldInspectorKey='';lldNode=null;lldPinned=false;activeLldEvidence=null;lldActiveSourcePromise=null;lldActiveSourceKey=null;lldInvariantId=null;lldCorrespondenceId=null;lldBaselineEntry=null;lldParentHld=null;lldComponent=null;lldElement=null;lldDetail=null;lldQuery='';
@@ -2329,6 +2358,7 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
 
   function renderHld(state) {
     if (designLevel !== 'hld') return;
+    syncFocusDesk();
     if (renderedHldReview !== state.reviewId) { renderedHldReview=state.reviewId; lastHldKey=''; $('hld-confirmation-preview').hidden=true; $('hld-confirm').disabled=true; $('hld-confirmation-status').textContent='Preview is required before confirmation.'; }
     const payload = state.hld, loading = state.loading.has('hld');
     if(payload && hldMode==='accepted'&&!payload.accepted)hldMode='combined';
@@ -2353,18 +2383,24 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
     $('hld-drift-status').textContent = publicStatic?'Read-only public snapshot. Accepted design records are not published.':(payload.accepted_drift ? `${hldOutcome(payload.accepted_drift)} before this PR · accepted ${short(payload.accepted?.snapshot)} → baseline ${short(payload.baseline?.snapshot)}` : payload.accepted ? 'Accepted as-built design drift has not been determined.' : 'No accepted as-built HLD baseline.')+(payload.accepted_intended?' · Accepted intended design is stored separately from observed code.':'');
     renderHldCoverage(payload);
     const comparison=hldComparison(presentationFilter('changedHld')?focusHldPayload(payload):payload,hldMode==='compare'?'combined':hldMode), elements=comparison.elements;
-    if (!elements.some(element=>element.id===hldSelection)) hldSelection=elements[0]?.id || null;
+    if (!elements.some(element=>element.id===hldSelection)) hldSelection=reviewMode==='focus'?null:elements[0]?.id||null;
     const filter=($('hld-element-filter').value||'').trim().toLowerCase();
     const visibleElements=filter?elements.filter(element=>`${element.name} ${element.kind} ${(element.roots||[]).join(' ')}`.toLowerCase().includes(filter)):elements;
     $('hld-element-count').textContent=`${visibleElements.length} of ${elements.length}`;
     const list=$('hld-element-list'); list.replaceChildren();
     if(!visibleElements.length) list.append(node('p','status','No HLD elements match this filter.'));
     for (const element of visibleElements) { const button=node('button','hld-element'); button.type='button'; button.setAttribute('aria-current',String(element.id===hldSelection)); button.append(node('span','',element.name),node('span','badge',comparison.status.get(element.id)||element.kind)); button.addEventListener('click',()=>selectHldElement(element.id)); list.append(button); }
+    if(focusDesk.active){
+      focusHldScopes=window.WorkspaceFocusModel.boundaries(payload,{mode:hldMode,changedOnly:presentationFilter('changedHld'),status:hldComparison(payload,'combined').status});
+      const current=focusHldScopes.find(scope=>scope.key===focusedHldBoundary)||focusHldScopes.find(scope=>scope.target.id===hldSelection)||focusHldScopes.find(scope=>scope.source.id===hldSelection)||focusHldScopes[0];
+      focusedHldBoundary=current?.key||null;if(!hldSelection&&current)hldSelection=current.target.id;
+      focusHldView=focusDesk.update({scopes:focusHldScopes,selectedKey:focusedHldBoundary,mode:hldMode,reviewId:state.reviewId,hasAccepted:Boolean(payload.accepted)});
+    }
     renderHldInspector(payload);
     updateHldConfirmationElements(payload);
     const modes=hldMode==='compare'?['baseline','proposal']:[hldMode];
-    $('hld-mermaid-source').firstElementChild.textContent=exportAllowed?modes.map(mode=>`## ${mode}\n\n\`\`\`mermaid\n${hldMermaid(payload,mode)}\n\`\`\``).join('\n\n'):'';
-    const key=[state.reviewId,hldMode,payload.baseline?.id,payload.proposal?.id,payload.accepted?.id,payload.delta?.id,reviewMode].join('|');
+    if(!focusDesk.active)$('hld-mermaid-source').firstElementChild.textContent=exportAllowed?modes.map(mode=>`## ${mode}\n\n\`\`\`mermaid\n${hldMermaid(payload,mode)}\n\`\`\``).join('\n\n'):'';
+    const key=[state.reviewId,hldMode,payload.baseline?.id,payload.proposal?.id,payload.accepted?.id,payload.delta?.id,reviewMode,focusDesk.active?focusedHldBoundary:'',focusDesk.active?focusDesk.focused:'',focusDesk.active?focusHldView?.start:''].join('|');
     if (lastHldKey!==key) { lastHldKey=key; renderHldDiagrams(payload); }
   }
 
@@ -2381,22 +2417,57 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
     const gaps=[...new Set([...(coverage.gaps || []),...(payload.baseline?.coverage?.gaps || []),...(payload.proposal?.coverage?.gaps || [])])].slice(0,20);
     for (const gap of gaps) container.append(node('p','',String(gap)));
     const omitted=hldComparison(payload,hldMode==='compare'?'combined':hldMode).omitted;
-    if (omitted) container.append(node('p','warning',`${omitted} design items omitted from this bounded view. Inspect the authorized export for the complete generated record.`));
+    if (omitted) container.append(node('p','warning',focusDesk.active?`The flat element/relationship list is bounded (${omitted} additional records). Review desk maps are paginated by boundary; inspect the authorized export for the complete generated record.`:`${omitted} design items omitted from this bounded view. Inspect the authorized export for the complete generated record.`));
     if (payload.generation_enabled===false) container.append(node('p','warning','New HLD generation is disabled. This is the authorized stored design history.'));
   }
 
   function selectHldElement(id) {
+    if(focusDesk.active){
+      const scope=focusHldScopes.find(item=>item.source.id===focusDesk.selected?.source.id&&item.target.id===id)||focusHldScopes.find(item=>item.target.id===id);
+      if(scope)focusedHldBoundary=scope.key;
+      const wasHidden=$('hld-inspector').hidden;
+      focusDesk.showInspector(true);
+      if(wasHidden)focusDesk.invalidateInspector();
+      if(hldSelection===id&&focusedHldBoundary===focusDesk.selected?.key){if(wasHidden)renderHld(workspace.state);return;}
+      lastHldKey='';
+    }
     hldSelection=id; ++hldSourceGeneration;
     renderHld(workspace.state);
     $('hld-diagrams').querySelectorAll('g.node[data-design-element]').forEach(element=>{element.classList.toggle('selected',element.dataset.designElement===id);element.setAttribute('aria-current',String(element.dataset.designElement===id));});
-    $('hld-element-list').querySelector('[aria-current="true"]')?.focus();
+    if(!focusDesk.active)$('hld-element-list').querySelector('[aria-current="true"]')?.focus();
     rememberRoute();
+  }
+
+  async function renderFocusDeskCanvas(payload,modes,generation) {
+    const container=$('hld-diagrams'),view=focusHldView;
+    if(!view?.selected){container.append(node('p','status','No high-level boundary change established in the covered scope. Coverage may be incomplete. Settings can include shared relationships.'));return;}
+    const styles=getComputedStyle(document.documentElement),token=name=>styles.getPropertyValue(name).trim();
+    const palette={panel:token('--panel2'),text:token('--text'),line:token('--line'),green:token('--green'),red:token('--red'),amber:token('--amber'),muted:token('--muted'),accent:token('--blue')};
+    const records=[];
+    for(const mode of modes){
+      if(generation!==architectureGeneration||!focusDesk.active)return;
+      const diagram=window.WorkspaceFocusModel.diagram(payload,view.scopes,view.selected,mode,{narrow:focusedHldNarrow.matches,palette,selection:hldSelection});
+      const frame=node('section','architecture-frame'),heading=node('h4','',({baseline:'Before',proposal:'Proposal',combined:'Observation change map',accepted:'Accepted architecture'}[mode]||mode));
+      heading.append(node('span','mono',short(payload[mode]?.snapshot||payload.proposal?.snapshot)));
+      const host=node('div','architecture-svg');frame.append(heading,host);container.append(frame);records.push({mode,source:diagram.source});
+      host.append(node('p','status','Loading authorized Mermaid diagram…'));
+      try{
+        const renderer=await ensureMermaid();if(generation!==architectureGeneration||!focusDesk.active)return;
+        const rendered=await renderer.render(`csb-focus-${generation}-${mode}`,diagram.source);if(generation!==architectureGeneration||!focusDesk.active)return;
+        host.innerHTML=rendered.svg;const svg=host.querySelector('svg');if(svg)svg.setAttribute('aria-label',`${mode}: ${view.selected.source.name} boundary overview`);
+        mountDiagramViewport(frame,host,svg,{initialMode:'overview',maximumFitScale:1,hint:'Structural references only; runtime behavior is unverified.'});
+        focusDesk.decorateNodes(host,diagram.nodes,hldSelection);
+      }catch(error){if(generation===architectureGeneration)host.replaceChildren(node('p','status',`Diagram unavailable: ${error.message}. Exact source evidence remains inspectable.`));}
+      if(!diagram.connected)frame.append(node('p','focus-desk-absence','No matching reference observed in this snapshot. This does not establish absence outside the covered scope.'));
+    }
+    if(generation===architectureGeneration&&hldExportAllowed(payload,hldMode))$('hld-mermaid-source').firstElementChild.textContent=records.map(item=>`## ${view.selected.source.name} · ${item.mode} · boundaries ${view.start+1}–${view.start+view.scopes.length} of ${view.total}\n\n\`\`\`mermaid\n${item.source}\n\`\`\``).join('\n\n');
   }
 
   async function renderHldDiagrams(payload) {
     const generation=++architectureGeneration;
     diagramObservers.splice(0).forEach(observer=>observer.disconnect());
     const modes=hldMode==='compare'?['baseline','proposal']:[hldMode], container=$('hld-diagrams'); container.replaceChildren(); container.classList.toggle('compare',modes.length===2);
+    if(focusDesk.active){await renderFocusDeskCanvas(payload,modes,generation);return;}
     const diagramPayload=presentationFilter('changedHld')?focusHldPayload(payload):payload;
     const sources=modes.map(mode=>({mode,source:hldMermaid(diagramPayload,mode)}));
     $('hld-mermaid-source').firstElementChild.textContent=hldExportAllowed(payload,hldMode)?sources.map(item=>`## ${item.mode}\n\n\`\`\`mermaid\n${item.source}\n\`\`\``).join('\n\n'):'';
@@ -2423,10 +2494,14 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
   }
 
   function renderHldInspector(payload) {
-    const container=$('hld-inspector'); container.replaceChildren();
+    const container=$('hld-inspector');
+    const focusKey=[workspace.generation,workspace.state.reviewId,payload.baseline?.id,payload.proposal?.id,payload.accepted?.id,hldMode,hldSelection,focusedHldBoundary,focusVisibility.componentDetails,focusVisibility.hldSource].join('|');
+    if(focusDesk.active&&focusDesk.inspectorCurrent(focusKey))return;
+    if(focusDesk.active)++hldSourceGeneration;
+    container.replaceChildren();
     const baseline=(hldMode==='accepted'?payload.accepted:payload.baseline)?.elements?.find(item=>item.id===hldSelection), proposal=payload.proposal?.elements?.find(item=>item.id===hldSelection);
     const selected=(hldMode==='baseline'||hldMode==='accepted'?baseline:proposal||baseline);
-    if(!selected){container.append(node('p','status','Select a component to inspect its authorized design evidence.'));return;}
+    if(!selected){if(focusDesk.active)focusDesk.emptyInspector(focusKey,'No element evidence for this selection in the chosen snapshot. Not observed does not establish architectural absence. Choose another boundary or comparison view.');else container.append(node('p','status','Select a component to inspect its authorized design evidence.'));return;}
     container.append(node('h3','',selected.name),node('p','status',`${selected.kind} · ${selected.id}`));
     const parentVersion=hldMode==='accepted'?payload.accepted:hldMode==='baseline'?payload.baseline:proposal?payload.proposal:payload.baseline;
     const parentComponent=selected.kind==='component'?selected:parentVersion?.elements.find(element=>element.id===selected.component_id&&element.kind==='component');
@@ -2458,6 +2533,11 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
     container.append(evidenceList);
     const sourceStatus=node('p','status');sourceStatus.id='hld-source-status';sourceStatus.setAttribute('role','status');container.append(sourceStatus);
     const source=node('pre','hld-source-text');source.id='hld-source-text';source.hidden=true;source.append(node('code'));container.append(source);
+    if(focusDesk.active){
+      const scope=focusDesk.selected||{source:selected,target:selected,changed:false,baseline:[],proposal:[],accepted:[]};
+      const first=focusDesk.decorateInspector({key:focusKey,selected,scope,payload,mode:hldMode,evidence,onSource:inspectHldEvidence});
+      if(first&&focusVisibility.componentDetails&&focusVisibility.hldSource&&!container.hidden)void inspectHldEvidence(first);
+    }
   }
 
   async function inspectHldEvidence(evidence) {
@@ -2470,7 +2550,7 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
       if(source.review_id!==reviewId||source.commit!==evidence.commit||source.path!==evidence.path||source.blob_id!==evidence.blob||source.start_line!==evidence.start_line||!Number.isSafeInteger(source.end_line)||source.end_line<source.start_line||source.end_line>evidence.end_line||typeof source.text!=='string')throw new Error('Source evidence does not match the selected design snapshot');
       $('hld-source-status').textContent=`${source.path}:${source.start_line}-${source.end_line} · exact commit ${source.commit} · blob ${evidence.blob}`;
       $('hld-source-text').firstElementChild.textContent=source.text; $('hld-source-text').hidden=false;
-    } catch(error) { if(generation!==hldSourceGeneration)return; if([401,403].includes(error.status)){renderHld(workspace.state);return;} $('hld-source-status').textContent=`Source unavailable: ${error.message}. This evidence remains pinned to ${short(evidence.commit)}; another revision is never substituted.`; }
+    } catch(error) { if(generation!==hldSourceGeneration||reviewId!==workspace.state.reviewId||designLevel!=='hld')return; if([401,403].includes(error.status)&&!focusDesk.active){renderHld(workspace.state);return;} $('hld-source-status').textContent=`Source unavailable: ${error.message}. This evidence remains pinned to ${short(evidence.commit)}; another revision is never substituted.`; }
   }
 
   function updateHldConfirmationElements(payload) {
@@ -2553,7 +2633,7 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
     defaults:applyPreferenceDefaults,
     status:()=>{const state=workspace.state;return [[state.error,state.hldError,state.lldError].filter(Boolean).join(' · '),state.details?.stale?'Stale comparison':'',state.details?.public_coverage?.complete?'Declared coverage complete':'Coverage incomplete or unverified','Static evidence · runtime unverified'].filter(Boolean).join(' · ');},
     filters:()=>{lastHldKey='';lastLldKey='';lastLldInspectorKey='';focusCatalogSource=null;renderHld(workspace.state);renderLld(workspace.state);selectFocusedFunction();},
-    visibility:preset=>{if(workspace.state.details){if(preset.visibility.findings||preset.visibility.explanations||preset.visibility.summary)void workspace.loadOptional('findings');if(preset.visibility.continuity||preset.visibility.notes||preset.visibility.bookmarks||preset.visibility.handoffs||preset.visibility.reviewed)void workspace.loadOptional('annotations');}const view={connected:'behavior',source:'code',architecture:'architecture'}[layout];if(!preset.visibility[view]&&Object.values(preset.visibility).some(Boolean)){const next=['behavior','code','architecture'].find(v=>preset.visibility[v]);if(next)setLayout({behavior:'connected',code:'source',architecture:'architecture'}[next],{remember:false});}if(!preset.visibility[designLevel]){const next=['structural','hld','lld'].find(v=>preset.visibility[v]);if(next)setDesignLevel(next,{remember:false});}}
+    visibility:preset=>{focusVisibility=preset.visibility;if(workspace.state.details){if(preset.visibility.findings||preset.visibility.explanations||preset.visibility.summary)void workspace.loadOptional('findings');if(preset.visibility.continuity||preset.visibility.notes||preset.visibility.bookmarks||preset.visibility.handoffs||preset.visibility.reviewed)void workspace.loadOptional('annotations');}const view={connected:'behavior',source:'code',architecture:'architecture'}[layout];if(!preset.visibility[view]&&Object.values(preset.visibility).some(Boolean)){const next=['behavior','code','architecture'].find(v=>preset.visibility[v]);if(next)setLayout({behavior:'connected',code:'source',architecture:'architecture'}[next],{remember:false});}if(!preset.visibility[designLevel]){const next=['structural','hld','lld'].find(v=>preset.visibility[v]);if(next)setDesignLevel(next,{remember:false});}syncFocusDesk();if(focusDesk.active&&workspace.state.hld)renderHldInspector(workspace.state.hld);}
   }).then(value=>{preferences=value;value.setMode(reviewMode);return value;}).catch(error=>{$('connection').textContent='Workspace settings unavailable: '+error.message;});
 
   $('session-form').addEventListener('submit', async event => { event.preventDefault(); preferences?.logout();token = $('session-token').value; $('session-token').value = ''; await preferences?.login();loadInbox(); });

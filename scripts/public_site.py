@@ -301,7 +301,26 @@ def assemble_site(bundles, output, observed_at, previous=None, previous_sha256=N
         if marker not in html or 'src="../assets/public-workspace.js"' not in html:
             raise SiteError("Approved workspace static hooks unavailable")
         (temporary / "workspace/index.html").write_text(html)
-        for name, source in {"inter.ttf": "src/fonts/inter.ttf", "jetbrains-mono.ttf": "src/fonts/jetbrains-mono.ttf", "inter-OFL.txt": "src/fonts/inter-OFL.txt", "jetbrains-mono-OFL.txt": "src/fonts/jetbrains-mono-OFL.txt", "workspace-preferences.js": "src/workspace-preferences.js", "workspace-registry.json": "src/workspace-registry.json", "workspace.js": "src/workspace.js", "workspace.css": "src/workspace.css", "public-workspace.js": "src/public-workspace.js", "mermaid.js": "docs/prototypes/vendor/mermaid.tiny-12.1.0.js", "mermaid-LICENSE.txt": "docs/prototypes/vendor/mermaid-LICENSE.txt"}.items():
+        for name, source in {
+            "inter.ttf": "src/fonts/inter.ttf",
+            "jetbrains-mono.ttf": "src/fonts/jetbrains-mono.ttf",
+            "inter-OFL.txt": "src/fonts/inter-OFL.txt",
+            "jetbrains-mono-OFL.txt": "src/fonts/jetbrains-mono-OFL.txt",
+            "workspace-preferences.js": "src/workspace-preferences.js",
+            "workspace-registry.json": "src/workspace-registry.json",
+            "workspace.js": "src/workspace.js",
+            "workspace.css": "src/workspace.css",
+            "workspace-focus-model.js": "src/workspace-focus-model.js",
+            "workspace-focus.js": "src/workspace-focus.js",
+            "workspace-focus.css": "src/workspace-focus.css",
+            "workspace-moria.js": "src/workspace-moria.js",
+            "workspace-moria.css": "src/workspace-moria.css",
+            "workspace-moria-palette.css": "src/workspace-moria-palette.css",
+            "workspace-moria.json": "src/workspace-moria.json",
+            "public-workspace.js": "src/public-workspace.js",
+            "mermaid.js": "docs/prototypes/vendor/mermaid.tiny-12.1.0.js",
+            "mermaid-LICENSE.txt": "docs/prototypes/vendor/mermaid-LICENSE.txt",
+        }.items():
             (temporary / "assets" / name).write_bytes(read_file(project_root / source, 4 * 1024 * 1024))
         (temporary / "assets/landing.css").write_bytes(read_file(project_root / "src/landing.css", 4 * 1024 * 1024))
         (temporary / "assets/landing").mkdir()

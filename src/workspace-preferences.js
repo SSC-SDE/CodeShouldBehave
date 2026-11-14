@@ -11,7 +11,14 @@ function defaults(registry){
 }
 function validate(doc,registry){
  const factory=defaults(registry);
- for(const name of ['standard','focus'])if(doc?.modes?.[name]&&doc.modes[name].hldAppearance===undefined)doc.modes[name].hldAppearance=factory.modes[name].hldAppearance;
+ for(const name of ['standard','focus']){
+  const mode=doc?.modes?.[name];if(!mode)continue;
+  if(mode.hldAppearance===undefined)mode.hldAppearance=factory.modes[name].hldAppearance;
+  if(doc.version===1&&registry.some(item=>item.id==='focusBackdrop')){
+   if(mode.visibility&&typeof mode.visibility==='object'&&!Array.isArray(mode.visibility)&&!Object.hasOwn(mode.visibility,'focusBackdrop'))mode.visibility.focusBackdrop=factory.modes[name].visibility.focusBackdrop;
+   if(Array.isArray(mode.order?.main)&&!mode.order.main.includes('focusBackdrop'))mode.order.main.push('focusBackdrop');
+  }
+ }
  if(doc&&doc.theme===undefined)doc.theme='graphite';
  if(!['graphite','blueprint','terminal','contrast'].includes(doc?.theme))throw Error('Invalid application theme');
  function shape(value,pattern){if(typeof pattern==='boolean')return typeof value==='boolean';if(Array.isArray(pattern))return Array.isArray(value)&&value.length===pattern.length&&new Set(value).size===value.length&&value.every(x=>pattern.includes(x));if(pattern&&typeof pattern==='object')return value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).length===Object.keys(pattern).length&&Object.keys(pattern).every(k=>shape(value[k],pattern[k]));return typeof value===typeof pattern;}

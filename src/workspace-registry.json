@@ -246,7 +246,7 @@
     "label": "Diagram legend",
     "category": "Diagram controls",
     "region": "main",
-    "selector": ".architecture-legend",
+    "selector": ".architecture-legend,.focus-desk-map-legend",
     "standard": true,
     "focus": true,
     "dependencies": [],
@@ -632,7 +632,7 @@
     "label": "Zoom and fit",
     "category": "Diagram controls",
     "region": "main",
-    "selector": ".diagram-tools,#fit-selection,#reset-graph",
+    "selector": ".diagram-tools,#fit-selection,#reset-graph,.focus-desk-zoom-control",
     "standard": true,
     "focus": true,
     "dependencies": [],
@@ -686,7 +686,7 @@
     "orderSelector": "",
     "expandedDefault": {
       "standard": true,
-      "focus": false
+      "focus": true
     }
   },
   {
@@ -856,6 +856,19 @@
     "selector": "#hld-inspector>.preference-design-details,#hld-inspector>p.status,#lld-inspector>p.mono,.lld-entry .mono,.lld-mapping-warning",
     "standard": true,
     "focus": false,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ""
+  },
+  {
+    "id": "focusBackdrop",
+    "label": "Moria colored-text backdrop (Focus HLD only)",
+    "category": "HLD context",
+    "region": "main",
+    "selector": "#workspace-moria",
+    "standard": false,
+    "focus": true,
     "dependencies": [],
     "permissions": [],
     "disclosure": false,

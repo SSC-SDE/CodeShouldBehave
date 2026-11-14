@@ -534,6 +534,21 @@ fn asset(name: &str) -> Option<(&'static [u8], &'static str)> {
             "application/json",
         ),
         "workspace.css" => (include_bytes!("../workspace.css"), "text/css"),
+        "workspace-focus-model.js" => (
+            include_bytes!("../workspace-focus-model.js"),
+            "text/javascript",
+        ),
+        "workspace-focus.js" => (include_bytes!("../workspace-focus.js"), "text/javascript"),
+        "workspace-focus.css" => (include_bytes!("../workspace-focus.css"), "text/css"),
+        "workspace-moria.js" => (include_bytes!("../workspace-moria.js"), "text/javascript"),
+        "workspace-moria.css" => (include_bytes!("../workspace-moria.css"), "text/css"),
+        "workspace-moria-palette.css" => {
+            (include_bytes!("../workspace-moria-palette.css"), "text/css")
+        }
+        "workspace-moria.json" => (
+            include_bytes!("../workspace-moria.json"),
+            "application/json",
+        ),
         "mermaid.js" => (
             include_bytes!("../../docs/prototypes/vendor/mermaid.tiny-12.1.0.js"),
             "text/javascript",
@@ -679,6 +694,13 @@ impl AppReportReadback for HttpsReportReadback {
             "workspace-preferences.js",
             "workspace-registry.json",
             "workspace.css",
+            "workspace-focus-model.js",
+            "workspace-focus.js",
+            "workspace-focus.css",
+            "workspace-moria.js",
+            "workspace-moria.css",
+            "workspace-moria-palette.css",
+            "workspace-moria.json",
             "mermaid.js",
             "inter.ttf",
             "jetbrains-mono.ttf",
@@ -982,5 +1004,19 @@ mod tests {
         }
         assert!(workspace_html().contains("csb-public-static"));
         assert!(asset("../app.sqlite").is_none());
+        assert!(asset("workspace-unpublished.js").is_none());
+        for (name, content_type) in [
+            ("workspace-focus-model.js", "text/javascript"),
+            ("workspace-focus.js", "text/javascript"),
+            ("workspace-focus.css", "text/css"),
+            ("workspace-moria.js", "text/javascript"),
+            ("workspace-moria.css", "text/css"),
+            ("workspace-moria-palette.css", "text/css"),
+            ("workspace-moria.json", "application/json"),
+        ] {
+            let (bytes, actual_type) = asset(name).unwrap();
+            assert!(!bytes.is_empty(), "{name}");
+            assert_eq!(actual_type, content_type, "{name}");
+        }
     }
 }

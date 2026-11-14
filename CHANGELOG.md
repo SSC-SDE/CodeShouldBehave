@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased: Focus Review desk
+
+- Replace Focus HLD with a searchable boundary list, bounded Mermaid maps,
+  snapshot comparison and an exact-source inspector. LLD and Standard stay intact.
+- Add the approved full-page Moria colored-text backdrop, controlled through
+  existing personal settings, without changing application palettes.
+- Package Focus assets for native, App-hosted, static and release distributions.
+  Local implementation only; no deployment or release-pin change.
+
 ## Unreleased: explicit historical report retirement
 
 - Base-owned, repository-bound approval of exact obsolete public report IDs.

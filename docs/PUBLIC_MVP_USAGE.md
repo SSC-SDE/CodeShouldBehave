@@ -66,6 +66,22 @@ Graphite, Blueprint, Terminal and Contrast. **HLD appearance** offers Studio
 (the Focus default) and Classic (the Standard default). Studio changes HLD
 presentation only; it does not change LLD or analysis evidence.
 
+The unreleased **Focus Review desk** places changed boundaries beside a compact
+Mermaid map and the selected element's commit-bound source evidence. **Overview**
+shows at most five boundaries from one source component; **Selected boundary**
+isolates one relationship. Use the boundary list, search, or Previous/Next to
+reach every boundary. On narrow screens use the boundary selector and **Evidence**.
+Comparison selects the original baseline, proposal, combined or side-by-side
+records; accepted architecture is available only when supplied by the service.
+An observation difference is not proof of a runtime or architectural change.
+**Inspect implementation in LLD** opens the existing, unchanged LLD drill-down.
+
+The approved Moria colored-text backdrop is decorative, Focus-HLD-only and
+non-interactive. Toggle **Moria colored-text backdrop (Focus HLD only)** in
+Profile / Settings and **Save** to persist it. It uses bundled same-origin
+assets, no AI or external image service, and is suppressed in forced-colors mode.
+If the artwork cannot load, the review remains usable without it.
+
 Static reports save layout preferences in the browser only. The optional Rust
 account service supports authenticated personal preferences with revision
 conflicts; it is not supplied by static Pages hosting. Temporary PR adjustments

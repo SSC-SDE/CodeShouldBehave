@@ -14,6 +14,12 @@ Discovery, operator activation validation, check lifecycle delivery and offline
 recovery tools have local evidence; no real installation was enabled. See
 [implementation progress](implementation-progress.md).
 
+Future optional capability:
+[plug-and-play AI extension implementation plan](AI_EXTENSION_IMPLEMENTATION_PLAN.md).
+It adds a disabled-by-default, evidence-bound explanation layer inside the
+existing Focus workspace. It does not replace deterministic execution, change
+LLD, enable model dispatch or pass the existing Phase 7 release gates.
+
 ## Implemented
 
 ### Installation credentials and fresh PR identity

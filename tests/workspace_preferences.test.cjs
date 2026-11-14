@@ -17,3 +17,30 @@ test('application themes survive storage and legacy preferences acquire Graphite
 });
 
 test('HLD appearance defaults migrate independently and reject unknown styles',()=>{const doc=defaults(registry);assert.equal(doc.modes.focus.hldAppearance,'studio');assert.equal(doc.modes.standard.hldAppearance,'classic');delete doc.modes.focus.hldAppearance;validate(doc,registry);assert.equal(doc.modes.focus.hldAppearance,'studio');doc.modes.focus.hldAppearance='classic';validate(doc,registry);assert.equal(doc.modes.standard.hldAppearance,'classic');doc.modes.focus.hldAppearance='custom-css';assert.throws(()=>validate(doc,registry));});
+
+test('legacy backdrop visibility and ordering migrate without resetting personal settings',async()=>{
+ const legacy=defaults(registry);legacy.theme='terminal';legacy.modes.focus.widths.right=380;
+ for(const mode of Object.values(legacy.modes)){delete mode.visibility.focusBackdrop;mode.order.main=mode.order.main.filter(id=>id!=='focusBackdrop').reverse();}
+ const previous=structuredClone(legacy);validate(legacy,registry);
+ for(const name of ['standard','focus']){
+  assert.equal(legacy.modes[name].visibility.focusBackdrop,name==='focus');
+  assert.deepEqual(legacy.modes[name].order.main.slice(0,-1),previous.modes[name].order.main);
+ }
+ assert.equal(legacy.theme,'terminal');assert.equal(legacy.modes.focus.widths.right,380);
+ const once=structuredClone(legacy);validate(legacy,registry);assert.deepEqual(legacy,once);
+ legacy.modes.focus.visibility.focusBackdrop=false;validate(legacy,registry);assert.equal(legacy.modes.focus.visibility.focusBackdrop,false);
+ const memory=new Map([['csb.workspace-preferences.v1',JSON.stringify(previous)]]);
+ const store=new Store(registry,{storage:{getItem:k=>memory.get(k),setItem:(k,v)=>memory.set(k,v)}});
+ await store.load();assert.equal(store.document.modes.focus.visibility.focusBackdrop,true);
+ await store.save(store.document);assert.equal(JSON.parse(memory.get('csb.workspace-preferences.v1')).modes.focus.visibility.focusBackdrop,true);
+ delete legacy.modes.standard.visibility.files;assert.throws(()=>validate(legacy,registry));
+});
+test('Moria artwork remains validated colored text with relative same-origin assets',()=>{
+ const {assetURL,validateArtwork}=require('../src/workspace-moria.js');
+ const artwork=require('../src/workspace-moria.json');assert.equal(validateArtwork(artwork),artwork);
+ assert.equal(assetURL('https://example.test/hosted/assets/workspace-moria.js','https://example.test/hosted/workspace').href,'https://example.test/hosted/assets/workspace-moria.json');
+ assert.throws(()=>assetURL('https://other.test/workspace-moria.js','https://example.test/workspace'));
+ for(const change of [a=>a.columns=1,a=>a.rows.pop(),a=>a.rows[0][0][0]=128,a=>a.rows[0][0][1]='\n']){
+  const invalid=structuredClone(artwork);change(invalid);assert.throws(()=>validateArtwork(invalid));
+ }
+});

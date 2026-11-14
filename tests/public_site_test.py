@@ -11,6 +11,11 @@ SPEC = importlib.util.spec_from_file_location("public_site", Path(__file__).reso
 site = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(site)
 NOW = "2026-10-17T06:00:00Z"
+FOCUS_ASSETS = (
+    "workspace-focus-model.js",
+    "workspace-focus.js", "workspace-focus.css", "workspace-moria.js",
+    "workspace-moria.css", "workspace-moria-palette.css", "workspace-moria.json",
+)
 
 
 class PublicSiteTests(unittest.TestCase):
@@ -23,12 +28,18 @@ class PublicSiteTests(unittest.TestCase):
         (self.project / "src").mkdir(parents=True)
         (self.project / "docs/prototypes/vendor").mkdir(parents=True)
         (self.project / "src/workspace.html").write_text('<meta name="color-scheme" content="dark"><link href="/assets/workspace.css"><a href="/workspace">CSB</a><script src="/assets/workspace.js"></script>')
+        with (self.project / "src/workspace.html").open("a") as stream:
+            for name in FOCUS_ASSETS:
+                if name.endswith(".js"):
+                    stream.write(f'<script src="/assets/{name}"></script>')
+                elif name.endswith(".css"):
+                    stream.write(f'<link href="/assets/{name}">')
         (self.project / "src/landing.html").write_text('<!doctype html><link href="assets/landing.css"><a href="workspace/">Workspace</a><img src="assets/landing/architecture.webp">')
         (self.project / "src/landing.css").write_text("body { color: #bfc4ce; }")
         (self.project / "src/landing").mkdir()
         for name in ("architecture.webp", "detail.webp", "source.webp", "favicon.png"):
             (self.project / "src/landing" / name).write_bytes(b"trusted image fixture: " + name.encode())
-        for name in ("workspace.js", "workspace.css", "public-workspace.js", "workspace-preferences.js", "workspace-registry.json"):
+        for name in ("workspace.js", "workspace.css", "public-workspace.js", "workspace-preferences.js", "workspace-registry.json") + FOCUS_ASSETS:
             (self.project / "src" / name).write_text("/* trusted UI fixture */")
         (self.project / "src/fonts").mkdir()
         for name in ("inter.ttf", "jetbrains-mono.ttf", "inter-OFL.txt", "jetbrains-mono-OFL.txt"):
@@ -83,6 +94,36 @@ class PublicSiteTests(unittest.TestCase):
         (output / "assets/workspace.js").write_text("tampered")
         with self.assertRaisesRegex(site.SiteError, "hash/length"):
             site.verify_site(output, result["site_sha256"])
+
+    def test_focus_assets_ship_exact_bytes_with_subpath_safe_links(self):
+        (self.project / "src/workspace-unpublished.js").write_text("not approved")
+        output, result = self.build([])
+        html = (output / "workspace/index.html").read_text()
+        manifest = json.loads((output / "site-manifest.json").read_text())
+        inventory = {item["path"]: item for item in manifest["files"]}
+        for name in FOCUS_ASSETS:
+            with self.subTest(name=name):
+                expected = (self.project / "src" / name).read_bytes()
+                self.assertEqual((output / "assets" / name).read_bytes(), expected)
+                self.assertEqual(inventory[f"assets/{name}"]["sha256"], site.digest(expected))
+                if not name.endswith(".json"):
+                    self.assertIn(f'"../assets/{name}"', html)
+        self.assertNotIn('href="/assets/', html)
+        self.assertNotIn('src="/assets/', html)
+        self.assertFalse((output / "assets/workspace-unpublished.js").exists())
+        self.assertEqual(site.verify_site(output)["site_sha256"], result["site_sha256"])
+
+    def test_missing_focus_assets_fail_before_publishing(self):
+        for name in FOCUS_ASSETS:
+            with self.subTest(name=name):
+                path = self.project / "src" / name
+                original = path.read_bytes()
+                path.unlink()
+                with self.assertRaises(site.SiteError):
+                    self.build([])
+                self.assertFalse((self.root / "site").exists())
+                self.assertFalse(list(self.root.glob(".csb-site-*")))
+                path.write_bytes(original)
 
     def test_landing_does_not_publish_unapproved_neighboring_assets(self):
         (self.project / "src/landing/unpublished.webp").write_bytes(b"not a public asset")

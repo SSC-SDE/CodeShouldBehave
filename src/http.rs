@@ -826,6 +826,19 @@ pub fn router(backend: Arc<dyn HttpBackend>) -> Router {
         .route("/workspace", get(workspace))
         .route("/assets/workspace.js", get(workspace_js))
         .route("/assets/workspace.css", get(workspace_css))
+        .route(
+            "/assets/workspace-focus-model.js",
+            get(workspace_focus_model_js),
+        )
+        .route("/assets/workspace-focus.js", get(workspace_focus_js))
+        .route("/assets/workspace-focus.css", get(workspace_focus_css))
+        .route("/assets/workspace-moria.js", get(workspace_moria_js))
+        .route("/assets/workspace-moria.css", get(workspace_moria_css))
+        .route(
+            "/assets/workspace-moria-palette.css",
+            get(workspace_moria_palette_css),
+        )
+        .route("/assets/workspace-moria.json", get(workspace_moria_json))
         .route("/assets/inter.ttf", get(inter_font))
         .route("/assets/jetbrains-mono.ttf", get(jetbrains_font))
         .route("/assets/mermaid.js", get(mermaid_js))
@@ -949,6 +962,55 @@ async fn workspace_css() -> impl IntoResponse {
     (
         [(header::CONTENT_TYPE, "text/css; charset=utf-8")],
         include_str!("workspace.css"),
+    )
+}
+
+async fn workspace_focus_model_js() -> impl IntoResponse {
+    (
+        [(header::CONTENT_TYPE, "text/javascript; charset=utf-8")],
+        include_str!("workspace-focus-model.js"),
+    )
+}
+
+async fn workspace_focus_js() -> impl IntoResponse {
+    (
+        [(header::CONTENT_TYPE, "text/javascript; charset=utf-8")],
+        include_str!("workspace-focus.js"),
+    )
+}
+
+async fn workspace_focus_css() -> impl IntoResponse {
+    (
+        [(header::CONTENT_TYPE, "text/css; charset=utf-8")],
+        include_str!("workspace-focus.css"),
+    )
+}
+
+async fn workspace_moria_js() -> impl IntoResponse {
+    (
+        [(header::CONTENT_TYPE, "text/javascript; charset=utf-8")],
+        include_str!("workspace-moria.js"),
+    )
+}
+
+async fn workspace_moria_css() -> impl IntoResponse {
+    (
+        [(header::CONTENT_TYPE, "text/css; charset=utf-8")],
+        include_str!("workspace-moria.css"),
+    )
+}
+
+async fn workspace_moria_palette_css() -> impl IntoResponse {
+    (
+        [(header::CONTENT_TYPE, "text/css; charset=utf-8")],
+        include_str!("workspace-moria-palette.css"),
+    )
+}
+
+async fn workspace_moria_json() -> impl IntoResponse {
+    (
+        [(header::CONTENT_TYPE, "application/json")],
+        include_str!("workspace-moria.json"),
     )
 }
 
@@ -1391,6 +1453,72 @@ mod tests {
         assert!(body.contains("Kept in memory only"));
         assert!(!body.contains("localStorage"));
         assert!(!body.contains("Authorization: Bearer"));
+    }
+
+    #[tokio::test]
+    async fn workspace_serves_exact_focus_assets_with_typed_embedded_bodies() {
+        let assets: [(&str, &str, &[u8]); 7] = [
+            (
+                "workspace-focus-model.js",
+                "text/javascript; charset=utf-8",
+                include_bytes!("workspace-focus-model.js"),
+            ),
+            (
+                "workspace-focus.js",
+                "text/javascript; charset=utf-8",
+                include_bytes!("workspace-focus.js"),
+            ),
+            (
+                "workspace-focus.css",
+                "text/css; charset=utf-8",
+                include_bytes!("workspace-focus.css"),
+            ),
+            (
+                "workspace-moria.js",
+                "text/javascript; charset=utf-8",
+                include_bytes!("workspace-moria.js"),
+            ),
+            (
+                "workspace-moria.css",
+                "text/css; charset=utf-8",
+                include_bytes!("workspace-moria.css"),
+            ),
+            (
+                "workspace-moria-palette.css",
+                "text/css; charset=utf-8",
+                include_bytes!("workspace-moria-palette.css"),
+            ),
+            (
+                "workspace-moria.json",
+                "application/json",
+                include_bytes!("workspace-moria.json"),
+            ),
+        ];
+        let backend = Arc::new(BackendMock::default());
+        for (name, content_type, expected) in assets {
+            let response = router(backend.clone())
+                .oneshot(
+                    Request::get(format!("/assets/{name}"))
+                        .body(Body::empty())
+                        .unwrap(),
+                )
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK, "{name}");
+            assert_eq!(response.headers()[header::CONTENT_TYPE], content_type);
+            let body = response.into_body().collect().await.unwrap().to_bytes();
+            assert_eq!(body.as_ref(), expected, "{name}");
+        }
+        let unknown = router(backend.clone())
+            .oneshot(
+                Request::get("/assets/workspace-unpublished.js")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(unknown.status(), StatusCode::NOT_FOUND);
+        assert!(backend.calls.lock().unwrap().is_empty());
     }
 
     #[tokio::test]

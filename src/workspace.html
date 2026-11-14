@@ -7,6 +7,9 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'">
   <title>CodeShouldBehave · Change inspection</title>
   <link rel="stylesheet" href="/assets/workspace.css">
+  <link rel="stylesheet" href="/assets/workspace-focus.css">
+  <link rel="stylesheet" href="/assets/workspace-moria-palette.css">
+  <link rel="stylesheet" href="/assets/workspace-moria.css">
 </head>
 <body>
   <a class="skip-link" href="#review-content">Skip to review</a>
@@ -205,6 +208,9 @@
   <dialog id="inspection-dialog" class="inspection-dialog" aria-labelledby="inspection-dialog-title"><div class="dialog-header"><h2 id="inspection-dialog-title">Workspace</h2><button id="inspection-dialog-close" type="button">Close</button></div><div id="inspection-dialog-content"></div></dialog>
   <dialog id="command-palette" class="command-palette" aria-label="Command palette"><label for="command-search">Jump to a view or action</label><input id="command-search" type="search" placeholder="Search commands…" autocomplete="off"><div id="command-results"></div><p>Enter to select · Escape to close</p></dialog>
   <script src="/assets/workspace-preferences.js"></script>
+  <script src="/assets/workspace-focus-model.js"></script>
+  <script src="/assets/workspace-focus.js"></script>
+  <script src="/assets/workspace-moria.js"></script>
   <script src="/assets/workspace.js"></script>
 </body>
 </html>

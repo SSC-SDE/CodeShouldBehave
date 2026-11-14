@@ -39,6 +39,39 @@ fn keys(value: &Value, expected: &[&str]) -> bool {
         .as_object()
         .is_some_and(|o| o.len() == expected.len() && expected.iter().all(|k| o.contains_key(*k)))
 }
+fn migrate_mode(mode: &mut Value, focus: bool) {
+    if let Some(object) = mode.as_object_mut() {
+        if !object.contains_key("hldAppearance") {
+            object.insert(
+                "hldAppearance".into(),
+                json!(if focus { "studio" } else { "classic" }),
+            );
+        }
+    }
+    if let Some(visibility) = mode.get_mut("visibility").and_then(Value::as_object_mut) {
+        if !visibility.contains_key("focusBackdrop") {
+            visibility.insert("focusBackdrop".into(), json!(focus));
+        }
+    }
+    if let Some(main) = mode
+        .pointer_mut("/order/main")
+        .and_then(Value::as_array_mut)
+    {
+        if !main.iter().any(|id| id == "focusBackdrop") {
+            main.push(json!("focusBackdrop"));
+        }
+    }
+}
+fn migrate(doc: &mut Value) {
+    if doc["version"] != 1 {
+        return;
+    }
+    for name in ["standard", "focus"] {
+        if let Some(mode) = doc.get_mut("modes").and_then(|modes| modes.get_mut(name)) {
+            migrate_mode(mode, name == "focus");
+        }
+    }
+}
 pub fn validate(doc: &Value) -> Result<(), String> {
     let bad = || "Invalid workspace preferences".to_string();
     if !(keys(doc, &["version", "defaultMode", "modes"])
@@ -63,11 +96,7 @@ pub fn validate(doc: &Value) -> Result<(), String> {
         .collect();
     for name in ["standard", "focus"] {
         let mut normalized = doc["modes"][name].clone();
-        if let Some(object) = normalized.as_object_mut() {
-            object
-                .entry("hldAppearance")
-                .or_insert(json!(if name == "focus" { "studio" } else { "classic" }));
-        }
+        migrate_mode(&mut normalized, name == "focus");
         let m = &normalized;
         if !keys(
             m,
@@ -149,9 +178,13 @@ pub fn read(storage: &Storage, principal: &PrincipalId) -> Result<Value, String>
         .optional()
         .map_err(|_| "Preference read unavailable")?;
     match row {
-        Some((revision, document)) => Ok(
-            json!({"account":principal.as_str(),"revision":revision,"preferences":serde_json::from_str::<Value>(&document).map_err(|_|"Invalid stored preferences")?}),
-        ),
+        Some((revision, document)) => {
+            let mut preferences = serde_json::from_str::<Value>(&document)
+                .map_err(|_| "Invalid stored preferences")?;
+            migrate(&mut preferences);
+            validate(&preferences)?;
+            Ok(json!({"account":principal.as_str(),"revision":revision,"preferences":preferences}))
+        }
         None => Ok(json!({"account":principal.as_str(),"revision":0,"preferences":defaults()})),
     }
 }
@@ -167,7 +200,9 @@ pub fn write(
         .as_i64()
         .filter(|v| *v >= 0 && *v < i64::MAX)
         .ok_or("Invalid preference revision")?;
-    validate(&request["preferences"])?;
+    let mut preferences = request["preferences"].clone();
+    migrate(&mut preferences);
+    validate(&preferences)?;
     let tx = storage
         .connection
         .transaction_with_behavior(TransactionBehavior::Immediate)
@@ -183,85 +218,10 @@ pub fn write(
     if current.unwrap_or(0) != revision {
         return Err("Preference conflict".into());
     }
-    tx.execute("INSERT INTO workspace_preferences(principal,revision,document) VALUES (?1,?2,?3) ON CONFLICT(principal) DO UPDATE SET revision=excluded.revision,document=excluded.document",params![principal.as_str(),revision+1,request["preferences"].to_string()]).map_err(|_|"Preference write unavailable")?;
+    tx.execute("INSERT INTO workspace_preferences(principal,revision,document) VALUES (?1,?2,?3) ON CONFLICT(principal) DO UPDATE SET revision=excluded.revision,document=excluded.document",params![principal.as_str(),revision+1,preferences.to_string()]).map_err(|_|"Preference write unavailable")?;
     tx.commit().map_err(|_| "Preference write unavailable")?;
-    Ok(
-        json!({"account":principal.as_str(),"revision":revision+1,"preferences":request["preferences"]}),
-    )
+    Ok(json!({"account":principal.as_str(),"revision":revision+1,"preferences":preferences}))
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn defaults_and_strict_validation() {
-        let mut doc = defaults();
-        assert!(validate(&doc).is_ok());
-        doc["modes"]["focus"]["visibility"]["architecture"] = json!(false);
-        assert!(validate(&doc).is_err());
-        doc = defaults();
-        doc["credential"] = json!("not accepted");
-        assert!(validate(&doc).is_err());
-        doc = defaults();
-        doc["modes"]["standard"]["widths"]["left"] = json!(421);
-        assert!(validate(&doc).is_err());
-    }
-    #[test]
-    fn theme_validation_and_legacy_documents() {
-        let mut doc = defaults();
-        for theme in ["graphite", "blueprint", "terminal", "contrast"] {
-            doc["theme"] = json!(theme);
-            assert!(validate(&doc).is_ok());
-        }
-        doc["theme"] = json!("custom-css");
-        assert!(validate(&doc).is_err());
-        doc.as_object_mut().unwrap().remove("theme");
-        assert!(validate(&doc).is_ok());
-    }
-    #[test]
-    fn hld_appearance_and_legacy_modes() {
-        let mut doc = defaults();
-        assert_eq!(doc["modes"]["focus"]["hldAppearance"], "studio");
-        assert_eq!(doc["modes"]["standard"]["hldAppearance"], "classic");
-        doc["modes"]["focus"]
-            .as_object_mut()
-            .unwrap()
-            .remove("hldAppearance");
-        assert!(validate(&doc).is_ok());
-        doc["modes"]["focus"]["hldAppearance"] = json!("classic");
-        assert!(validate(&doc).is_ok());
-        doc["modes"]["focus"]["hldAppearance"] = json!("custom-css");
-        assert!(validate(&doc).is_err());
-    }
-    #[test]
-    fn account_isolation_and_atomic_revision_conflicts() {
-        let root = std::env::temp_dir().join(format!("csb-preferences-{}", std::process::id()));
-        std::fs::create_dir_all(&root).unwrap();
-        let mut storage =
-            Storage::open(&root.join("state.sqlite"), &root.join("artifacts")).unwrap();
-        let a = PrincipalId::new("github-user:11").unwrap();
-        let b = PrincipalId::new("github-user:12").unwrap();
-        let first = read(&storage, &a).unwrap();
-        let revision = first["revision"].as_i64().unwrap();
-        let mut doc = defaults();
-        doc["defaultMode"] = json!("focus");
-        let request = json!({"revision":revision,"preferences":doc});
-        assert_eq!(
-            write(&mut storage, &a, &request).unwrap()["revision"],
-            revision + 1
-        );
-        assert_eq!(
-            write(&mut storage, &a, &request).unwrap_err(),
-            "Preference conflict"
-        );
-        assert_eq!(read(&storage, &b).unwrap()["revision"], 0);
-        drop(storage);
-        let storage = Storage::open(&root.join("state.sqlite"), &root.join("artifacts")).unwrap();
-        assert_eq!(
-            read(&storage, &a).unwrap()["preferences"]["defaultMode"],
-            "focus"
-        );
-        drop(storage);
-        std::fs::remove_dir_all(root).unwrap();
-    }
-}
+mod tests;
