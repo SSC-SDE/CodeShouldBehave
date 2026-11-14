@@ -41,7 +41,19 @@ and hosted attestation. Release `canary-34fe46947146` passed both downloaded arc
 checksums and exact source/signer provenance verification with self-hosted runners
 denied. Production bootstrap from the actual release URLs passed. Both engine pin
 documents select this package; runtime budget, policy and scope remain unchanged.
-Native preflight and hosted promotion are pending. Demo PR53 remains draft.
+Native credential-free sandbox and ELF compatibility passed in
+https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/43625424967.
+Pin PR https://github.com/SSC-SDE/CodeShouldBehave/pull/61 merged at
+`7e7cc051f64d519c2356a3d5cc1c996a3e069f58` after its provider check passed.
+Hosted controller https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/43625591975
+passed live readback, durable receipt commit and Architecture check repair.
+Receipt `7791831622` records sequence `120` with no pending promotion intent.
+PR53 check `132541907439` is `Ready · Changes to review` and links to Focus HLD.
+The actual hosted report passed browser inspection: concise HLD entry, six-node
+flow windows, node-selected red/green Unified and Split source, Live animations,
+Still with zero running animations and preserved Standard/Ring. Its HLD correctly
+reports no detected boundary change; the implementation change is visible in LLD.
+Demo PR53 remains draft and unmerged.
 
 ## 2026-11-14 — HLD-first check entry correction
 
