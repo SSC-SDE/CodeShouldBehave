@@ -34,7 +34,8 @@ per-review positions and stale/current authorization failures. Verification:
 - Actual source UI served at localhost:3224 over the existing published fixture: Changes → HLD → native LLD → exact baseline source, Focus round-trip, Ring pause/off/cancel and reduced-motion static mode verified. At 390px viewport, document width was 390px.
 - Browser reported no JavaScript exceptions; one evidence request was aborted during navigation/reload. The fixture contains one PR, so multi-PR position isolation was covered by regression tests rather than a multi-PR browser session.
 - Standard queue hides redundant timestamps, status and commit metadata; the exact comparison remains available under Evidence & scope.
-- Merge preparation: fetched `origin/main`; no newer main commits than the implementation base `7ea5246992372db6d438364356e20ff3dcded5c6`. PR and provider-confirmed merge identity will be recorded after publication.
+- Integration PR: https://github.com/SSC-SDE/CodeShouldBehave/pull/51; implementation commit `7d55ea69835cb66995b5752df13744d7f0d8f5d6`, base `7ea5246992372db6d438364356e20ff3dcded5c6`.
+- GitHub reported mergeable/CLEAN with successful `wake` nudge check. No branch protection/rulesets or required approvals are configured. The nudge is not test CI; the local test and browser evidence above are the verification gates. Owner authorized merge; provider-confirmed merge SHA will be recorded separately.
 
 ## 2026-11-08 — public canary activation preparation
 
