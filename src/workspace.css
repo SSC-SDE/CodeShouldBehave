@@ -444,3 +444,83 @@ html[data-hld-appearance=studio] .hld-map .node:focus-visible rect{stroke-width:
   .hld-element-list{order:2}
   .hld-inspector{grid-column:1}
 }
+
+/* Focus LLD: flow first, exact source only after deliberate step selection. */
+body.focus-lld-active{--font-ui:'Avenir Next',Avenir,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+html[data-theme=terminal] body.focus-lld-active{--font-ui:var(--font-code)}
+body.focus-lld-active .shell{grid-template-columns:minmax(0,1fr)}
+body.focus-lld-active .inbox,body.focus-lld-active #inspection-context,body.focus-lld-active .review-toolbar,body.focus-lld-active #interrogation,body.focus-lld-active #customize-pr{display:none}
+body.focus-lld-active .review{width:100%;padding:38px 28px 80px;font-family:var(--font-ui);font-size:16px}
+body.focus-lld-active #review-content{max-width:1200px;margin-inline:auto}
+body.focus-lld-active .review-heading{display:flex;align-items:start;gap:14px;flex-wrap:wrap;border:0;margin:0 0 30px;padding:0}
+body.focus-lld-active .review-heading .review-identity{display:block}
+body.focus-lld-active #review-title{font-family:var(--font-ui);font-weight:550;font-size:clamp(26px,3vw,38px);letter-spacing:-.04em;line-height:1.22;white-space:normal;overflow-wrap:anywhere;max-width:55ch}
+body.focus-lld-active .topbar.focus-review-header{display:flex;flex-wrap:nowrap;gap:16px;min-height:64px;padding:8px 28px}
+body.focus-lld-active .focus-review-header .brand{display:flex;align-items:center;gap:10px;font-size:14px;order:0}
+body.focus-lld-active .focus-review-header .brand span{font-size:22px;margin:0}
+body.focus-lld-active .focus-review-header .design-levels{display:flex;order:1;flex:1;border:0;background:none;padding:0;gap:4px;margin:0}
+body.focus-lld-active .focus-review-header .design-levels button{font-size:13px;min-width:0;min-height:38px;padding:8px 14px;background:none;border:0;border-radius:0;color:var(--muted)}
+body.focus-lld-active .focus-review-header .design-levels button.active{border-bottom:2px solid var(--blue);color:var(--text)}
+body.focus-lld-active .focus-review-header .focus-legend{order:2}
+body.focus-lld-active .focus-review-header #workspace-settings-open{order:3}
+body.focus-lld-active .focus-review-header .review-mode-switch{order:4;margin:0}
+body.focus-lld-active #lld-review{gap:0}
+.lld-focus-toolbar{position:relative;display:flex;align-items:center;flex-wrap:wrap;gap:14px;padding:16px 24px;border:1px solid var(--line);border-radius:var(--surface) var(--surface) 0 0;background:var(--panel)}
+.lld-focus-toolbar>label{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:14px;min-width:0}
+.lld-focus-toolbar select{max-width:min(40vw,360px);min-height:36px;font:14px var(--font-ui);color:var(--text);background:var(--bg)}
+.lld-focus-toolbar>.mono{flex:1;min-width:0;font-size:12px}
+.lld-focus-toolbar .architecture-controls{order:2;gap:4px;margin-left:auto}
+.lld-focus-toolbar .architecture-controls button{font:13px var(--font-ui);min-height:34px;padding:7px 10px}
+body.focus-lld-active #lld-compare{display:none}
+body.focus-lld-active #lld-combined:not(.active):has(~#lld-compare.active){background:var(--panel2);color:var(--text)}
+.lld-focus-disclosures{display:flex;gap:18px;order:3}
+.lld-focus-catalog>summary,.lld-focus-evidence>summary{cursor:pointer;width:max-content;color:var(--muted);font-size:14px;padding:4px 0}
+.lld-focus-disclosure-body{position:absolute;top:calc(100% - 1px);right:0;z-index:4;display:grid;gap:16px;width:min(620px,100%);max-height:65dvh;overflow:auto;padding:20px 24px;border:1px solid var(--line);border-radius:0 0 var(--surface) var(--surface);background:var(--panel);box-shadow:0 16px 32px color-mix(in srgb,var(--bg) 70%,transparent)}
+.lld-focus-metadata{display:grid;gap:10px;min-width:0}
+.lld-focus-metadata label{display:grid;gap:6px;color:var(--muted)}
+.lld-focus-metadata select{width:100%;max-width:100%}
+.lld-focus-disclosure-body .review-commits,.lld-focus-disclosure-body #essential-review-status{font-size:13px;line-height:1.6;white-space:normal;overflow-wrap:anywhere;color:var(--muted)}
+body.focus-lld-active[data-review-mode=focus] .lld-catalog{display:block;max-height:none;border:0;padding:0}
+body.focus-lld-active .lld-workspace{display:block;border:1px solid var(--line);border-top:0;border-radius:0 0 var(--surface) var(--surface);background:var(--panel);padding:20px 24px}
+body.focus-lld-active .lld-detail{display:block;background:transparent}
+body.focus-lld-active .architecture-frame{display:flex;flex-direction:column;border:0;border-radius:0;background:transparent}
+body.focus-lld-active .architecture-frame h4{order:0;background:transparent;border:0;font:550 16px/1.5 var(--font-ui);padding:0 0 12px}
+body.focus-lld-active .architecture-svg{order:2;height:540px;min-height:320px;background:var(--panel);padding:14px 0}
+body.focus-lld-active .diagram-tools{order:4;background:transparent;border:0;justify-content:flex-start;padding:4px 0}
+body.focus-lld-active .diagram-hint{order:5;display:block;padding:8px 0 0;border:0;font-size:13px}
+body.focus-lld-active .lld-detail .architecture-diagrams.compare{grid-template-columns:repeat(2,minmax(0,1fr));gap:28px}
+.lld-flow-navigation{order:1;display:flex;align-items:center;flex-wrap:wrap;gap:6px;border-bottom:1px solid var(--line);padding:0 0 12px;color:var(--muted);font-size:12px}
+.lld-flow-navigation>span{margin-right:auto;font-variant-numeric:tabular-nums}
+.lld-flow-navigation button{font:12px var(--font-ui);padding:5px 7px;min-height:30px;background:transparent}
+.lld-flow-scope{order:3;font-size:12px;line-height:1.6;color:var(--muted);padding:10px 0}
+body.focus-lld-active #lld-inspector.source-open{display:block;margin-top:24px;padding:20px 0 0;border-top:1px solid var(--line)}
+.lld-diff-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:12px}
+.lld-diff-toolbar h3{flex:1;min-width:0;font-size:17px;overflow-wrap:anywhere}
+.lld-diff-toolbar .diff-modes{margin-left:auto}
+.lld-source-pair>.lld-diff-note,.lld-source-pair>.lld-unified{grid-column:1/-1}
+.lld-diff-note{font-size:12px;color:var(--muted);padding:0}
+.lld-source-pair .lld-exact-code{background:var(--bg);font:13px/1.8 var(--font-code);min-height:0;max-height:460px;border-color:var(--line)}
+.lld-source-pair[data-diff-mode=unified]{grid-template-columns:minmax(0,1fr)}
+.lld-source-pair .diff-line.added{color:var(--green);background:color-mix(in srgb,var(--green) 12%,var(--bg))}
+.lld-source-pair .diff-line.removed{color:var(--red);background:color-mix(in srgb,var(--red) 12%,var(--bg))}
+.lld-source-pair .diff-line.same{color:var(--text);background:transparent}
+.lld-source-pair .mono{font-size:11px}
+.lld-exact-code:focus-visible,.lld-svg g.node:focus-visible{outline:2px solid var(--amber);outline-offset:3px}
+.lld-source-pair .diff-line::before{content:none}
+.lld-scoped-identity{grid-column:1/-1;font-size:12px;color:var(--muted)}
+.lld-scoped-identity>summary{cursor:pointer;padding:6px 0}
+.lld-scoped-identity p{padding:6px 0;overflow-wrap:anywhere}
+/* Mermaid measures single-line operation labels; never wrap them after layout. */
+body.focus-lld-active .lld-svg .nodeLabel,body.focus-lld-active .lld-svg .nodeLabel p{white-space:nowrap;overflow-wrap:normal;word-break:normal;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;line-height:1.5}
+@media(max-width:850px){
+  body.focus-lld-active .review{padding:20px 16px 36px}
+  body.focus-lld-active .topbar.focus-review-header{padding:8px 16px;flex-wrap:wrap;gap:8px 12px}
+  body.focus-lld-active .focus-review-header .brand{font-size:12px}
+  body.focus-lld-active .lld-detail .architecture-diagrams.compare,body.focus-lld-active .lld-source-pair{grid-template-columns:minmax(0,1fr)}
+  body.focus-lld-active .lld-workspace{padding:18px 16px}.lld-focus-toolbar{padding:12px 16px}
+  .lld-focus-toolbar>label{width:100%}.lld-focus-toolbar select{max-width:100%;min-width:0;flex:1}
+  .lld-focus-toolbar .architecture-controls{margin-left:0}.lld-focus-disclosure-body{padding:16px}
+}
+/* Mermaid measures labels in a temporary SVG outside .architecture-svg.
+   Trusted CSS must match there too: strict CSP blocks its injected font styles. */
+body.focus-lld-active .nodeLabel,body.focus-lld-active .nodeLabel p{font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap}

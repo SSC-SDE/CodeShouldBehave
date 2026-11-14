@@ -45,6 +45,86 @@ test('Moria artwork remains validated colored text with relative same-origin ass
  }
 });
 
+async function moriaHarness({saved=null,reduced=false,forced=false,hidden=false,fail=false,storageBlocked=false}={}){
+ const {readFileSync}=require('node:fs'),{join}=require('node:path'),vm=require('node:vm');
+ const source=readFileSync(join(__dirname,'../src/workspace-moria.js'),'utf8');
+ class Element{
+  constructor(tag){this.tagName=tag;this.children=[];this.dataset={};this.attributes={};this.handlers={};this.classes=new Set();this.hidden=false;this.renders=0;this.classList={contains:name=>this.classes.has(name),toggle:(name,on)=>on?this.classes.add(name):this.classes.delete(name)};}
+  set className(value){this.classes=new Set(value.split(/\s+/));}
+  setAttribute(name,value){this.attributes[name]=value;}
+  addEventListener(name,handler){this.handlers[name]=handler;}
+  append(...nodes){for(const node of nodes)this.children.push(...(node.tagName==='#fragment'?node.children:[node]));}
+  prepend(node){this.children.unshift(node);}
+  replaceChildren(...nodes){this.renders++;this.children=[];this.append(...nodes);}
+ }
+ const body=new Element('body'),topbar=new Element('header');body.append(topbar);
+ const find=(node,id)=>node.id===id?node:node.children.map(child=>find(child,id)).find(Boolean);
+ const document={body,hidden,currentScript:{src:'https://example.test/assets/workspace-moria.js'},handlers:{},getElementById:id=>find(body,id),querySelector:selector=>selector==='.topbar'?topbar:null,createElement:tag=>new Element(tag),createDocumentFragment:()=>new Element('#fragment'),createTextNode:text=>Object.assign(new Element('#text'),{textContent:text}),addEventListener(name,handler){this.handlers[name]=handler;}};
+ const media=new Map();
+ for(const [name,matches] of [['(prefers-reduced-motion: reduce)',reduced],['(forced-colors: active)',forced]])media.set(name,{matches,addEventListener(_,handler){this.change=handler;}});
+ const memory=new Map(saved===null?[]:[['csb.moria-motion.v1',saved]]),requests=[],observations=[];
+ let refresh;
+ const sandbox={document,URL,MutationObserver:class{constructor(callback){refresh=callback;}observe(target,options){observations.push({target,options});}},fetch:async(url,options)=>{requests.push({url,options});return {ok:!fail,json:async()=>require('../src/workspace-moria.json')};},window:{location:{href:'https://example.test/workspace'},matchMedia:name=>media.get(name),localStorage:{getItem:key=>{if(storageBlocked)throw Error('Storage blocked');return memory.get(key);},setItem:(key,value)=>{if(storageBlocked)throw Error('Storage blocked');memory.set(key,value);}}}};
+ const execute=()=>vm.runInNewContext(source,sandbox);execute();
+ const host=document.getElementById('workspace-moria'),select=document.getElementById('workspace-moria-mode'),control=topbar.children[0],grid=host.children[0].children[0];
+ const settle=()=>new Promise(resolve=>setImmediate(resolve));
+ return {document,body,topbar,host,select,control,grid,memory,requests,observations,execute,settle,
+  async activate(mode='focus-desk-active',visible=true){body.classes.delete('focus-desk-active');body.classes.delete('focus-lld-active');if(mode)body.classes.add(mode);host.classList.toggle('preference-hidden',!visible);refresh();await settle();},
+  choose(value){select.value=value;select.handlers.change();},
+  media(name,value){const query=media.get(name);query.matches=value;query.change();},
+  visibility(value){document.hidden=value;document.handlers.visibilitychange();},
+  refresh:()=>refresh()};
+}
+
+test('Moria renders original ASCII once and shares one control across Focus HLD and LLD',async()=>{
+ const h=await moriaHarness();assert.equal(h.requests.length,0);assert.equal(h.control.hidden,true);
+ await h.activate();assert.equal(h.requests.length,1);assert.equal(h.host.dataset.visible,'true');assert.equal(h.host.dataset.running,'true');
+ assert.equal(h.select.attributes['aria-label'],'Backdrop');assert.equal(h.host.attributes['aria-hidden'],'true');assert.ok('inert' in h.host.attributes);
+ assert.equal(h.requests[0].url.href,'https://example.test/assets/workspace-moria.json');
+ assert.deepEqual({...h.requests[0].options},{credentials:'same-origin',mode:'same-origin',redirect:'error'});
+ const expected=require('../src/workspace-moria.json').rows.map(row=>row.map(run=>run[1]).join('')).join('\n');
+ assert.equal(h.grid.children.map(node=>node.textContent).join(''),expected);
+ assert.equal(h.grid.renders,1);assert.equal(h.host.children[0].children.length,5);assert.equal(h.host.children[0].children[4].children.length,6);
+ await h.activate('focus-lld-active');h.refresh();h.execute();
+ assert.equal(h.host.dataset.running,'true');assert.equal(h.requests.length,1);assert.equal(h.grid.renders,1);assert.equal(h.topbar.children.length,1);
+ await h.activate(null);assert.equal(h.host.dataset.visible,'false');assert.equal(h.host.dataset.running,'false');assert.equal(h.control.hidden,true);
+ assert.equal(h.observations.length,2);
+ for(const observation of h.observations){assert.equal(observation.options.attributes,true);assert.deepEqual([...observation.options.attributeFilter],['class']);assert.equal(observation.options.subtree,undefined);}
+});
+
+test('Moria Live Still Off choices persist without mutating profile visibility',async()=>{
+ const h=await moriaHarness();await h.activate('focus-lld-active');
+ h.choose('still');assert.equal(h.host.dataset.visible,'true');assert.equal(h.host.dataset.running,'false');assert.equal(h.host.dataset.motion,'still');
+ h.choose('off');assert.equal(h.host.dataset.visible,'false');assert.equal(h.host.classList.contains('preference-hidden'),false);
+ assert.equal(h.memory.get('csb.moria-motion.v1'),'off');
+ const restored=await moriaHarness({saved:h.memory.get('csb.moria-motion.v1')});await restored.activate();
+ assert.equal(restored.select.value,'off');assert.equal(restored.requests.length,0);assert.equal(restored.control.hidden,false);
+ restored.choose('live');await restored.settle();assert.equal(restored.requests.length,1);assert.equal(restored.host.dataset.running,'true');
+ await restored.activate('focus-desk-active',false);assert.equal(restored.host.dataset.visible,'false');assert.equal(restored.host.dataset.running,'false');assert.equal(restored.control.hidden,true);
+ const blocked=await moriaHarness({saved:'invalid',storageBlocked:true});await blocked.activate();blocked.choose('still');assert.equal(blocked.host.dataset.motion,'still');
+ const invalid=await moriaHarness({saved:'invalid'});await invalid.activate();assert.equal(invalid.select.value,'live');
+});
+
+test('Moria reduced motion forced colors and hidden tabs prevent live work',async()=>{
+ const h=await moriaHarness({saved:'live',reduced:true,hidden:true});await h.activate('focus-lld-active');
+ assert.equal(h.requests.length,0);assert.equal(h.select.value,'still');assert.equal(h.select.children[0].disabled,true);
+ h.visibility(false);await h.settle();assert.equal(h.host.dataset.running,'false');assert.equal(h.host.dataset.visible,'true');
+ h.media('(prefers-reduced-motion: reduce)',false);assert.equal(h.host.dataset.running,'true');assert.equal(h.select.value,'live');
+ h.visibility(true);assert.equal(h.host.dataset.running,'false');h.visibility(false);assert.equal(h.host.dataset.running,'true');
+ h.media('(forced-colors: active)',true);assert.equal(h.host.dataset.visible,'false');assert.equal(h.host.dataset.running,'false');assert.equal(h.control.hidden,true);
+ h.media('(forced-colors: active)',false);assert.equal(h.host.dataset.running,'true');assert.equal(h.grid.renders,1);
+ const forced=await moriaHarness({forced:true});await forced.activate();assert.equal(forced.requests.length,0);
+ const hiddenPreference=await moriaHarness();await hiddenPreference.activate('focus-lld-active',false);assert.equal(hiddenPreference.requests.length,0);
+});
+
+test('Moria unavailable artwork leaves review usable without repeated fetches',async()=>{
+ const h=await moriaHarness({fail:true});await h.activate();
+ const status=h.document.getElementById('workspace-moria-status');
+ assert.equal(status.hidden,false);assert.equal(status.attributes.role,'status');assert.equal(h.host.dataset.visible,'false');
+ await h.activate('focus-lld-active');assert.equal(h.requests.length,1);
+ h.choose('off');assert.equal(status.hidden,true);await h.activate(null);assert.equal(h.control.hidden,true);
+});
+
 test('Ring v1 migration keeps Focus, ordering, and the existing browser storage key',async()=>{
  const legacy=defaults(registry);legacy.theme='blueprint';legacy.defaultMode='focus';
  legacy.modes.standard.widths.left=280;legacy.modes.focus.visibility.focusBackdrop=false;

@@ -7,16 +7,16 @@ function mount(hooks){
   const button=(text,action,cls='quiet')=>{const item=el('button',cls,text);item.type='button';item.onclick=action;return item;};
   const old=document.querySelector('.hld-workspace'),diagrams=byId('hld-diagrams'),inspector=byId('hld-inspector');
   const desk=el('section','focus-desk');desk.hidden=true;desk.setAttribute('aria-label','High-level review desk');old.before(desk);
-  const nav=el('nav','focus-desk-nav');nav.setAttribute('aria-label','HLD change set');
-  const navHeader=el('header'),count=el('span','mono');navHeader.append(el('h3','','Change set'),count);
-  const overview=button('All boundaries',()=>{focused=false;hooks.redraw();},'focus-desk-all');
+  const nav=el('details','focus-desk-nav'),navSummary=el('summary'),count=el('span');
+  navSummary.append(document.createTextNode('Boundaries '),count);
+  const navBody=el('nav','focus-desk-nav-body');navBody.setAttribute('aria-label','HLD boundaries');
   const search=el('input');search.type='search';search.placeholder='Find boundary';search.setAttribute('aria-label','Find HLD boundary');
   const list=el('div','focus-desk-changes'),extras=el('details','focus-desk-elements');extras.append(el('summary','','All elements'));
-  nav.append(navHeader,overview,search,list,extras);
+  navBody.append(search,list,extras);nav.append(navSummary,navBody);
+  nav.onkeydown=event=>{if(event.key==='Escape'){nav.open=false;navSummary.focus();}};
   const canvas=el('section','focus-desk-canvas'),toolbar=el('header','focus-desk-toolbar'),tabs=el('nav','focus-desk-tabs');tabs.setAttribute('aria-label','HLD canvas scope');
   const overviewTab=button('Overview',()=>{focused=false;hooks.redraw();}),boundaryTab=button('Selected boundary',()=>{focused=true;hooks.redraw();});tabs.append(overviewTab,boundaryTab);
   const options=el('div','focus-desk-options'),comparison=el('label','architecture-controls');comparison.setAttribute('aria-label','HLD comparison controls');
-  const scopeSelect=el('select','focus-desk-scope-select');scopeSelect.setAttribute('aria-label','HLD boundary');scopeSelect.onchange=()=>{const scope=all[Number(scopeSelect.value)];if(scope)hooks.scope(scope);};
   const mode=el('select');mode.setAttribute('aria-label','HLD comparison view');
   for(const [value,text] of [['combined','Change map'],['compare','Side by side'],['baseline','Baseline'],['proposal','Proposal map'],['accepted','Accepted architecture']]){const option=el('option','',text);option.value=value;mode.append(option);}
   mode.onchange=()=>hooks.mode(mode.value);comparison.append(mode);
@@ -26,12 +26,11 @@ function mount(hooks){
   for(const item of [fit,minus,zoom,plus])item.classList.add('focus-desk-zoom-control');
   minus.setAttribute('aria-label','Zoom HLD out');plus.setAttribute('aria-label','Zoom HLD in');
   const evidence=button('Evidence',()=>hooks.evidence(inspector.hidden||inspector.classList.contains('preference-hidden')));evidence.setAttribute('aria-controls','hld-inspector');
-  options.append(comparison,fit,minus,zoom,plus,evidence);toolbar.append(tabs,options,scopeSelect);
-  const intro=el('header','focus-desk-map-heading'),introText=el('div'),title=el('h3'),position=el('span','focus-desk-position');introText.append(el('span','mono','HLD / changed boundaries'),title);intro.append(introText,position);
-  const legend=el('div','focus-desk-map-legend');for(const text of ['? Unverified difference','~ Contract modified','→ Structural reference','Select a node for exact evidence'])legend.append(el('span','',text));
-  const metadata=el('details','focus-desk-metadata');metadata.append(el('summary','','Coverage and design identity'));
-  const footer=el('footer','focus-desk-footer'),caption=el('span'),previous=button('← Previous',()=>step(-1)),next=button('Next boundary →',()=>step(1));footer.append(caption,previous,next);
-  canvas.append(toolbar,intro,diagrams,legend,metadata,footer);desk.append(nav,canvas);
+  options.append(comparison,fit,minus,zoom,plus,evidence);toolbar.append(nav,tabs,options);
+  const intro=el('header','focus-desk-map-heading'),title=el('h3'),position=el('span','focus-desk-position');intro.append(title,position);
+  const metadata=el('details','focus-desk-metadata');metadata.append(el('summary','','Coverage and design details'));
+  const footer=el('footer','focus-desk-footer'),previous=button('← Previous',()=>step(-1)),next=button('Next →',()=>step(1));previous.setAttribute('aria-label','Previous HLD boundary');next.setAttribute('aria-label','Next HLD boundary');footer.append(previous,next);
+  canvas.append(toolbar,intro,diagrams,footer,metadata);desk.append(canvas);
   const homes=new Map();
   function move(item,parent){if(!item)return;if(!homes.has(item)){const mark=document.createComment('Review desk control home');item.before(mark);homes.set(item,mark);}if(item.parentNode!==parent)parent.append(item);}
   // The diagrams were adopted above; record their original home explicitly.
@@ -41,10 +40,10 @@ function mount(hooks){
   function activate(value){
     if(active===value)return;active=value;desk.hidden=!value;old.hidden=value;inspectorKey=null;
     if(value){
-      canvas.insertBefore(diagrams,legend);
+      canvas.insertBefore(diagrams,footer);showInspector(false);nav.open=false;metadata.open=false;
       move(inspector,desk);inspector.classList.add('focus-desk-inspector');diagrams.classList.add('focus-desk-diagrams');
       move(document.querySelector('.hld-map-toolbar'),extras);move(byId('hld-element-list'),extras);
-      for(const item of [byId('hld-identity'),document.querySelector('.hld-drift'),byId('hld-coverage'),document.querySelector('.hld-provenance')])move(item,metadata);
+      for(const item of [document.querySelector('.review-commits'),byId('hld-identity'),document.querySelector('.hld-drift'),byId('hld-coverage'),document.querySelector('.hld-provenance')])move(item,metadata);
     }else{
       for(const [item,home] of homes)if(item.parentNode!==home.parentNode)home.after(item);
       inspector.classList.remove('focus-desk-inspector');diagrams.classList.remove('focus-desk-diagrams');inspector.hidden=false;
@@ -57,6 +56,7 @@ function mount(hooks){
   }
   new MutationObserver(syncZoom).observe(diagrams,{subtree:true,childList:true});syncZoom();
   function step(delta){const index=all.findIndex(scope=>scope.key===current?.key),scope=all[index+delta];if(scope)hooks.scope(scope);}
+  function syncControls(){for(const item of [nav,tabs,comparison,fit,minus,zoom,plus])item.hidden=all.length===0;}
   function drawNav(){
     const scroll=list.scrollTop,focusedKey=document.activeElement?._focusScopeKey;list.replaceChildren();
     const query=search.value.trim().toLowerCase(),visible=all.filter(scope=>`${scope.source.name} ${scope.target.name} ${(scope.target.roots||[]).join(' ')}`.toLowerCase().includes(query));
@@ -64,7 +64,7 @@ function mount(hooks){
     for(const category of categories){
       const group=el('section','focus-desk-group');group.append(el('h4','',category));
       for(const scope of visible.filter(item=>(model.kinds[item.target.kind]||item.target.kind)===category)){
-        const item=button('',()=>hooks.scope(scope),'focus-desk-boundary');item._focusScopeKey=scope.key;item.setAttribute('aria-current',String(scope.key===current?.key));
+        const item=button('',()=>{nav.open=false;navSummary.focus();hooks.scope(scope);},'focus-desk-boundary');item._focusScopeKey=scope.key;item.setAttribute('aria-current',String(scope.key===current?.key));
         item.append(el('span','',scope.target.name),el('span','focus-desk-marker',({added:'+',removed:'−',modified:'~',uncertain:'?'}[model.state(scope)]||'')));
         if(multipleSources)item.title=`${scope.source.name} → ${scope.target.name}`;
         group.append(item);
@@ -77,26 +77,28 @@ function mount(hooks){
   }
   search.oninput=drawNav;
   function update({scopes,selectedKey,mode:comparisonMode,reviewId,hasAccepted}){
-    if(review!==reviewId){review=reviewId;search.value='';inspectorKey=null;focused=window.matchMedia('(max-width:700px)').matches;inspector.hidden=window.innerWidth<=950;}
-    all=scopes;const view=model.view(scopes,selectedKey,focused);current=view.selected;count.textContent=String(scopes.length);mode.value=comparisonMode;mode.querySelector('[value=accepted]').disabled=!hasAccepted;
-    scopeSelect.replaceChildren();scopes.forEach((scope,index)=>{const option=el('option','',`${scope.source.name} → ${scope.target.name}`);option.value=String(index);scopeSelect.append(option);});scopeSelect.value=String(scopes.indexOf(current));
-    overview.classList.toggle('active',!focused);overviewTab.classList.toggle('active',!focused);boundaryTab.classList.toggle('active',focused);
-    overviewTab.setAttribute('aria-pressed',String(!focused));boundaryTab.setAttribute('aria-pressed',String(focused));
-    title.textContent=current?(focused?`${current.source.name} → ${current.target.name}`:`${current.source.name} · ${view.total} boundaries to review`):'High-level design';
-    position.textContent=current?(focused?'Selected boundary':`Boundaries ${view.start+1}–${view.start+view.scopes.length} of ${view.total}`):'No boundaries established';
-    caption.textContent=current?`Selected: ${current.source.name} → ${current.target.name}`:'Source-backed structure; runtime behavior is unverified.';
+    if(review!==reviewId){review=reviewId;search.value='';inspectorKey=null;focused=window.matchMedia('(max-width:700px)').matches;showInspector(false);nav.open=false;metadata.open=false;}
+    all=scopes;const view=model.view(scopes,selectedKey,focused);current=view.selected;count.textContent=`(${scopes.length})`;mode.value=comparisonMode;mode.querySelector('[value=accepted]').disabled=!hasAccepted;
+    syncControls();
+    overviewTab.classList.toggle('active',!focused);boundaryTab.classList.toggle('active',focused);
+    overviewTab.setAttribute('aria-pressed',String(!focused));boundaryTab.setAttribute('aria-pressed',String(focused));boundaryTab.disabled=!current;
+    title.textContent=current?(focused?`${current.source.name} → ${current.target.name}`:current.source.name):'High-level design';
+    position.textContent=current?(focused?'':`${view.start+1}–${view.start+view.scopes.length} of ${view.total} boundaries`):'';
+    intro.hidden=!current;footer.hidden=scopes.length<2;
     const index=scopes.indexOf(current);previous.disabled=index<=0;next.disabled=index<0||index>=scopes.length-1;
     drawNav();showInspector(!inspector.hidden);return view;
   }
   function showInspector(open){inspector.hidden=!open;evidence.setAttribute('aria-expanded',String(open&&!inspector.classList.contains('preference-hidden')));}
-  function empty(message){
-    all=[];current=null;inspectorKey=null;review=null;search.value='';scopeSelect.replaceChildren();list.replaceChildren();count.textContent='0';title.textContent='High-level design';position.textContent='';caption.textContent=message;
-    const status=el('p','status',message),reload=button('Reload HLD',()=>byId('hld-reload').click());reload.disabled=byId('hld-reload').disabled;diagrams.replaceChildren(status,reload);previous.disabled=true;next.disabled=true;
+  function empty(message,{retry=false}={}){
+    all=[];current=null;inspectorKey=null;review=null;search.value='';list.replaceChildren();count.textContent='(0)';intro.hidden=true;footer.hidden=true;nav.open=false;if(active)showInspector(false);syncControls();
+    diagrams.replaceChildren(el('p','status',message));
+    if(retry&&!byId('hld-reload').disabled)diagrams.append(button('Reload HLD',()=>byId('hld-reload').click()));
+    previous.disabled=true;next.disabled=true;
   }
   function decorateInspector({key,selected,scope,payload,mode:comparisonMode,evidence:spans,onSource}){
     inspectorKey=key;
     const heading=inspector.querySelector('h3');if(!heading)return null;
-    const top=el('header','focus-desk-inspector-heading'),close=button('×',()=>{showInspector(false);evidence.focus();});close.setAttribute('aria-label','Close HLD evidence');top.append(el('span','','Selected boundary'),close);inspector.prepend(top);
+    const top=el('header','focus-desk-inspector-heading'),close=button('×',()=>{showInspector(false);evidence.focus();});close.setAttribute('aria-label','Close HLD evidence');top.append(el('span','','Evidence'),close);inspector.prepend(top);
     heading.classList.add('focus-desk-selected-name');heading.before(el('span','focus-desk-selected-kind',model.kinds[selected.kind]||selected.kind));
     const status=model.state(scope),statusText=comparisonMode==='accepted'?'Accepted architecture':status==='same'?'Shared context':status==='uncertain'?'? Observation difference · unverified':({added:'+ Added',removed:'− Removed',modified:'~ Modified'}[status]);
     const tag=el('p','focus-desk-selected-status',selected.id===scope.target.id?statusText:'Component context');heading.after(tag);
@@ -109,6 +111,9 @@ function mount(hooks){
     }
     explanation.after(snapshots);
     const sources=inspector.querySelector('.hld-source-evidence'),sourceStatus=byId('hld-source-status'),code=byId('hld-source-text');
+    const details=el('details','focus-desk-selection-details');details.append(el('summary','','Design details'));
+    for(const item of [...inspector.children])if(![top,heading,tag,explanation,snapshots,sources,sourceStatus,code,byId('hld-zoom-lld')].includes(item)&&!item.classList.contains('focus-desk-selected-kind'))details.append(item);
+    inspector.append(details);
     sources.open=true;sources.querySelector('summary').textContent='Source evidence';
     sources.querySelectorAll('button').forEach(item=>item.remove());
     for(const item of spans){
@@ -116,7 +121,7 @@ function mount(hooks){
       entry.append(el('span','',item.path),el('small','',`Lines ${item.start_line}–${item.end_line} · ${model.short(item.commit)}`));sources.append(entry);
     }
     sources.append(sourceStatus,code);
-    const lld=byId('hld-zoom-lld');if(lld){lld.classList.add('focus-desk-lld-action');lld.textContent='Inspect implementation in LLD ↗';inspector.append(lld);}
+    const lld=byId('hld-zoom-lld');if(lld){lld.classList.add('focus-desk-lld-action');lld.textContent='Inspect LLD ↗';inspector.append(lld);}
     const first=spans.find(item=>item.commit===payload.proposal?.snapshot&&/\.(rs|[cm]?[jt]sx?|py|go|java|rb|cs|cpp|c|h)$/.test(item.path))||spans.find(item=>item.commit===payload.proposal?.snapshot)||spans[0];
     if(first){const index=spans.indexOf(first);sources.querySelectorAll('button')[index]?.setAttribute('aria-current','true');}
     return first;

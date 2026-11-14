@@ -259,6 +259,7 @@ class ReviewWorkspace {
     this.cancelLldRequests(['lld-hover']);
     const generation=this.generation, detailGeneration=this.lldDetailGeneration, token=++this.lldSourceGeneration;
     this.state.lldSource=null;this.state.loading.add('lld-source');this.emit();
+    const requestedEnd=evidence.end_line;
     evidence={...evidence,end_line:Math.min(evidence.end_line,evidence.start_line+199)};
     const query=new URLSearchParams({entry:this.state.lldDetail?.entry_id || '',evidence:evidence.id,start_line:String(evidence.start_line),end_line:String(evidence.end_line)});
     if(selection.parentHld)query.set('parent_hld',selection.parentHld);
@@ -269,7 +270,7 @@ class ReviewWorkspace {
       if(generation!==this.generation || detailGeneration!==this.lldDetailGeneration || token!==this.lldSourceGeneration)return;
       validateLldResponse(value,{reviewId,...selection,scopeVersion:this.state.lld?.scope_version});
       if(value.evidence_id!==evidence.id || value.commit!==evidence.commit || value.path!==evidence.path || value.blob_id!==(evidence.blob_id || evidence.blob) || value.start_line!==evidence.start_line || !Number.isSafeInteger(value.end_line) || value.end_line<value.start_line || value.end_line>evidence.end_line || typeof value.text!=='string')throw new Error('LLD source does not match the selected immutable evidence');
-      this.state.lldSource={...value,evidence_id:evidence.id};return this.state.lldSource;
+      this.state.lldSource={...value,evidence_id:evidence.id,truncated:Boolean(value.truncated || value.end_line<requestedEnd)};return this.state.lldSource;
     } catch(error) {
       if(generation===this.generation && token===this.lldSourceGeneration && error.name!=='AbortError')this.state.lldError=error.message;
     } finally {
@@ -755,6 +756,30 @@ function focusLldDetail(payload={}) {
   return {...payload,baseline:project(payload.baseline),proposal:project(payload.proposal),focus:true};
 }
 
+// A bounded view of actual nodes and edges, never a contracted execution path.
+function focusLldFlowWindow(payload,comparison,{offsets={},size=6,full=false,nodeId=null}={}){
+  const paired=LldSourcePairView.rows(comparison,payload),canLocate=paired.paired && !comparison.baseline.truncated && !comparison.proposal.truncated;
+  const sides={},projected={...payload};
+  for(const side of ['baseline','proposal']){
+    const detail=payload[side];if(!detail)continue;
+    const graph=detail.graph || {},edges=graph.edges || [],nodes=(graph.nodes || []).filter(item=>item.operation!=='unknown_exit'||edges.some(edge=>edge.from===item.id||edge.to===item.id));
+    const changedLines=canLocate?paired.rows.filter(row=>row.kind!=='same').map(row=>row[side==='baseline'?'beforeLine':'afterLine']).filter(line=>line!==null):[];
+    let changedIndex=-1;
+    for(const line of changedLines){
+      const candidates=nodes.flatMap((item,index)=>['entry','exit'].includes(item.operation)?[]:lldEvidence(detail,item).filter(evidence=>evidence.start_line<=line && evidence.end_line>=line).map(evidence=>({index,width:evidence.end_line-evidence.start_line})));
+      candidates.sort((left,right)=>left.width-right.width||left.index-right.index);
+      if(candidates.length){changedIndex=candidates[0].index;break;}
+    }
+    const anchor=nodeId?nodes.findIndex(item=>item.id===nodeId):-1;
+    const requested=offsets[side] ?? Math.max(0,(anchor>=0?anchor:changedIndex)-2);
+    const start=full?0:Math.min(Math.max(0,requested),Math.max(0,nodes.length-1)),visible=full?nodes:nodes.slice(start,start+size),ids=new Set(visible.map(item=>item.id));
+    const retainedEdges=edges.filter(edge=>ids.has(edge.from)&&ids.has(edge.to)),crossing=edges.filter(edge=>ids.has(edge.from)!==ids.has(edge.to)).length;
+    sides[side]={start,end:start+visible.length,total:nodes.length,crossing,omittedEdges:edges.length-retainedEdges.length,localized:changedIndex>=0,changedStart:Math.max(0,changedIndex-2)};
+    projected[side]={...detail,graph:{...graph,focus_window:true,nodes:visible,edges:retainedEdges,regions:(graph.regions || []).filter(region=>visible.some(item=>item.region_id===region.id))}};
+  }
+  return {payload:projected,sides,full};
+}
+
 function lldSafeLabel(value) {
   return String(value ?? '').slice(0,180).replace(/[\r\n\t]+/g,' ').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/["|{}\[\]`\\]/g,' ').replace(/javascript:/gi,'');
 }
@@ -768,7 +793,7 @@ function lldGraphView(payload = {}, mode = 'combined') {
 function lldMermaid(payload = {}, mode = 'combined') {
   const lines=['flowchart TD'], views=lldGraphView(payload,mode), inventory=[];
   for(const view of views) {
-    const graph=view.detail.graph || {}, nodes=(graph.nodes || []).slice(0,200).filter(item=>item.operation!=='unknown_exit'||(graph.edges || []).some(edge=>edge.from===item.id||edge.to===item.id)), ids=new Map(nodes.map((item,index)=>[item.id,`lld${inventory.length+index}`]));
+    const graph=view.detail.graph || {}, nodes=(graph.nodes || []).slice(0,200).filter(item=>graph.focus_window || item.operation!=='unknown_exit'||(graph.edges || []).some(edge=>edge.from===item.id||edge.to===item.id)), ids=new Map(nodes.map((item,index)=>[item.id,`lld${inventory.length+index}`]));
     lines.push(`subgraph ${view.side}["${view.side === 'baseline'?'Baseline':'Proposal'} · ${nodes.length?'Static local control flow':'Declaration structure'}"]`);
     const drawNode=item=>{
       const status=view.side==='baseline'?'before':'after', uncertainty=item.resolution==='unknown'||String(item.resolution).includes('unresolved')||String(item.operation).startsWith('unsupported');
@@ -1191,18 +1216,79 @@ class LldCatalogView {
 class LldSourcePairView {
   constructor({node}) {this.node=node;this.host=null;this.comparison=undefined;this.presence='';}
   clear() {this.host?.replaceChildren();this.host=null;this.comparison=undefined;this.presence='';}
-  render(host,comparison,payload) {
-    const presence=`${Boolean(payload.baseline)}|${Boolean(payload.proposal)}`;
+  static correspondence(payload) {
+    const before=payload.baseline?.entry,after=payload.proposal?.entry;
+    if(!before || !after)return false;
+    const asserted=(payload.delta?.correspondence || []).some(item=>item.resolution==='user_assertion' && ['rename','move'].includes(item.kind) && item.from_ids?.length===1 && item.to_ids?.length===1 && item.from_ids[0]===before.id && item.to_ids[0]===after.id);
+    return asserted || (before.kind===after.kind && before.logical_key===after.logical_key && before.parent?.state==='matched' && after.parent?.state==='matched' && before.parent.component_id===after.parent.component_id && !(payload.delta?.ambiguous_groups>0));
+  }
+  static rows(comparison,payload,scope=null) {
+    const before=comparison?.baseline,after=comparison?.proposal;
+    const paired=Boolean(before && after && LldSourcePairView.correspondence(payload));
+    const numberRows=rows=>{let left=before?.start_line,right=after?.start_line;return rows.map(row=>({...row,beforeLine:row.before===null?null:left++,afterLine:row.after===null?null:right++}));};
+    const bounded=code=>code.text.split('\n').slice(0,code.end_line-code.start_line+1).join('\n');
+    let rows=paired?numberRows(diffLines(bounded(before),bounded(after))):[];
+    if(!scope)return {rows,paired,baseline:before,proposal:after};
+    const {side,evidence,source}=scope,own=comparison?.[side],field=side==='baseline'?'beforeLine':'afterLine';
+    const exact=source && evidence && source.evidence_id===evidence.id && source.commit===evidence.commit && source.path===evidence.path && source.blob_id===(evidence.blob_id || evidence.blob) && source.start_line===evidence.start_line && source.end_line<=evidence.end_line;
+    if(!exact)return {rows:[],paired:false,baseline:null,proposal:null,message:'No retained source for this step. Another revision is never substituted.'};
+    const end=Math.min(source.end_line,evidence.end_line),start=source.start_line;
+    const covered=paired && own.commit===source.commit && own.path===source.path && own.blob_id===source.blob_id && own.start_line<=start && own.end_line>=end && !before.truncated && !after.truncated;
+    if(covered) {
+      const indices=rows.flatMap((row,index)=>row[field]>=start && row[field]<=end?[index]:[]);
+      if(indices.length){
+        let first=indices[0],last=indices.at(-1);
+        while(first>0 && rows[first].kind!=='same' && rows[first-1].kind!=='same')first--;
+        while(last+1<rows.length && rows[last].kind!=='same' && rows[last+1].kind!=='same')last++;
+        const selected=rows.slice(first,last+1);
+        // A partial edit block has no proven opposite scope. Do not pull in adjacent operations.
+        if(selected.every(row=>row[field]===null || (row[field]>=start && row[field]<=end))){
+          const slice=(code,key)=>{const lines=selected.map(row=>row[key]).filter(line=>line!==null);return lines.length?{...code,start_line:Math.min(...lines),end_line:Math.max(...lines)}:null;};
+          return {rows:selected,paired:true,baseline:slice(before,'beforeLine'),proposal:slice(after,'afterLine'),message:selected.every(row=>row.kind==='same')?'Unchanged in this scope. Execution-path equivalence is unverified.':'Exact selected lines and their text-diff counterpart. Execution-path equivalence is unverified.'};
+        }
+      }
+    }
+    const text=source.text.split('\n').slice(0,end-start+1).join('\n');
+    return {rows:[],paired:false,baseline:side==='baseline'?{...source,text}:null,proposal:side==='proposal'?{...source,text}:null,message:'Counterpart scope unavailable or unproven. Selected exact source is shown without addition/removal claims.'};
+  }
+  render(host,comparison,payload,{mode='split',scope=null}={}) {
+    const presence=[Boolean(payload.baseline),Boolean(payload.proposal),LldSourcePairView.correspondence(payload),mode,scope?.side,scope?.evidence?.id,scope?.source?.text].join('|');
     if(this.host===host && this.comparison===comparison && this.presence===presence)return;
-    this.host=host;this.comparison=comparison;this.presence=presence;host.replaceChildren();if(!comparison)return;
-    const node=this.node,rows=diffLines(comparison.baseline?.text || '',comparison.proposal?.text || '');
-    for(const [side,code] of [['Baseline',comparison.baseline],['Proposal',comparison.proposal]]){
-      const section=node('section');section.append(node('strong','',`${side}${code?.truncated?' · bounded excerpt':''}`));
-      if(code){section.append(node('p','mono',`${code.path}:${code.start_line}-${code.end_line} · ${code.commit ? String(code.commit).slice(0,8) : 'unavailable'}`));const pre=node('pre','lld-exact-code');let line=code.start_line;for(const row of rows.filter(row=>side==='Baseline'?row.kind!=='added':row.kind!=='removed')){const kind=row.kind==='modified'?(side==='Baseline'?'removed':'added'):row.kind,text=side==='Baseline'?row.before:row.after;pre.append(node('span',`diff-line ${kind}`,`${line++} ${kind==='added'?'+':kind==='removed'?'-':' '} ${text}\n`));}section.append(pre);}
-      else section.append(node('p','status',payload[side.toLowerCase()]?'No retained source is available for this declaration.':side==='Baseline'?'Absent in baseline.':'Absent in proposal.'));
+    this.host=host;this.comparison=comparison;this.presence=presence;host.replaceChildren();if(!comparison && !scope)return;
+    host.dataset.diffMode=mode;
+    const node=this.node,model=LldSourcePairView.rows(comparison,payload,scope);
+    const line=(pre,kind,beforeLine,afterLine,text)=>pre.append(node('span',`diff-line ${kind}`,`${String(beforeLine??'').padStart(5)} ${String(afterLine??'').padStart(5)} ${kind==='added'?'+':kind==='removed'?'-':' '} ${text}\n`));
+    const makeCode=label=>{const pre=node('pre','lld-exact-code');pre.tabIndex=0;pre.setAttribute('role','region');pre.setAttribute('aria-label',label);return pre;};
+    if(model.message)host.append(node('p','lld-diff-note',model.message));
+    if(mode==='unified' && model.paired){
+      const section=node('section','lld-unified'),pre=makeCode('Unified scoped diff, original before and after line numbers');
+      for(const [side,title] of [['baseline','Before'],['proposal','After']]){const code=model[side];if(code)section.append(node('p','mono',`${title} · ${code.path}:${code.start_line}-${code.end_line} · ${scope?String(code.commit || '').slice(0,8):code.commit}`));}
+      for(let index=0;index<model.rows.length;){
+        const row=model.rows[index];
+        if(row.kind==='same'){line(pre,'same',row.beforeLine,row.afterLine,row.before);index++;continue;}
+        const start=index;while(index<model.rows.length&&model.rows[index].kind!=='same')index++;
+        for(let current=start;current<index;current++){const edit=model.rows[current];if(edit.before!==null)line(pre,'removed',edit.beforeLine,null,edit.before);}
+        for(let current=start;current<index;current++){const edit=model.rows[current];if(edit.after!==null)line(pre,'added',null,edit.afterLine,edit.after);}
+      }
+      section.append(pre);host.append(section);
+    }else for(const [side,title,field] of [['baseline','Before','before'],['proposal','After','after']]){
+      const code=model[side],section=node('section');section.append(node('strong','',`${title}${code?.truncated?' · bounded excerpt':''}`));
+      if(code){
+        section.append(node('p','mono',`${code.path}:${code.start_line}-${code.end_line} · ${scope?String(code.commit || 'unavailable').slice(0,8):code.commit || 'unavailable'}`));
+        const pre=makeCode(`${title} exact source, original line numbers`);
+        if(model.paired)for(const row of model.rows){if(row[field]===null)continue;line(pre,row.kind==='modified'?(side==='baseline'?'removed':'added'):row.kind,side==='baseline'?row.beforeLine:null,side==='proposal'?row.afterLine:null,row[field]);}
+        else code.text.split('\n').slice(0,code.end_line-code.start_line+1).forEach((text,index)=>line(pre,'same',side==='baseline'?code.start_line+index:null,side==='proposal'?code.start_line+index:null,text));
+        section.append(pre);
+      }else section.append(node('p','status',scope?'No proven counterpart source in this scope.':payload[side]?'No retained source is available for this declaration.':'Counterpart not observed; absence is not established.'));
       host.append(section);
     }
-    for(const error of comparison.errors)host.append(node('p','status',`Source unavailable: ${error}`));
+    if(scope){
+      const evidence=node('details','lld-scoped-identity');evidence.append(node('summary','','Source evidence'));
+      for(const [side,title] of [['baseline','Before'],['proposal','After']]){const code=model[side];if(code)evidence.append(node('p','mono',`${title} · ${code.path}:${code.start_line}-${code.end_line} · commit ${code.commit} · blob ${code.blob_id} · evidence ${code.evidence_id}`));}
+      if(scope.evidence)evidence.append(node('p','mono',`Selected step evidence ${scope.evidence.id} · ${scope.evidence.path}:${scope.evidence.start_line}-${scope.evidence.end_line}`));
+      host.append(evidence);
+    }
+    for(const error of comparison?.errors || [])host.append(node('p','status',`Source unavailable: ${error}`));
   }
 }
 
@@ -1222,7 +1308,7 @@ async function workspaceHttpError(response) {
   return error;
 }
 
-if (typeof module !== 'undefined') module.exports = {focusHldPayload, focusLldCatalog, focusLldDetail, ReviewWorkspace, workspaceHttpError, clearHldEvidence, clearLldEvidence, clearReviewEvidence, LldCatalogView, LldSourcePairView, graphItems, filterGraphItems, clusterEdges, mergeGraphs, diffLines, architectureMeaning, architectureAreas, architectureMermaid, hldOutcome, hldExportAllowed, hldComparison, hldDiagramElements, hldMermaid, hldEvidenceFor, hldCorrection, validateLldResponse, lldOutcome, lldCatalogRows, lldMermaid, lldEvidence, LLD_INITIAL_SCALE, observationAge, filterChangedFiles, diagramScale, parseScopePaths, summarizeReviewState, classifyFinding, groupFindings, encodeWorkspaceRoute, decodeWorkspaceRoute, resolvePublicWorkspaceRoute, betaFeedbackRecord, importBetaFeedback, BetaFeedbackDraft};
+if (typeof module !== 'undefined') module.exports = {focusHldPayload, focusLldCatalog, focusLldDetail, focusLldFlowWindow, ReviewWorkspace, workspaceHttpError, clearHldEvidence, clearLldEvidence, clearReviewEvidence, LldCatalogView, LldSourcePairView, graphItems, filterGraphItems, clusterEdges, mergeGraphs, diffLines, architectureMeaning, architectureAreas, architectureMermaid, hldOutcome, hldExportAllowed, hldComparison, hldDiagramElements, hldMermaid, hldEvidenceFor, hldCorrection, validateLldResponse, lldOutcome, lldCatalogRows, lldMermaid, lldEvidence, LLD_INITIAL_SCALE, observationAge, filterChangedFiles, diagramScale, parseScopePaths, summarizeReviewState, classifyFinding, groupFindings, encodeWorkspaceRoute, decodeWorkspaceRoute, resolvePublicWorkspaceRoute, betaFeedbackRecord, importBetaFeedback, BetaFeedbackDraft};
 if (typeof window !== 'undefined') Object.assign(window, {ReviewWorkspace, encodeWorkspaceRoute, decodeWorkspaceRoute});
 
 if (typeof document !== 'undefined' && document.getElementById('session-form')) {
@@ -1259,6 +1345,9 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
   let lastLldInspectorKey = '', activeLldEvidence = null, lldInvariantId = null;
   let lldBaselineEntry = null, lldCorrespondence = 'rename', lldCorrespondenceId = null;
   let lldActiveSourcePromise = null, lldActiveSourceKey = null;
+  let focusLldRecord=null,focusLldOrigin=null,focusLldDiffMode='unified';
+  let focusLldWindow={offsets:{},full:false},focusLldWindowKey='',focusLldWindowSource=null;
+  let focusLldNavigationFocus=null;
   let mermaidLoading = null;
   let architectureGeneration = 0;
   let lastArchitectureKey = '';
@@ -1347,8 +1436,12 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
     const active=reviewMode==='focus'&&designLevel==='hld'&&layout==='architecture'&&!$('review-content').hidden&&document.body.dataset.view==='inspection';
     if(focusDesk.active!==active)++hldSourceGeneration;
     document.body.classList.toggle('focus-desk-active',active);
+    const lldActive=reviewMode==='focus'&&designLevel==='lld'&&layout==='architecture'&&!$('review-content').hidden&&document.body.dataset.view==='inspection';
+    document.body.classList.toggle('focus-lld-active',lldActive);
+    if(!active)focusDesk.activate(false);
+    syncFocusLldLayout(lldActive);
     document.querySelector('.review-heading').classList.toggle('focus-desk-heading',active);
-    focusDesk.activate(active);
+    if(active)focusDesk.activate(true);
     return active;
   }
   focusedHldNarrow.addEventListener('change',()=>{
@@ -1368,13 +1461,47 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
   document.addEventListener('pointerdown',event=>{if(!legend.contains(event.target))closeLegend();});
   // Move the existing controls, preserving their handlers, IDs and restore positions.
   const focusHeaderHomes=new Map();
+  const focusLldHomes=new Map();
+  let focusLldLayoutActive=false;
+  function syncFocusLldLayout(active){
+    if(!active){
+      if(!focusLldLayoutActive)return;focusLldLayoutActive=false;
+      for(const [element,home] of focusLldHomes)if(element.parentNode!==home.parentNode)home.after(element);
+      for(const id of ['lld-focus-toolbar','lld-focus-evidence','lld-focus-catalog','lld-focus-status'])if($(id))$(id).hidden=true;
+      const metadata=$('lld-focus-metadata');if(metadata?.childElementCount){metadata.replaceChildren();delete metadata.dataset.detail;}
+      for(const [id,label] of [['lld-combined','Unified'],['lld-compare','Split'],['lld-baseline','Baseline'],['lld-proposal','Proposal']])if($(id).textContent!==label)$(id).textContent=label;
+      $('lld-inspector').hidden=false;return;
+    }
+    focusLldLayoutActive=true;
+    if(!$('lld-focus-toolbar')){
+      const toolbar=node('div','lld-focus-toolbar');toolbar.id='lld-focus-toolbar';
+      const label=node('label','','Declaration'),picker=node('select');picker.id='lld-focus-declaration';picker.setAttribute('aria-label','Declaration to inspect');label.append(picker);toolbar.append(label);
+      picker.addEventListener('change',()=>{const row=lldCatalogRows(workspace.state.lld).find(row=>row.id===picker.value);if(row)openLldEntry(row.id,row.entry);});
+      const path=node('span','mono');path.id='lld-focus-path';toolbar.append(path);
+      const catalog=node('details','lld-focus-catalog');catalog.id='lld-focus-catalog';catalog.append(node('summary','','Catalog'));
+      const catalogBody=node('div','lld-focus-disclosure-body');catalogBody.id='lld-focus-catalog-body';catalog.append(catalogBody);
+      const evidence=node('details','lld-focus-evidence');evidence.id='lld-focus-evidence';evidence.append(node('summary','','Evidence'));
+      const evidenceBody=node('div','lld-focus-disclosure-body');evidenceBody.id='lld-focus-evidence-body';evidence.append(evidenceBody);
+      const metadata=node('div','lld-focus-metadata');metadata.id='lld-focus-metadata';evidenceBody.append(metadata);
+      const disclosures=node('div','lld-focus-disclosures');disclosures.append(catalog,evidence);toolbar.append(disclosures);
+      const status=node('p','status');status.id='lld-focus-status';status.hidden=true;status.setAttribute('role','status');$('lld-review').prepend(toolbar,status);
+    }
+    for(const id of ['lld-focus-toolbar','lld-focus-evidence','lld-focus-catalog'])$(id).hidden=false;
+    const move=(element,host)=>{if(!element)return;if(!focusLldHomes.has(element)){const home=document.createComment('LLD Standard home');element.before(home);focusLldHomes.set(element,home);}if(element.parentNode!==host)host.append(element);};
+    move(document.querySelector('.lld-catalog'),$('lld-focus-catalog-body'));
+    const evidence=$('lld-focus-evidence-body');
+    for(const element of [$('lld-parent-identity'),document.querySelector('.lld-profile'),$('lld-coverage'),$('lld-changes'),$('lld-history'),$('lld-full-identity').closest('details'),$('lld-reload').parentElement,$('lld-mermaid-source'),$('lld-acceptance'),$('lld-summary'),document.querySelector('#lld-review .design-breadcrumbs'),document.querySelector('.review-commits')])move(element,evidence);
+    const controls=document.querySelector('#lld-review .architecture-controls') || [...focusHeaderHomes.keys()].find(item=>item.getAttribute('aria-label')==='LLD comparison mode');
+    move(controls,$('lld-focus-toolbar'));
+    for(const [id,label] of [['lld-combined','Before / After'],['lld-compare','Before / After'],['lld-baseline','Before'],['lld-proposal','After']])if($(id).textContent!==label)$(id).textContent=label;
+  }
   function syncFocusHeader(){
-    const bar=document.querySelector('.topbar'),enabled=reviewMode==='focus'&&!$('review-content').hidden,desk=syncFocusDesk();
+    const bar=document.querySelector('.topbar'),enabled=reviewMode==='focus'&&!$('review-content').hidden,desk=syncFocusDesk()||document.body.classList.contains('focus-lld-active');
     const heading=document.querySelector('.review-heading'),essential=$('essential-review-status');
     const controls=document.querySelector(`#${designLevel==='lld'?'lld':'hld'}-review .architecture-controls`) || [...focusHeaderHomes.keys()].find(item=>item.getAttribute('aria-label')===`${designLevel==='lld'?'LLD':'HLD'} comparison mode`);
     const wanted=enabled?(desk?[document.querySelector('.design-levels')]:[heading,essential,document.querySelector('.design-levels'),controls]).filter(Boolean):[];
     for(const [element,home] of focusHeaderHomes)if(!wanted.includes(element)&&!(desk&&element===essential)&&element.parentNode!==home.parentNode)home.after(element);
-    if(desk&&essential){if(!focusHeaderHomes.has(essential)){const home=document.createComment('Focus status home');essential.before(home);focusHeaderHomes.set(essential,home);}if(essential.parentNode!==heading)heading.append(essential);}
+    if(desk&&essential){if(!focusHeaderHomes.has(essential)){const home=document.createComment('Focus status home');essential.before(home);focusHeaderHomes.set(essential,home);}const target=document.body.classList.contains('focus-lld-active')?$('lld-focus-evidence-body'):heading;if(essential.parentNode!==target)target.append(essential);}
     for(const element of wanted){if(!focusHeaderHomes.has(element)){const home=document.createComment('Focus control home');element.before(home);focusHeaderHomes.set(element,home);}if(element.parentNode!==bar)bar.append(element);}
     bar.classList.toggle('focus-review-header',enabled);if(!enabled)closeLegend();
     const status=$('essential-review-status');if(status&&status.title!==status.textContent)status.title=status.textContent;
@@ -2080,11 +2207,11 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
 
   function ensureMermaid() {
     if (mermaidLoading) return mermaidLoading;
-    mermaidLoading=new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=publicStatic?publicTransport.assetURL('mermaid.js'):'/assets/mermaid.js';script.onload=()=>{if(!window.mermaid){reject(new Error('Local Mermaid renderer unavailable'));return;}window.mermaid.initialize({startOnLoad:false,securityLevel:'strict',theme:'base',fontFamily:'ui-monospace, SFMono-Regular, Menlo, monospace',themeVariables:{background:'#101214',primaryColor:'#20252c',primaryTextColor:'#edf0f4',primaryBorderColor:'#718094',lineColor:'#8b99ad',tertiaryColor:'#171a1e'},flowchart:{htmlLabels:false,curve:'basis',useMaxWidth:false,wrappingWidth:320,nodeSpacing:32,rankSpacing:56,padding:18},maxTextSize:20000});resolve(window.mermaid);};script.onerror=()=>reject(new Error('Local Mermaid renderer could not load'));document.head.append(script);});
+    mermaidLoading=new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=publicStatic?publicTransport.assetURL('mermaid.js'):'/assets/mermaid.js';script.onload=()=>{if(!window.mermaid){reject(new Error('Local Mermaid renderer unavailable'));return;}window.mermaid.initialize({startOnLoad:false,securityLevel:'strict',theme:'base',fontFamily:'ui-monospace, SFMono-Regular, Menlo, monospace',themeVariables:{fontFamily:'ui-monospace, SFMono-Regular, Menlo, monospace',fontSize:'14px',background:'#101214',primaryColor:'#20252c',primaryTextColor:'#edf0f4',primaryBorderColor:'#718094',lineColor:'#8b99ad',tertiaryColor:'#171a1e'},flowchart:{htmlLabels:false,curve:'basis',useMaxWidth:false,wrappingWidth:320,nodeSpacing:32,rankSpacing:56,padding:18},maxTextSize:20000});resolve(window.mermaid);};script.onerror=()=>reject(new Error('Local Mermaid renderer could not load'));document.head.append(script);});
     return mermaidLoading;
   }
 
-  function mountDiagramViewport(frame, host, svg, {initialMode = 1,initialSelector = null,hint = 'Select a component to inspect code. Scroll the canvas to pan.',maximumFitScale=Infinity} = {}) {
+  function mountDiagramViewport(frame, host, svg, {initialMode = 1,initialSelector = null,hint = 'Select a component to inspect code. Scroll the canvas to pan.',maximumFitScale=Infinity,minimumFitScale=0} = {}) {
     if (!svg) return;
     const bounds = svg.viewBox.baseVal;
     if (!(bounds.width > 0 && bounds.height > 0)) return;
@@ -2098,7 +2225,7 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
     const apply = () => {
       if (!host.clientWidth) return;
       scale = mode === 'overview'
-        ? Math.min(maximumFitScale,diagramScale(bounds.width, host.clientWidth), diagramScale(bounds.height, host.clientHeight))
+        ? Math.max(minimumFitScale,Math.min(maximumFitScale,diagramScale(bounds.width, host.clientWidth), diagramScale(bounds.height, host.clientHeight)))
         : diagramScale(bounds.width, host.clientWidth, mode);
       svg.setAttribute('width', String(Math.round(bounds.width * scale)));
       svg.setAttribute('height', String(Math.round(bounds.height * scale)));
@@ -2213,7 +2340,7 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
     if(!lldParentHld){workspace.state.lldError='An exact HLD parent is required for LLD. Reload after confirming repository context.';workspace.emit();return;}
     const generation=workspace.generation;
     await workspace.loadLldCatalog({parentHld:lldParentHld,component:lldComponent,cursor});
-    if(publicStatic&&reviewMode!=='focus'&&!cursor&&!lldElement&&designLevel==='lld'&&generation===workspace.generation){
+    if((publicStatic || reviewMode==='focus')&&!cursor&&!lldElement&&designLevel==='lld'&&generation===workspace.generation){
       const payload=workspace.state.lld;
       const changed=new Set((payload?.delta?.changes||[]).flatMap(change=>[change.baseline_entry_id,change.proposal_entry_id]));
       const first=lldCatalogRows(presentationFilter('changedFunctions')?focusLldCatalog(payload):payload).find(row=>['function','method'].includes(row.entry.kind)&&(changed.has(row.id)||changed.has(row.baseline?.id)));
@@ -2226,16 +2353,19 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
   function renderLld(state) {
     if(designLevel!=='lld')return;
     const payload=state.lld,detail=state.lldDetail;
+    syncFocusDesk();
+    if(!detail){focusLldRecord=null;renderFocusLldMetadata(null);if(reviewMode==='focus')$('lld-inspector').hidden=true;}
     const versions=[state.hld?.baseline,state.hld?.proposal,state.hld?.accepted].filter(Boolean),parent=versions.find(version=>version.id===lldParentHld),component=parent?.elements.find(item=>item.id===lldComponent);
     $('lld-component-name').textContent=component?.name||lldComponent||'Authorized inventory';
     $('lld-parent-identity').textContent=`baseline ${short(payload?.baseline?.snapshot || analysisBaseline(state.details || {}))} → proposal ${short(payload?.proposal?.snapshot || state.details?.proposal)} · scope ${short(payload?.scope_version)} · ${lldParentHld?'selected HLD component':'all authorized declarations'}`;
     $('lld-full-identity').textContent=`review ${state.reviewId} · scope ${payload?.scope_version || 'unavailable'} · HLD ${lldParentHld || 'unmapped inventory'} · component ${lldComponent || 'all authorized'} · baseline catalog ${payload?.baseline?.id || 'unavailable'} · proposal catalog ${payload?.proposal?.id || 'unavailable'} · selected entry ${lldElement || 'none'} · baseline detail ${detail?.baseline?.id || 'none'} · proposal detail ${detail?.proposal?.id || 'none'}`;
     $('lld-summary').textContent=state.loading.has('lld')?'Loading authorized LLD inventory…':state.loading.has('lld-detail')?'Loading selected implementation…':state.lldError?`LLD unavailable: ${state.lldError}`:payload?lldOutcome(detail?.delta || payload.delta):'No authorized LLD catalog loaded.';
+    if(reviewMode==='focus'&&$('lld-focus-status')){const status=$('lld-focus-status');status.hidden=Boolean(payload&&!state.lldError&&!state.loading.has('lld')&&!state.loading.has('lld-detail'));status.textContent=status.hidden?'':$('lld-summary').textContent;}
     $('lld-reload').disabled=state.loading.has('lld');
     $('lld-load-history').hidden=publicStatic || !lldElement || !payload;$('lld-load-history').disabled=state.loading.has('lld-history');
     renderLldHistory(state.lldHistory);
     if(!payload){$('lld-confirmation-preview').hidden=true;$('lld-confirmation-preview').firstElementChild.textContent='';$('lld-invariant').value='';$('lld-known-gaps').checked=false;$('lld-activate-default').checked=false;}
-    for(const mode of ['combined','compare','baseline','proposal']){$('lld-'+mode).classList.toggle('active',hldMode===mode);$('lld-'+mode).setAttribute('aria-pressed',String(hldMode===mode));}
+    for(const mode of ['combined','compare','baseline','proposal']){const selected=reviewMode==='focus'&&mode==='combined'?['combined','compare','accepted'].includes(hldMode):hldMode===mode;$('lld-'+mode).classList.toggle('active',selected);$('lld-'+mode).setAttribute('aria-pressed',String(selected));}
     const exportAllowed=Boolean((detail || payload)?.can_export || (detail || payload)?.export_allowed);
     $('lld-mermaid').disabled=!detail || !exportAllowed;$('lld-export').disabled=!payload || !exportAllowed;
     if(publicStatic){$('lld-export').disabled=true;$('lld-export').title='Only the published full review Markdown is available.';}
@@ -2254,7 +2384,7 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
       $('lld-inspector').replaceChildren();$('lld-detail-breadcrumb').textContent='';return;
     }
     const changes=$('lld-changes');changes.replaceChildren();
-    if(presentationFilter('changedFunctions')&&payload&&!lldCatalogRows(focusLldCatalog(payload)).some(row=>row.id===lldElement)){
+    if(reviewMode!=='focus'&&presentationFilter('changedFunctions')&&payload&&!lldCatalogRows(focusLldCatalog(payload)).some(row=>row.id===lldElement)){
       ++architectureGeneration;lastLldKey='';lastLldInspectorKey='';$('lld-diagrams').replaceChildren(node('p','status',focusLldCatalog(payload).entries.length?'Select a changed function.':'No changed functions in the loaded inventory. Other declarations remain in Standard.'));$('lld-inspector').replaceChildren();return;
     }
     if(detail) {
@@ -2263,7 +2393,12 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
       else changes.append(node('p','status',lldOutcome(detail.delta)));
       if(hldMode==='combined')changes.append(node('p','mono','Diff retains each snapshot’s local graph. Semantic classifications above do not imply runtime equivalence or a matched execution path.'));
     }
-    const key=[state.reviewId,payload?.scope_version,lldParentHld,lldComponent,detail?.baseline?.id,detail?.proposal?.id,detail?.delta?.id,hldMode,reviewMode,JSON.stringify(preferences?.filters())].join('|');
+    if(reviewMode==='focus'&&detail){
+      const windowKey=[detail.baseline?.id,detail.proposal?.id].join('|');
+      if(windowKey!==focusLldWindowKey){focusLldWindowKey=windowKey;focusLldWindow={offsets:{},full:false};focusLldWindowSource=null;}
+      if(focusLldWindowSource!==state.lldSourceComparison){focusLldWindowSource=state.lldSourceComparison;if(!Object.keys(focusLldWindow.offsets).length&&!focusLldRecord)lastLldKey='';}
+    }
+    const key=[state.reviewId,payload?.scope_version,lldParentHld,lldComponent,detail?.baseline?.id,detail?.proposal?.id,detail?.delta?.id,hldMode,reviewMode,JSON.stringify(preferences?.filters()),reviewMode==='focus'?JSON.stringify(focusLldWindow):''].join('|');
     if(!detail){if(lastLldKey!==key){++architectureGeneration;lastLldKey=key;$('lld-diagrams').replaceChildren();}lastLldInspectorKey='';activeLldEvidence=null;lldSourcePairView.clear();$('lld-inspector').replaceChildren(node('p','status',state.loading.has('lld-detail')?'Loading exact implementation evidence…':'Select a module, type or function from the authorized inventory.'));$('lld-acceptance').hidden=true;$('lld-detail-breadcrumb').textContent='';$('lld-confirmation-preview').hidden=true;$('lld-confirmation-preview').firstElementChild.textContent='';return;}
     if(lastLldKey!==key){lastLldKey=key;renderLldDiagrams(detail);}
     renderLldInspector(detail);
@@ -2288,9 +2423,14 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
   }
 
   function renderLldCatalog(payload) {
-    if(presentationFilter('changedFunctions')&&payload){if(focusCatalogSource!==payload){focusCatalogSource=payload;focusCatalogProjection=focusLldCatalog(payload);}payload=focusCatalogProjection;}
+    if(reviewMode!=='focus'&&presentationFilter('changedFunctions')&&payload){if(focusCatalogSource!==payload){focusCatalogSource=payload;focusCatalogProjection=focusLldCatalog(payload);}payload=focusCatalogProjection;}
     lldCatalogView.render(payload,{query:lldQuery,selection:lldElement,loading:workspace.state.loading.has('lld')});
-    if(presentationFilter('changedFunctions')&&payload)$('lld-catalog-status').textContent=`${payload.entries.length} changed functions${payload.next_cursor?' · more available':''}`;
+    if(reviewMode!=='focus'&&presentationFilter('changedFunctions')&&payload)$('lld-catalog-status').textContent=`${payload.entries.length} changed functions${payload.next_cursor?' · more available':''}`;
+    if(reviewMode==='focus'&&$('lld-focus-declaration')){
+      const picker=$('lld-focus-declaration'),rows=lldCatalogRows(payload),key=rows.map(row=>row.id).join('|');
+      if(picker.dataset.catalog!==key){picker.dataset.catalog=key;picker.replaceChildren();const empty=node('option','','Select a declaration');empty.value='';picker.append(empty);for(const row of rows){const option=node('option','',`${row.entry.name} · ${row.entry.kind} · ${row.status || row.entry.detail_state}`);option.value=row.id;picker.append(option);}}
+      picker.value=lldElement || '';$('lld-focus-path').textContent=rows.find(row=>row.id===lldElement)?.entry.path || '';
+    }
   }
 
   function renderLldHistory(history) {
@@ -2301,6 +2441,8 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
 
   async function openLldEntry(id,entry = null,{remember = true} = {}) {
     $('lld-inspector').classList.remove('source-open');
+    focusLldRecord=null;focusLldOrigin=null;
+    focusLldWindow={offsets:{},full:false};focusLldWindowKey='';focusLldWindowSource=null;
     lldElement=id;lldDetail=['file','module','import'].includes(entry?.kind)?'module':['type','struct','enum','trait','impl','type_alias','field','variant'].includes(entry?.kind)?'type':'function';lldNode=null;lldPinned=false;lldBaselineEntry=null;lldCorrespondenceId=null;activeLldEvidence=null;++lldSourceRequest;clearTimeout(lldSourceTimer);
     lastLldInspectorKey='';$('lld-invariant').value='';$('lld-known-gaps').checked=false;$('lld-activate-default').checked=false;lldInvariantId=null;
     $('lld-confirmation-status').textContent='Preview is required before confirmation.';
@@ -2309,18 +2451,20 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
 
   async function renderLldDiagrams(payload) {
     const generation=++architectureGeneration;diagramObservers.splice(0).forEach(observer=>observer.disconnect());
-    const modes=hldMode==='compare'?['baseline','proposal']:[hldMode==='accepted'?'combined':hldMode],container=$('lld-diagrams');container.replaceChildren();container.classList.toggle('compare',modes.length===2);
-    const diagramPayload=presentationFilter('collapseValues')?focusLldDetail(payload):payload;
+    const focus=reviewMode==='focus',modes=focus?(hldMode==='baseline'||hldMode==='proposal'?[hldMode]:['baseline','proposal']):hldMode==='compare'?['baseline','proposal']:[hldMode==='accepted'?'combined':hldMode],container=$('lld-diagrams');container.replaceChildren();container.classList.toggle('compare',modes.length===2);
+    const windowView=focus?focusLldFlowWindow(payload,workspace.state.lldSourceComparison,{...focusLldWindow,nodeId:lldNode}):null;
+    const diagramPayload=focus?windowView.payload:presentationFilter('collapseValues')?focusLldDetail(payload):payload;
     const sources=modes.map(mode=>({mode,...lldMermaid(diagramPayload,mode)}));
-    $('lld-mermaid-source').firstElementChild.textContent=(payload.can_export || payload.export_allowed)?sources.map(item=>`## ${item.mode}\n\n\`\`\`mermaid\n${item.source}\n\`\`\``).join('\n\n'):'';
+    $('lld-mermaid-source').firstElementChild.textContent=(payload.can_export || payload.export_allowed)?sources.map(item=>`## ${item.mode}${focus?' · full retained graph':''}\n\n\`\`\`mermaid\n${focus?lldMermaid(payload,item.mode).source:item.source}\n\`\`\``).join('\n\n'):'';
     try {
       const renderer=await ensureMermaid();if(generation!==architectureGeneration||designLevel!=='lld')return;
       for(const item of sources) {
         await renderer.parse(item.source);const rendered=await renderer.render(`csb-lld-${generation}-${item.mode}`,item.source);if(generation!==architectureGeneration||designLevel!=='lld')return;
-        const frame=node('section','architecture-frame');frame.append(node('h4','',item.mode==='combined'?(presentationFilter('collapseValues')?'Control-flow comparison · values collapsed':'LLD PR comparison'):item.mode));const host=node('div','architecture-svg lld-svg');host.innerHTML=rendered.svg;frame.append(host);container.append(frame);const svg=host.querySelector('svg');svg?.setAttribute('aria-label',`${item.mode} static local control flow`);
+        const frame=node('section','architecture-frame');frame.append(node('h4','',focus?(item.mode==='baseline'?'Before':'After'):item.mode==='combined'?(presentationFilter('collapseValues')?'Control-flow comparison · values collapsed':'LLD PR comparison'):item.mode));const host=node('div','architecture-svg lld-svg');host.innerHTML=rendered.svg;frame.append(host);container.append(frame);const svg=host.querySelector('svg');svg?.setAttribute('aria-label',`${item.mode} static local control flow`);
+        if(focus&&windowView.sides[item.mode])mountFocusLldNavigation(frame,item.mode,windowView.sides[item.mode],windowView);
         let initialIndex=item.nodes.findIndex(record=>record.node.id===lldNode);if(initialIndex<0)initialIndex=item.nodes.findIndex(record=>record.side===(item.mode==='baseline'?'baseline':'proposal') && (record.node.operation==='entry' || record.entry?.id===record.detail.entry.id));if(initialIndex<0)initialIndex=0;
         if(item.nodes[initialIndex])host.dataset.initialDesignNode=item.nodes[initialIndex].node.id;
-        mountDiagramViewport(frame,host,svg,{initialMode:LLD_INITIAL_SCALE,initialSelector:`g.node[id*="flowchart-lld${initialIndex}-"]`,hint:'Select a step to inspect code. Scroll the canvas to pan.'});
+        mountDiagramViewport(frame,host,svg,{initialMode:focus?'overview':LLD_INITIAL_SCALE,maximumFitScale:focus?1:Infinity,minimumFitScale:focus ? .75 : 0,initialSelector:focus?null:`g.node[id*="flowchart-lld${initialIndex}-"]`,hint:focus?'Select a step to inspect its exact source. Omitted steps are not absent.':'Select a step to inspect code. Scroll the canvas to pan.'});
         host.querySelectorAll('g.node').forEach(graphNode=>{
           const match=graphNode.id.match(/-flowchart-lld(\d+)-/),record=match?item.nodes[Number(match[1])]:null;if(!record)return;
           graphNode.dataset.lldNode=record.node.id;graphNode.dataset.lldSide=record.side;graphNode.setAttribute('tabindex','0');graphNode.setAttribute('role','button');graphNode.setAttribute('aria-label',`${record.side}: ${record.node.label}. ${record.node.resolution}. Inspect exact source.`);graphNode.setAttribute('aria-current',String(record.node.id===lldNode));
@@ -2328,20 +2472,46 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
           const preview=()=>{if(reviewMode==='focus')return;if(lldPinned&&lldNode!==record.node.id)return;showLldNode(record,evidence,false);};
           graphNode.addEventListener('pointerenter',()=>{clearTimeout(lldSourceTimer);lldSourceTimer=setTimeout(preview,100);});graphNode.addEventListener('focus',preview);
           graphNode.addEventListener('pointerleave',()=>{clearTimeout(lldSourceTimer);if(!lldPinned){++lldSourceRequest;++workspace.lldSourceGeneration;workspace.state.lldSource=null;host.querySelectorAll('.lld-node-source').forEach(item=>item.remove());}});
-          const pin=()=>record.entry && record.entry.id!==record.detail.entry.id?openLldEntry(record.entry.id,record.entry):showLldNode(record,evidence,true);graphNode.addEventListener('click',pin);graphNode.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();pin();}else if(event.key==='Escape'){lldPinned=false;lldNode=null;activeLldEvidence=null;++lldSourceRequest;++workspace.lldSourceGeneration;workspace.state.lldSource=null;host.querySelectorAll('.lld-node-source').forEach(item=>item.remove());rememberRoute();renderLldInspector(workspace.state.lldDetail);}});
+          const pin=()=>{focusLldOrigin=graphNode;return record.entry && record.entry.id!==record.detail.entry.id?openLldEntry(record.entry.id,record.entry):showLldNode(record,evidence,true);};graphNode.addEventListener('click',pin);graphNode.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();pin();}else if(event.key==='Escape'){event.preventDefault();closeFocusLldSource();}});
           if(lldNode===record.node.id && lldPinned)showLldNode(record,evidence,true,{remember:false});
         });
       }
+      if(focus&&focusLldNavigationFocus){const target=focusLldNavigationFocus;focusLldNavigationFocus=null;const nav=container.querySelector(`[data-flow-side="${target.side}"]`);(nav?.querySelector(`[data-flow-action="${target.action}"]:not(:disabled)`) || nav?.querySelector('button:not(:disabled)'))?.focus();}
     } catch(error){if(generation!==architectureGeneration)return;lastLldKey='';container.replaceChildren(node('p','status',`Local diagram unavailable: ${error.message}. Declaration facts and exact source evidence remain available.`));}
+  }
+
+  function mountFocusLldNavigation(frame,side,scope,view){
+    const controls=node('nav','lld-flow-navigation');controls.dataset.flowSide=side;controls.setAttribute('aria-label',`${side} flow window`);
+    controls.append(node('span','',`${scope.total?scope.start+1:0}–${scope.end} of ${scope.total} steps`));
+    const navigate=(offset,full=false,action='changed')=>{
+      const selected=lldNode;if(lldPinned)closeFocusLldSource();
+      focusLldWindow={offsets:{...focusLldWindow.offsets,[side]:offset},full};
+      const next=focusLldFlowWindow(workspace.state.lldDetail,workspace.state.lldSourceComparison,focusLldWindow);
+      lldNode=['baseline','proposal'].some(name=>next.payload[name]?.graph?.nodes.some(item=>item.id===selected))?selected:null;
+      focusLldNavigationFocus={side,action};
+      lastLldKey='';renderLld(workspace.state);rememberRoute();
+    };
+    for(const [label,offset,disabled] of [['Previous',Math.max(0,scope.start-6),scope.start===0||view.full],['Next',scope.start+6,scope.end>=scope.total||view.full]]){
+      const button=node('button','quiet',label);button.type='button';button.dataset.flowAction=label.toLowerCase();button.disabled=disabled;button.onclick=()=>navigate(offset,false,label.toLowerCase());controls.append(button);
+    }
+    if(scope.localized){const changed=node('button','quiet','Changed lines');changed.type='button';changed.dataset.flowAction='changed';changed.onclick=()=>navigate(scope.changedStart);controls.append(changed);}
+    const full=node('button','quiet',view.full?'Bounded flow':'Full flow');full.type='button';full.dataset.flowAction='full';full.setAttribute('aria-pressed',String(view.full));full.onclick=()=>navigate(scope.start,!view.full,'full');controls.append(full);frame.prepend(controls);
+    frame.append(node('p','lld-flow-scope',view.full?'Full retained local graph. Static syntax only.':`${scope.total-(scope.end-scope.start)} steps omitted · ${scope.omittedEdges} edges omitted (${scope.crossing} crossing). No inferred connections.${scope.localized?'':' Changed lines unavailable; browse windows.'}`));
   }
 
   async function showLldNode(record,evidence,pin,{remember = true} = {}) {
     if(!workspace.state.lldDetail || designLevel!=='lld')return;
+    focusLldRecord=record;
+    if(reviewMode==='focus'){for(const id of ['lld-focus-evidence','lld-focus-catalog'])if($(id))$(id).open=false;}
+    if(reviewMode==='focus'&&!$('lld-diagrams').querySelector(`[data-lld-node="${CSS.escape(record.node.id)}"]`)){
+      const nodes=workspace.state.lldDetail[record.side]?.graph?.nodes || [],index=nodes.findIndex(item=>item.id===record.node.id);
+      if(index>=0){focusLldWindow={offsets:{...focusLldWindow.offsets,[record.side]:Math.max(0,index-2)},full:false};lastLldKey='';renderLld(workspace.state);}
+    }
     lldNode=record.node.id;lldDetail='flow';if(pin)lldPinned=true;activeLldEvidence=evidence || null;
     $('lld-diagrams').querySelectorAll('g.node[data-lld-node]').forEach(item=>item.setAttribute('aria-current',String(item.dataset.lldNode===lldNode)));
     $('lld-diagrams').querySelectorAll('.lld-node-source').forEach(item=>item.remove());
     if(remember&&pin)rememberRoute();
-    if(pin&&reviewMode==='focus'){$('lld-inspector').classList.add('source-open');renderLldInspector(workspace.state.lldDetail);$('lld-source-pair')?.scrollIntoView({block:'nearest'});}
+    if(pin&&reviewMode==='focus'){$('lld-inspector').classList.add('source-open');renderLldInspector(workspace.state.lldDetail);$('lld-scoped-title')?.focus();$('lld-inspector').scrollIntoView({block:'nearest'});}
     if(!evidence){$('lld-source-status').textContent='This operation has no retained source evidence. Another revision is never substituted.';return;}
     const token=++lldSourceRequest,key=[workspace.generation,workspace.lldDetailGeneration,evidence.id].join('|');
     let promise=lldActiveSourceKey===key?lldActiveSourcePromise:null;
@@ -2358,8 +2528,72 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
     const body=node('div','lld-box-preview');body.setAttribute('xmlns','http://www.w3.org/1999/xhtml');body.append(node('strong','',`${side} · ${source.path}:${source.start_line} · ${short(source.commit)}`),node('pre','',source.text.split('\n').slice(0,6).join('\n')));preview.append(body);target.append(preview);
   }
 
+  function closeFocusLldSource(){
+    const origin=focusLldOrigin || [...$('lld-diagrams').querySelectorAll('[data-lld-node]')].find(item=>item.dataset.lldNode===lldNode);
+    lldPinned=false;lldNode=null;focusLldRecord=null;activeLldEvidence=null;++lldSourceRequest;++workspace.lldSourceGeneration;
+    workspace.state.lldSource=null;clearTimeout(lldSourceTimer);workspace.cancelLldRequests(['lld-hover']);
+    $('lld-inspector').classList.remove('source-open');$('lld-diagrams').querySelectorAll('.lld-node-source').forEach(item=>item.remove());
+    $('lld-diagrams').querySelectorAll('[aria-current=true]').forEach(item=>item.setAttribute('aria-current','false'));
+    rememberRoute();if(reviewMode==='focus')renderFocusLldInspector(workspace.state.lldDetail);else renderLldInspector(workspace.state.lldDetail);
+    if(origin?.isConnected){const disclosure=origin.closest('details');if(disclosure)disclosure.open=true;origin.focus();}else $('lld-focus-declaration')?.focus();
+  }
+  $('lld-inspector').addEventListener('keydown',event=>{if(event.key==='Escape'&&reviewMode==='focus'){event.preventDefault();closeFocusLldSource();}});
+  function renderFocusLldInspector(payload){
+    const container=$('lld-inspector'),selected=payload?.proposal || payload?.baseline;
+    container.hidden=!lldPinned || !focusLldRecord;
+    if(!selected || container.hidden){container.replaceChildren();lldSourcePairView.clear();lastLldInspectorKey='';return;}
+    const key=['focus',payload.baseline?.id,payload.proposal?.id].join('|');
+    if(lastLldInspectorKey!==key){
+      lastLldInspectorKey=key;container.replaceChildren();
+      const toolbar=node('header','lld-diff-toolbar'),title=node('h3');title.id='lld-scoped-title';title.tabIndex=-1;toolbar.append(title);
+      const modes=node('nav','diff-modes');modes.setAttribute('aria-label','Scoped diff display');
+      for(const mode of ['unified','split']){const button=node('button','',mode==='unified'?'Unified':'Split');button.type='button';button.dataset.lldDiff=mode;button.onclick=()=>{focusLldDiffMode=mode;renderFocusLldInspector(workspace.state.lldDetail);};modes.append(button);}
+      const close=node('button','','Close');close.type='button';close.setAttribute('aria-label','Close scoped diff');close.onclick=closeFocusLldSource;toolbar.append(modes,close);container.append(toolbar);
+      const status=node('p','status');status.id='lld-source-status';status.setAttribute('role','status');
+      const pair=node('div','lld-source-pair');pair.id='lld-source-pair';container.append(status,pair);
+    }
+    $('lld-scoped-title').textContent=focusLldRecord.node.label || focusLldRecord.node.operation || selected.entry.name;
+    container.querySelectorAll('[data-lld-diff]').forEach(button=>{const active=button.dataset.lldDiff===focusLldDiffMode;button.setAttribute('aria-pressed',String(active));button.classList.toggle('active',active);});
+    const source=workspace.state.lldSource?.evidence_id===activeLldEvidence?.id?workspace.state.lldSource:null;
+    $('lld-source-status').textContent=workspace.state.loading.has('lld-source')?'Loading selected source…':workspace.state.lldError?`Source unavailable: ${workspace.state.lldError}`:source?`${source.path}:${source.start_line}-${source.end_line} · ${focusLldRecord.side} · ${source.truncated?'bounded excerpt · ':''}original line numbers`:'No retained source for this step.';
+    lldSourcePairView.render($('lld-source-pair'),workspace.state.lldSourceComparison,payload,{mode:focusLldDiffMode,scope:{side:focusLldRecord.side,evidence:activeLldEvidence,source}});
+  }
+  function renderFocusLldMetadata(payload){
+    const host=$('lld-focus-metadata');if(!host)return;
+    const key=[payload?.baseline?.id,payload?.proposal?.id,payload?.delta?.id].join('|');if(host.dataset.detail===key)return;host.dataset.detail=key;host.replaceChildren();
+    if(!payload)return;
+    host.append(node('p','status','Static local syntax only. Missing or collapsed paths are not proven absent; runtime behavior remains unverified.'));
+    const label=node('label','','Step evidence'),select=node('select');select.setAttribute('aria-label','Inspect retained step evidence');const empty=node('option','','Select a step');empty.value='';select.append(empty);
+    const records=['baseline','proposal'].flatMap(side=>{const detail=payload[side];return detail?(detail.graph?.nodes || []).map(node=>({side,detail,node})):[];}).filter(record=>lldEvidence(record.detail,record.node).length);
+    records.forEach((record,index)=>{const option=node('option','',`${record.side} · ${record.node.label}`);option.value=String(index);select.append(option);});
+    select.onchange=()=>{if(select.value==='')return;const record=records[Number(select.value)];focusLldOrigin=select;showLldNode(record,lldEvidence(record.detail,record.node)[0],true);};label.append(select);host.append(label);
+    for(const [side,detail] of [['Before',payload.baseline],['After',payload.proposal]])if(detail){host.append(node('h4','',`${side} · ${detail.entry.name}`),node('p','mono',`${detail.entry.path}:${detail.entry.start_line}-${detail.entry.end_line} · ${detail.entry.visibility}`));for(const limitation of detail.entry.limitations || [])host.append(node('p','status',limitation));}
+    appendLldCorrespondenceControls(host,payload);
+    for(const [label,accepted] of [['As-built',payload.accepted],['Intended',payload.accepted_intended]])if(accepted)appendHldList(host,`${label} recorded assertions`,[...(accepted.design?.lld?.invariants || []).map(item=>`${item.statement} · ${item.resolution} · ${item.verification}`),`Original commit ${accepted.observed_design?.snapshot || 'unavailable'} · runtime claim remains unverified`]);
+    for(const [side,detail] of [['baseline',payload.baseline],['proposal',payload.proposal]])if(detail)for(const evidence of lldEvidence(detail)){
+      const button=node('button','quiet',`${side} declaration source · ${evidence.path}:${evidence.start_line}-${evidence.end_line}`);button.type='button';button.onclick=()=>{focusLldOrigin=button;showLldNode({side,detail,node:{id:detail.entry.id,label:detail.entry.name}},evidence,true);};host.append(button);
+    }
+  }
+  function appendLldCorrespondenceControls(container,payload){
+    if(!payload.proposal || publicStatic)return;
+    const fields=node('div','hld-confirm-fields'),label=node('label','','Reviewer correspondence'),select=node('select');select.id='lld-baseline-counterpart';const automatic=node('option','','Automatic unique qualified correspondence');automatic.value='';select.append(automatic);
+    const candidates=[...new Map(lldCatalogRows(workspace.state.lld).filter(row=>row.baseline?.kind===payload.proposal.entry.kind).map(row=>[row.baseline.id,row.baseline])).values()];
+    for(const candidate of candidates){const option=node('option','',`${candidate.name} · ${candidate.container || candidate.module} · ${candidate.path}:${candidate.start_line}`);option.value=candidate.id;select.append(option);}
+    if(lldBaselineEntry&&!candidates.some(item=>item.id===lldBaselineEntry)){const option=node('option','',`${lldBaselineEntry} · pinned authorized selection`);option.value=lldBaselineEntry;select.append(option);}select.value=lldBaselineEntry || '';label.append(select);fields.append(label);
+    const kindLabel=node('label','','Correspondence assertion'),kind=node('select');kind.id='lld-correspondence-kind';for(const value of ['rename','move']){const option=node('option','',value==='rename'?'Rename':'Move');option.value=value;kind.append(option);}kind.value=lldCorrespondence;kind.disabled=!lldBaselineEntry;kindLabel.append(kind);fields.append(kindLabel);container.append(fields,node('p','mono','Correspondence is an explicit reviewer assertion. It links occurrences and does not establish equivalent behavior. Candidates come only from the loaded authorized catalog.'));
+    select.addEventListener('change',async()=>{lldBaselineEntry=select.value || null;lldCorrespondence='rename';lldCorrespondenceId=null;lldNode=null;lldPinned=false;focusLldRecord=null;activeLldEvidence=null;++lldSourceRequest;invalidateLldConfirmation();rememberRoute();await workspace.loadLldDetail(lldElement,{baselineEntry:lldBaselineEntry,correspondenceKind:lldCorrespondence});});
+    kind.addEventListener('change',async()=>{lldCorrespondence=kind.value;invalidateLldConfirmation();rememberRoute();await workspace.loadLldDetail(lldElement,{baselineEntry:lldBaselineEntry,correspondenceKind:lldCorrespondence});});
+  }
   function renderLldInspector(payload) {
     if(!payload)return;
+    if(reviewMode==='focus'){
+      renderFocusLldMetadata(payload);renderFocusLldInspector(payload);
+      $('lld-detail-breadcrumb').textContent=`/ ${(payload.proposal || payload.baseline).entry.name}`;
+      $('lld-acceptance').hidden=!payload.can_accept;$('lld-confirm').disabled=!payload.can_accept || !workspace.state.lldPreview;
+      $('lld-confirm-side').querySelector('[value="baseline"]').disabled=!payload.baseline;$('lld-confirm-side').querySelector('[value="proposal"]').disabled=!payload.proposal;if(!payload[$('lld-confirm-side').value])$('lld-confirm-side').value=payload.proposal?'proposal':'baseline';
+      return;
+    }
+    $('lld-inspector').hidden=false;
     const selected=payload.proposal || payload.baseline,key=[payload.baseline?.id,payload.proposal?.id,payload.accepted?.accepted_id,payload.accepted_intended?.accepted_id,payload.accepted_status,hldMode,reviewMode,JSON.stringify(preferences?.filters())].join('|'),container=$('lld-inspector');
     if(lastLldInspectorKey!==key){
       lastLldInspectorKey=key;container.replaceChildren();
@@ -2368,15 +2602,7 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
       $('lld-detail-breadcrumb').textContent=`/ ${selected.entry.module} / ${selected.entry.name}`;
       const facts=node('div','hld-facts');
       for(const [side,detail] of hldMode==='baseline'?[['Baseline',payload.baseline]]:hldMode==='proposal'?[['Proposal',payload.proposal]]:[['Baseline',payload.baseline],['Proposal',payload.proposal]]){const section=node('section');section.append(node('strong','',side));if(!detail)section.append(node('p','',side==='Baseline'?'Added in proposal.':'Removed from proposal.'));else{section.append(node('pre','lld-signature',detail.entry.signature),node('p','mono',`${detail.entry.visibility} · ${detail.entry.start_line}-${detail.entry.end_line} · parent ${detail.entry.parent?.state}`));for(const limitation of detail.entry.limitations || [])section.append(node('p','status',limitation));}facts.append(section);}container.append(facts);
-      if(payload.proposal&&!publicStatic){
-        const fields=node('div','hld-confirm-fields'),label=node('label','','Reviewer correspondence'),select=node('select');select.id='lld-baseline-counterpart';const automatic=node('option','','Automatic unique qualified correspondence');automatic.value='';select.append(automatic);
-        const candidates=[...new Map(lldCatalogRows(workspace.state.lld).filter(row=>row.baseline?.kind===payload.proposal.entry.kind).map(row=>[row.baseline.id,row.baseline])).values()];
-        for(const candidate of candidates){const option=node('option','',`${candidate.name} · ${candidate.container || candidate.module} · ${candidate.path}:${candidate.start_line}`);option.value=candidate.id;select.append(option);}
-        if(lldBaselineEntry&&!candidates.some(item=>item.id===lldBaselineEntry)){const option=node('option','',`${lldBaselineEntry} · pinned authorized selection`);option.value=lldBaselineEntry;select.append(option);}select.value=lldBaselineEntry || '';label.append(select);fields.append(label);
-        const kindLabel=node('label','','Correspondence assertion'),kind=node('select');kind.id='lld-correspondence-kind';for(const value of ['rename','move']){const option=node('option','',value==='rename'?'Rename':'Move');option.value=value;kind.append(option);}kind.value=lldCorrespondence;kind.disabled=!lldBaselineEntry;kindLabel.append(kind);fields.append(kindLabel);container.append(fields,node('p','mono','Correspondence is an explicit reviewer assertion. It links occurrences and does not establish equivalent behavior. Candidates come only from the loaded authorized catalog.'));
-        select.addEventListener('change',async()=>{lldBaselineEntry=select.value || null;lldCorrespondence='rename';lldCorrespondenceId=null;lldNode=null;lldPinned=false;activeLldEvidence=null;++lldSourceRequest;invalidateLldConfirmation();rememberRoute();await workspace.loadLldDetail(lldElement,{baselineEntry:lldBaselineEntry,correspondenceKind:lldCorrespondence});});
-        kind.addEventListener('change',async()=>{lldCorrespondence=kind.value;invalidateLldConfirmation();rememberRoute();await workspace.loadLldDetail(lldElement,{baselineEntry:lldBaselineEntry,correspondenceKind:lldCorrespondence});});
-      }
+      appendLldCorrespondenceControls(container,payload);
       {
       const children=selected.declarations || [];if(children.length){container.append(node('h4','','Declarations'));for(const entry of children.slice(0,100)){const button=node('button','quiet lld-child',`${entry.kind} · ${entry.name}`);button.type='button';button.addEventListener('click',()=>openLldEntry(entry.id,entry));container.append(button);}}
       appendHldList(container,'Possible callers',(payload.delta?.possible_callers || []).map(item=>`${item.logical_key} · ${item.resolution} · ${item.classification}`));
@@ -2397,10 +2623,11 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
     $('lld-confirm-side').querySelector('[value="baseline"]').disabled=!payload.baseline;$('lld-confirm-side').querySelector('[value="proposal"]').disabled=!payload.proposal;if(!payload[$('lld-confirm-side').value])$('lld-confirm-side').value=payload.proposal?'proposal':'baseline';
   }
 
-  function clearHldView() {++architectureGeneration;++hldSourceGeneration;lastHldKey='';hldCorrections=[];hldCorrectionDesignId=null;focusedHldBoundary=null;focusHldScopes=[];focusHldView=null;clearHldEvidence(document);focusDesk.empty(workspace.state.loading.has('hld')?'Loading commit-bound HLD evidence…':workspace.state.hldError?`HLD unavailable: ${workspace.state.hldError}`:'No authorized HLD evidence loaded.');}
+  function clearHldView() {++architectureGeneration;++hldSourceGeneration;lastHldKey='';hldCorrections=[];hldCorrectionDesignId=null;focusedHldBoundary=null;focusHldScopes=[];focusHldView=null;clearHldEvidence(document);focusDesk.empty(workspace.state.loading.has('hld')?'Loading HLD…':workspace.state.hldError?`HLD unavailable: ${workspace.state.hldError}`:'No authorized HLD evidence.',{retry:Boolean(workspace.state.hldError)});}
 
   function clearLldView() {
     ++architectureGeneration;++lldSourceRequest;clearTimeout(lldSourceTimer);lastLldKey='';lastLldInspectorKey='';lldNode=null;lldPinned=false;activeLldEvidence=null;lldActiveSourcePromise=null;lldActiveSourceKey=null;lldInvariantId=null;lldCorrespondenceId=null;lldBaselineEntry=null;lldParentHld=null;lldComponent=null;lldElement=null;lldDetail=null;lldQuery='';
+    focusLldRecord=null;focusLldOrigin=null;renderFocusLldMetadata(null);
     lldCatalogView.clear();lldSourcePairView.clear();clearLldEvidence(document);
   }
 
@@ -2489,17 +2716,17 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
 
   async function renderFocusDeskCanvas(payload,modes,generation) {
     const container=$('hld-diagrams'),view=focusHldView;
-    if(!view?.selected){container.append(node('p','status','No high-level boundary change established in the covered scope. Coverage may be incomplete. Settings can include shared relationships.'));return;}
+    if(!view?.selected){container.append(node('p','status','No boundary changes found in scope.'));return;}
     const styles=getComputedStyle(document.documentElement),token=name=>styles.getPropertyValue(name).trim();
     const palette={panel:token('--panel2'),text:token('--text'),line:token('--line'),green:token('--green'),red:token('--red'),amber:token('--amber'),muted:token('--muted'),accent:token('--blue')};
     const records=[];
     for(const mode of modes){
       if(generation!==architectureGeneration||!focusDesk.active)return;
       const diagram=window.WorkspaceFocusModel.diagram(payload,view.scopes,view.selected,mode,{narrow:focusedHldNarrow.matches,palette,selection:hldSelection});
-      const frame=node('section','architecture-frame'),heading=node('h4','',({baseline:'Before',proposal:'Proposal',combined:'Observation change map',accepted:'Accepted architecture'}[mode]||mode));
+      const frame=node('section','architecture-frame'),heading=node('h4','',({baseline:'Before',proposal:'Proposal',combined:'Change map',accepted:'Accepted architecture'}[mode]||mode));
       heading.append(node('span','mono',short(payload[mode]?.snapshot||payload.proposal?.snapshot)));
       const host=node('div','architecture-svg');frame.append(heading,host);container.append(frame);records.push({mode,source:diagram.source});
-      host.append(node('p','status','Loading authorized Mermaid diagram…'));
+      host.append(node('p','status','Loading diagram…'));
       try{
         const renderer=await ensureMermaid();if(generation!==architectureGeneration||!focusDesk.active)return;
         const rendered=await renderer.render(`csb-focus-${generation}-${mode}`,diagram.source);if(generation!==architectureGeneration||!focusDesk.active)return;
@@ -2507,7 +2734,7 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
         mountDiagramViewport(frame,host,svg,{initialMode:'overview',maximumFitScale:1,hint:'Structural references only; runtime behavior is unverified.'});
         focusDesk.decorateNodes(host,diagram.nodes,hldSelection);
       }catch(error){if(generation===architectureGeneration)host.replaceChildren(node('p','status',`Diagram unavailable: ${error.message}. Exact source evidence remains inspectable.`));}
-      if(!diagram.connected)frame.append(node('p','focus-desk-absence','No matching reference observed in this snapshot. This does not establish absence outside the covered scope.'));
+      if(!diagram.connected)frame.append(node('p','focus-desk-absence','No reference observed in this snapshot. Coverage may be partial.'));
     }
     if(generation===architectureGeneration&&hldExportAllowed(payload,hldMode))$('hld-mermaid-source').firstElementChild.textContent=records.map(item=>`## ${view.selected.source.name} · ${item.mode} · boundaries ${view.start+1}–${view.start+view.scopes.length} of ${view.total}\n\n\`\`\`mermaid\n${item.source}\n\`\`\``).join('\n\n');
   }
@@ -2550,7 +2777,7 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
     container.replaceChildren();
     const baseline=(hldMode==='accepted'?payload.accepted:payload.baseline)?.elements?.find(item=>item.id===hldSelection), proposal=payload.proposal?.elements?.find(item=>item.id===hldSelection);
     const selected=(hldMode==='baseline'||hldMode==='accepted'?baseline:proposal||baseline);
-    if(!selected){if(focusDesk.active)focusDesk.emptyInspector(focusKey,'No element evidence for this selection in the chosen snapshot. Not observed does not establish architectural absence. Choose another boundary or comparison view.');else container.append(node('p','status','Select a component to inspect its authorized design evidence.'));return;}
+    if(!selected){if(focusDesk.active)focusDesk.emptyInspector(focusKey,'No element evidence in this snapshot. Choose another boundary or comparison.');else container.append(node('p','status','Select a component to inspect its authorized design evidence.'));return;}
     container.append(node('h3','',selected.name),node('p','status',`${selected.kind} · ${selected.id}`));
     const parentVersion=hldMode==='accepted'?payload.accepted:hldMode==='baseline'?payload.baseline:proposal?payload.proposal:payload.baseline;
     const parentComponent=selected.kind==='component'?selected:parentVersion?.elements.find(element=>element.id===selected.component_id&&element.kind==='component');
@@ -2558,7 +2785,7 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
     const facts=node('div','hld-facts');
     for(const [label,element] of hldMode==='accepted'?[['Accepted',baseline]]:hldMode==='baseline'?[['Baseline',baseline]]:hldMode==='proposal'?[['Proposal',proposal]]:[['Baseline',baseline],['Proposal',proposal]]) {
       const section=node('section');section.append(node('strong','',label));
-      if(!element)section.append(node('p','',label==='Baseline'?'Added in proposal.':'Removed from proposal.'));
+      if(!element)section.append(node('p','',focusDesk.active?'Not observed in this snapshot.':label==='Baseline'?'Added in proposal.':'Removed from proposal.'));
       else { section.append(node('p','',element.responsibility||'Responsibility not established.'),node('p','mono',(element.roots||[]).join(', ')||'Owning paths unknown.')); appendHldList(section,'Observed facts',(element.facts||[]).filter(fact=>fact.resolution!=='user_assertion').map(fact=>`${String(fact.kind).replaceAll('_',' ')}: ${fact.value} · ${fact.resolution}`)); appendHldList(section,'User assertions',[...(element.user_assertions||[]).map(value=>typeof value==='string'?value:JSON.stringify(value)),...(element.facts||[]).filter(fact=>fact.resolution==='user_assertion').map(fact=>`${fact.kind}: ${fact.value}`)]); }
       facts.append(section);
     }

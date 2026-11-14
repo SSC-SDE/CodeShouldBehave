@@ -5,6 +5,36 @@ copied into this repository. Branch: `phase-6`; PR base: `main`.
 The standalone landing-page publication below uses `codex/public-landing`;
 it does not advance, merge or activate the Phase 6 App implementation.
 
+## 2026-11-14 — approved minimal Focus review implementation
+
+Owner approved HLD B (wide canvas) and the hybrid LLD flow-first design, then
+authorized implementation and merge. Work starts on `feat/minimal-focus-review`
+from merged main `1d21f8b5368797720e5f4bdff668ebb19f756b06`.
+
+- HLD: Standard typography, concise scope-aware copy, no permanent sidebar,
+  compact boundary selection and on-demand evidence.
+- LLD: implementation flow first; selecting a step opens scoped Unified/Split
+  source comparison with original line numbers and red/green highlights.
+  Unchanged, unmatched and unavailable evidence remain distinct.
+- Moria: preserve the original artwork and palette; add restrained fire,
+  embers and staff glow with Live/Still/Off, reduced-motion and hidden-tab handling.
+- Standard/Ring, source authorization and deployment budget limits stay intact.
+
+Local implementation verified against PR53's immutable public report. HLD empty
+and populated shared-context views, evidence disclosure, Standard/Ring preservation,
+LLD exact source scopes (baseline421 vs proposal423 unchanged; baseline422–426 vs
+proposal424 changed), Unified/Split, keyboard close, bounded flow navigation and
+390px layout passed browser inspection. Original Moria text remains 34,679
+characters; Live advances, Still stops animation and Off hides it.
+
+Large real flows use six retained nodes per snapshot with omission counts,
+pagination and Full flow; no connecting edges are invented. A strict-CSP font
+measurement mismatch was corrected in trusted CSS so diagram labels are not clipped.
+Checks passed: 28 HLD/preferences tests, 142 initial related workspace tests,
+52 final LLD tests, two workspace asset tests and JavaScript syntax checks.
+The source-text-only new assertion was removed in favor of actual browser proof.
+Source merge and signed release promotion are pending. Demo PR53 remains draft.
+
 ## 2026-11-14 — HLD-first check entry correction
 
 Owner reported that the hosted report still opened LLD. The publisher hardcoded
