@@ -534,6 +534,13 @@ fn asset(name: &str) -> Option<(&'static [u8], &'static str)> {
             "application/json",
         ),
         "workspace.css" => (include_bytes!("../workspace.css"), "text/css"),
+        "workspace-standard.js" => (
+            include_bytes!("../workspace-standard.js"),
+            "text/javascript",
+        ),
+        "workspace-standard.css" => (include_bytes!("../workspace-standard.css"), "text/css"),
+        "workspace-ring.js" => (include_bytes!("../workspace-ring.js"), "text/javascript"),
+        "workspace-ring.css" => (include_bytes!("../workspace-ring.css"), "text/css"),
         "workspace-focus-model.js" => (
             include_bytes!("../workspace-focus-model.js"),
             "text/javascript",
@@ -1006,6 +1013,10 @@ mod tests {
         assert!(asset("../app.sqlite").is_none());
         assert!(asset("workspace-unpublished.js").is_none());
         for (name, content_type) in [
+            ("workspace-standard.js", "text/javascript"),
+            ("workspace-standard.css", "text/css"),
+            ("workspace-ring.js", "text/javascript"),
+            ("workspace-ring.css", "text/css"),
             ("workspace-focus-model.js", "text/javascript"),
             ("workspace-focus.js", "text/javascript"),
             ("workspace-focus.css", "text/css"),

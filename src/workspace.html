@@ -10,6 +10,8 @@
   <link rel="stylesheet" href="/assets/workspace-focus.css">
   <link rel="stylesheet" href="/assets/workspace-moria-palette.css">
   <link rel="stylesheet" href="/assets/workspace-moria.css">
+  <link rel="stylesheet" href="/assets/workspace-standard.css">
+  <link rel="stylesheet" href="/assets/workspace-ring.css">
 </head>
 <body>
   <a class="skip-link" href="#review-content">Skip to review</a>
@@ -21,6 +23,7 @@
       <button type="submit">Connect</button>
     </form>
     <nav id="review-mode-switch" class="review-mode-switch" aria-label="Review mode" hidden><button id="mode-standard" type="button" aria-pressed="true">Standard</button><button id="mode-focus" type="button" aria-pressed="false">Focus</button></nav>
+    <button id="workspace-ring-pause" type="button" aria-pressed="false">Pause Ring</button>
     <span class="brand-manifesto">AI WROTE IT. PROVE IT WORKS.</span><button id="command-open" class="command-trigger" type="button">Commands <kbd>⌘ K</kbd></button>
     <a id="onboarding-link" href="/onboarding" hidden>Repository context</a>
     <button id="open-feedback" class="quiet" type="button">Send feedback</button>
@@ -211,6 +214,8 @@
   <script src="/assets/workspace-focus-model.js"></script>
   <script src="/assets/workspace-focus.js"></script>
   <script src="/assets/workspace-moria.js"></script>
+  <script src="/assets/workspace-standard.js"></script>
+  <script src="/assets/workspace-ring.js"></script>
   <script src="/assets/workspace.js"></script>
 </body>
 </html>

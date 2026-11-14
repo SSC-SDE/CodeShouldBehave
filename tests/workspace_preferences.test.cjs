@@ -44,3 +44,33 @@ test('Moria artwork remains validated colored text with relative same-origin ass
   const invalid=structuredClone(artwork);change(invalid);assert.throws(()=>validateArtwork(invalid));
  }
 });
+
+test('Ring v1 migration keeps Focus, ordering, and the existing browser storage key',async()=>{
+ const legacy=defaults(registry);legacy.theme='blueprint';legacy.defaultMode='focus';
+ legacy.modes.standard.widths.left=280;legacy.modes.focus.visibility.focusBackdrop=false;
+ for(const mode of Object.values(legacy.modes)){delete mode.visibility.ringBackdrop;mode.order.main=mode.order.main.filter(id=>id!=='ringBackdrop').reverse();}
+ const before=structuredClone(legacy);validate(legacy,registry);
+ for(const name of ['standard','focus']){
+  assert.equal(legacy.modes[name].visibility.ringBackdrop,name==='standard');
+  const expected=structuredClone(before.modes[name]);expected.visibility.ringBackdrop=name==='standard';expected.order.main.push('ringBackdrop');
+  assert.deepEqual(legacy.modes[name],expected);
+ }
+ assert.equal(legacy.theme,'blueprint');assert.equal(legacy.defaultMode,'focus');
+ const once=structuredClone(legacy);validate(legacy,registry);assert.deepEqual(legacy,once);
+ legacy.modes.standard.visibility.ringBackdrop=false;legacy.modes.focus.visibility.ringBackdrop=true;
+ validate(legacy,registry);assert.equal(legacy.modes.standard.visibility.ringBackdrop,false);assert.equal(legacy.modes.focus.visibility.ringBackdrop,true);
+ const memory=new Map([['csb.workspace-preferences.v1',JSON.stringify(before)]]);
+ const store=new Store(registry,{storage:{getItem:k=>memory.get(k),setItem:(k,v)=>memory.set(k,v)}});
+ await store.load();await store.save(store.document);
+ assert.deepEqual([...memory.keys()],['csb.workspace-preferences.v1']);
+ assert.deepEqual(JSON.parse(memory.get('csb.workspace-preferences.v1')),once);
+ for(const invalid of ['yes',null,1]){const bad=defaults(registry);bad.modes.standard.visibility.ringBackdrop=invalid;assert.throws(()=>validate(bad,registry));}
+ const duplicate=defaults(registry);duplicate.modes.standard.order.main.push('ringBackdrop');assert.throws(()=>validate(duplicate,registry));
+});
+test('oldest v1 preferences acquire both backdrops without resetting or accepting new versions',()=>{
+ const legacy=defaults(registry);
+ for(const mode of Object.values(legacy.modes)){for(const id of ['focusBackdrop','ringBackdrop'])delete mode.visibility[id];mode.order.main=mode.order.main.filter(id=>!['focusBackdrop','ringBackdrop'].includes(id));}
+ validate(legacy,registry);
+ assert.deepEqual(legacy,defaults(registry));
+ legacy.version=2;assert.throws(()=>validate(legacy,registry));
+});

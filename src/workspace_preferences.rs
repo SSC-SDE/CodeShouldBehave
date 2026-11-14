@@ -52,6 +52,9 @@ fn migrate_mode(mode: &mut Value, focus: bool) {
         if !visibility.contains_key("focusBackdrop") {
             visibility.insert("focusBackdrop".into(), json!(focus));
         }
+        if !visibility.contains_key("ringBackdrop") {
+            visibility.insert("ringBackdrop".into(), json!(!focus));
+        }
     }
     if let Some(main) = mode
         .pointer_mut("/order/main")
@@ -59,6 +62,9 @@ fn migrate_mode(mode: &mut Value, focus: bool) {
     {
         if !main.iter().any(|id| id == "focusBackdrop") {
             main.push(json!("focusBackdrop"));
+        }
+        if !main.iter().any(|id| id == "ringBackdrop") {
+            main.push(json!("ringBackdrop"));
         }
     }
 }

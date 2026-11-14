@@ -5,6 +5,37 @@ copied into this repository. Branch: `phase-6`; PR base: `main`.
 The standalone landing-page publication below uses `codex/public-landing`;
 it does not advance, merge or activate the Phase 6 App implementation.
 
+## 2026-11-14 - Standard Character desk implementation
+
+Approved reference: Character A+B in the local Ring/Standard prototype. Work is
+isolated to `ui/standard-review-desk`; the unrelated App/backend checkout is not
+part of this UI change. The owner subsequently authorized publication and merge
+of the verified changes. Deployment, activation and release-pin changes remain out of scope.
+
+Implemented the Standard-only review desk with a persistent authorized PR queue,
+native sans typography, paginated DTO-backed change summaries, bounded structural
+reference maps, exact-side HLD-to-LLD mapping, source identity validation and an
+evidence/scope disclosure. Per-PR positions remain local to page memory; evidence
+is reauthorized on navigation. The existing Focus and native LLD renderers remain
+the authority for their respective views. No synthetic author-claim text, sample
+review questions, invented runtime findings or example source enters the new desk.
+
+HTML loads the Standard and Ring assets before workspace preferences mount.
+Ring visibility uses the native registry; the pause button is outside its inert
+decorative host. Reduced-motion, forced-color and unavailable-artwork behavior
+remain presentation-only.
+
+Added focused JavaScript regression cases for uncertain and relation-only deltas,
+bounded-map reachability, exact-side LLD ownership, immutable source identity,
+per-review positions and stale/current authorization failures. Verification:
+- JavaScript: 58 Standard/Focus/workspace tests and 15 preference tests passed.
+- Python 3.14: 2 workspace asset tests and 129 public-host/package tests passed.
+- Native `--features github-app`: 6 preference, 1 exact asset-route and 3 report-host tests passed. Initial commands without feature flags selected no tests and are not gate evidence.
+- Actual source UI served at localhost:3224 over the existing published fixture: Changes → HLD → native LLD → exact baseline source, Focus round-trip, Ring pause/off/cancel and reduced-motion static mode verified. At 390px viewport, document width was 390px.
+- Browser reported no JavaScript exceptions; one evidence request was aborted during navigation/reload. The fixture contains one PR, so multi-PR position isolation was covered by regression tests rather than a multi-PR browser session.
+- Standard queue hides redundant timestamps, status and commit metadata; the exact comparison remains available under Evidence & scope.
+- Merge preparation: fetched `origin/main`; no newer main commits than the implementation base `7ea5246992372db6d438364356e20ff3dcded5c6`. PR and provider-confirmed merge identity will be recorded after publication.
+
 ## 2026-11-08 — public canary activation preparation
 
 Owner completed the local HLD/LLD review and authorized continuation of the

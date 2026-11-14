@@ -873,5 +873,18 @@
     "permissions": [],
     "disclosure": false,
     "orderSelector": ""
+  },
+  {
+    "id": "ringBackdrop",
+    "label": "Etched Ring backdrop (Standard only)",
+    "category": "HLD context",
+    "region": "main",
+    "selector": "#workspace-ring,#workspace-ring-pause",
+    "standard": true,
+    "focus": false,
+    "dependencies": [],
+    "permissions": [],
+    "disclosure": false,
+    "orderSelector": ""
   }
 ]

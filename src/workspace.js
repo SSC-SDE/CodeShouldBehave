@@ -1310,6 +1310,39 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
       }
     }
   });
+  const standardRoutes=new Map();let openingPr=0;
+  const standardDesk=window.WorkspaceStandard.mount({
+    hldStatus:payload=>hldComparison(payload,'combined').status,
+    selectElement:id=>{hldSelection=id;rememberRoute();},
+    openHld:()=>{setLayout('architecture',{remember:false});if(designLevel!=='hld')setDesignLevel('hld');else if(!workspace.state.hld&&!workspace.state.loading.has('hld'))void workspace.loadHld();},
+    reloadHld:()=>workspace.loadHld(),
+    moreFiles:()=>$('more-files').click(),
+    openLld:mapping=>{
+      preferences?.reveal(['architecture','lld']);
+      setLayout('architecture',{remember:false});
+      if(mapping){
+        hldSelection=mapping.component.id;lldComponent=mapping.component.id;lldParentHld=mapping.version.id;lldDetail='module';lldElement=null;
+        lldNode=null;lldPinned=false;lldBaselineEntry=null;lldCorrespondenceId=null;
+        setDesignLevel('lld',{inferParent:false});
+      }
+      else if(designLevel!=='lld')setDesignLevel('lld');
+    },
+    openFile:async path=>{preferences?.reveal(['code','source']);focusedFinding=null;setLayout('source',{remember:false});$('side').value='diff';await workspace.selectPath({path,side:'diff'});rememberRoute();},
+    hldEvidence:id=>hldEvidenceFor(workspace.state.hld,id),
+    lldEvidence:()=>activeLldEvidence?[activeLldEvidence]:[...lldEvidence(workspace.state.lldDetail?.baseline),...lldEvidence(workspace.state.lldDetail?.proposal)],
+    source:async(kind,evidence)=>{
+      if(kind==='lld')return workspace.loadLldSource(evidence);
+      const reviewId=workspace.state.reviewId,generation=workspace.generation;
+      const query=new URLSearchParams({design_id:evidence.design_id,evidence_id:evidence.id});
+      const source=await workspace.fetch(`/v1/reviews/${encodeURIComponent(reviewId)}/hld/source?${query}`,generation);
+      if(!window.WorkspaceStandard.sourceMatches(source,evidence,reviewId))throw new Error('Source evidence does not match the selected design snapshot');
+      return source;
+    }
+  });
+  function syncStandardDesk(){
+    const active=reviewMode==='standard'&&!$('review-content').hidden&&document.body.dataset.view==='inspection';
+    standardDesk.update({state:workspace.state,pr:activePr,active});
+  }
   function syncFocusDesk(){
     const active=reviewMode==='focus'&&designLevel==='hld'&&layout==='architecture'&&!$('review-content').hidden&&document.body.dataset.view==='inspection';
     if(focusDesk.active!==active)++hldSourceGeneration;
@@ -1346,6 +1379,7 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
     bar.classList.toggle('focus-review-header',enabled);if(!enabled)closeLegend();
     const status=$('essential-review-status');if(status&&status.title!==status.textContent)status.title=status.textContent;
     if(status)status.dataset.short=/stale/i.test(status.textContent)?'Stale':/denied/i.test(status.textContent)?'Access denied':/error|failed/i.test(status.textContent)?'Error':/incomplete|unverified/i.test(status.textContent)?'Partial · static':'Static evidence';
+    syncStandardDesk();
   }
   new MutationObserver(()=>syncFocusHeader()).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['data-view']});
   function setReviewMode(next,{remember=true,restore=true}={}){
@@ -1507,6 +1541,7 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
   }
 
   async function loadInbox({append = false} = {}) {
+    const inboxGeneration=openingPr;
     await preferencesReady;
     $('inbox-status').textContent = publicStatic?'Loading published comparisons…':'Loading authorized pull requests…';
     try {
@@ -1515,6 +1550,7 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
       if (append && inboxCursor) query.set('cursor', inboxCursor);
       const page = await request(`/v1/prs?${query}`);
       if (!append) {$('pr-list').replaceChildren();inspectionQueue=[];$('review-queue-rows').replaceChildren();}
+      syncStandardDesk();
       page.items.forEach(addPrCard);
       inboxCursor = page.next_cursor;
       $('more-prs').hidden = !inboxCursor;
@@ -1530,6 +1566,7 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
       }
     } catch (error) {
       if(error.invalidateReview || [401,403].includes(error.status))workspace.clearReview(error.message);
+      if([401,403].includes(error.status)&&inboxGeneration===openingPr){$('pr-list').replaceChildren();inspectionQueue=[];standardRoutes.clear();standardDesk.clear();}
       $('inbox-status').textContent = error.message;
       $('connection').textContent = 'Disconnected';
     }
@@ -1567,6 +1604,10 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
   }
 
   async function openPr(pr, card, {remember = true, route = null} = {}) {
+    if(reviewMode==='standard'&&workspace.state.reviewId&&workspace.state.details)standardRoutes.set(workspace.state.reviewId,decodeWorkspaceRoute(window.location.hash));
+    const savedRoute=!route?standardRoutes.get(pr.review_id):null;
+    const opening=++openingPr;
+    standardDesk.activate(false);
     setReviewMode('standard',{remember:false,restore:false});standardView=null;
     preferences?.review(pr.review_id);preferences?.setMode(route?.reviewMode||'standard');
     activePr = pr; document.body.dataset.view='inspection';$('review-mode-switch').hidden=false;inspectionKey='';focusedFinding=null;auditEvent(`Opened ${pr.provider_pr_id} at ${short(pr.head_commit)}`); pinned = false;lldCatalogView.clear();lldSourcePairView.clear();
@@ -1593,10 +1634,14 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
     $('scope-contexts').replaceChildren(); invalidateScopePreview();
     setLayout('connected', {remember: false});
     await Promise.all([workspace.selectReview(pr.review_id), loadRevisions(pr)]);
+    if(opening!==openingPr||workspace.state.reviewId!==pr.review_id||!workspace.state.details)return;
     if (route) {preferences?.reveal([({connected:'behavior',source:'code',architecture:'architecture'})[route.layout],route.designLevel||'structural',...(route.selection?['source']:[])]);await applyRoute(route);}
-    else if(preferences){setReviewMode('standard',{remember:false,restore:false});applyPreferenceDefaults(preferences.defaults());if(remember)rememberRoute();}
-    else if(publicStatic){setLayout('architecture',{remember:false});setDesignLevel('lld',{remember:false,load:false});await loadSelectedLldCatalog();if(remember)rememberRoute();}
-    else if (remember) rememberRoute();
+    else if(savedRoute){await applyRoute(savedRoute);if(remember)rememberRoute();}
+    else if(preferences){setReviewMode('standard',{remember:false,restore:false});hldMode='combined';setLayout('architecture',{remember:false});setDesignLevel('hld',{remember:false});if(remember)rememberRoute();}
+    else {hldMode='combined';setLayout('architecture',{remember:false});setDesignLevel('hld',{remember:false});if(remember)rememberRoute();}
+    if(route)standardDesk.restoreSection(route.layout==='source'?'source':route.designLevel==='lld'?'lld':route.designLevel==='hld'?'hld':'changes',route.designElement||route.component,route.selection?.path);
+    syncStandardDesk();
+    if(reviewMode==='standard'&&!workspace.state.hld&&!workspace.state.loading.has('hld'))void workspace.loadHld();
   }
 
   function rememberRoute({replace = false} = {}) {
@@ -1752,6 +1797,7 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
   function renderWorkspace(state) {
     preferences?.changed();
     renderInspection(state);
+    syncStandardDesk();
     if (!state.reviewId) return;
     if(publicStatic&&state.details?.public_verdict){$('review-verdict').hidden=false;$('review-verdict').textContent=state.details.public_verdict.label;$('review-verdict').dataset.verdict=state.details.public_verdict.kind;}
     if(publicStatic&&$('public-export-report'))$('public-export-report').disabled=!(state.details?.capabilities||[]).includes('export');
@@ -1759,6 +1805,7 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
     if(publicStatic&&state.details){const scope=state.details.scope_manifest;$('scope-primary-include').value=(scope?.include||[]).join(', ');$('scope-primary-exclude').value=(scope?.exclude||[]).join(', ');$('scope-preview').textContent=`Published scope ${state.details.scope_version}. ${state.details.public_coverage?.complete?'Declared analysis coverage complete; runtime behavior remains unverified.':(state.details.public_coverage?.gaps||[]).join(' · ')} Request a new analysis to change scope or commits.`;}
     $('lld-boundary-state').textContent=state.lld?lldOutcome(state.lld.delta):state.lldError?'Unavailable':'Not loaded';
     if(!state.details && state.error){
+      standardRoutes.clear();standardDesk.clear();
       pinned=false;clearHldView();clearLldView();clearSourceInspector('Current access does not authorize this review.');clearReviewEvidence(document);
       hldSelection=null;renderedGraph=null;graphCursor=null;lastArchitectureKey='';graphQuery='';edgeKindFilter='';expandedCluster=null;previewedScope=null;++architectureGeneration;
     }
@@ -2136,6 +2183,7 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
   }
 
   function setDesignLevel(next, {remember = true, load = true, inferParent = true} = {}) {
+    if(reviewMode==='standard'&&standardDesk.active&&next==='hld'&&standardDesk.section==='lld')standardDesk.restoreSection('hld',hldSelection);
     if(remember)preferences?.reveal([next,"architecture"]);
     if(inferParent&&next==='lld'&&designLevel==='hld'&&workspace.state.hld){const payload=workspace.state.hld;let version=hldMode==='accepted'?payload.accepted:hldMode==='baseline'?payload.baseline:payload.proposal;if(!version?.elements.some(element=>element.id===hldSelection))version=payload.baseline;const selected=version?.elements.find(element=>element.id===hldSelection);const component=selected?.kind==='component'?selected:version?.elements.find(element=>element.id===selected?.component_id&&element.kind==='component');if(component){hldSelection=component.id;lldComponent=component.id;lldParentHld=version.id;lldDetail='module';lldElement=null;lldNode=null;lldPinned=false;}}
     designLevel = ['structural','hld','lld'].includes(next) ? next : 'structural';queueMicrotask(syncFocusHeader);
@@ -2357,6 +2405,7 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
   }
 
   function renderHld(state) {
+    if(reviewMode==='standard'&&standardDesk.active&&standardDesk.section!=='lld')return;
     if (designLevel !== 'hld') return;
     syncFocusDesk();
     if (renderedHldReview !== state.reviewId) { renderedHldReview=state.reviewId; lastHldKey=''; $('hld-confirmation-preview').hidden=true; $('hld-confirm').disabled=true; $('hld-confirmation-status').textContent='Preview is required before confirmation.'; }

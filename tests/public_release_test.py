@@ -70,7 +70,7 @@ class PublicReleaseTests(unittest.TestCase):
             self.assertNotIn(".git", names)
             self.assertNotIn("docs/evidence", names)
 
-    def test_runtime_packages_only_the_seven_approved_focus_assets(self):
+    def test_runtime_packages_only_the_approved_workspace_assets(self):
         approved = {
             "src/workspace-focus-model.js",
             "src/workspace-focus.js", "src/workspace-focus.css",
@@ -78,6 +78,12 @@ class PublicReleaseTests(unittest.TestCase):
             "src/workspace-moria-palette.css", "src/workspace-moria.json",
         }
         self.assertEqual(release.FOCUS_FILES, approved)
+        standard = {
+            "src/workspace-standard.js", "src/workspace-standard.css",
+            "src/workspace-ring.js", "src/workspace-ring.css",
+        }
+        self.assertEqual(release.STANDARD_FILES, standard)
+        approved.update(standard)
         files = dict(self.empty_notices, **{"Cargo.lock": (self.lock, 0o644)})
         files.update({name: (name.encode(), 0o644) for name in approved})
         files["src/workspace-unpublished.js"] = (b"not a runtime asset", 0o644)
@@ -97,12 +103,14 @@ class PublicReleaseTests(unittest.TestCase):
                 self.assertEqual(archive.extractfile(name).read(), name.encode())
             self.assertNotIn("src/workspace-unpublished.js", archive.getnames())
 
-    def test_source_requires_each_focus_asset(self):
+    def test_source_requires_each_workspace_asset(self):
         approved = {
             "src/workspace-focus-model.js",
             "src/workspace-focus.js", "src/workspace-focus.css",
             "src/workspace-moria.js", "src/workspace-moria.css",
             "src/workspace-moria-palette.css", "src/workspace-moria.json",
+            "src/workspace-standard.js", "src/workspace-standard.css",
+            "src/workspace-ring.js", "src/workspace-ring.css",
         }
         with patch.object(release, "git", return_value=b""):
             with self.assertRaisesRegex(ValueError, "Release source is incomplete") as caught:

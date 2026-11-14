@@ -37,6 +37,12 @@ FOCUS_FILES = {
     "src/workspace-moria-palette.css",
     "src/workspace-moria.json",
 }
+STANDARD_FILES = {
+    "src/workspace-standard.js",
+    "src/workspace-standard.css",
+    "src/workspace-ring.js",
+    "src/workspace-ring.css",
+}
 SECRET_RULES = {
     "private-key": re.compile(rb"-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----"),
     "github-token": re.compile(rb"(?<![A-Za-z0-9])(?:gh[pousr]_[A-Za-z0-9]{36,255}|github_pat_[A-Za-z0-9_]{60,255})(?![A-Za-z0-9])"),
@@ -78,6 +84,7 @@ def distribution_files(revision):
     required = {"Cargo.toml", "Cargo.lock", "LICENSE", "THIRD_PARTY_NOTICES.md", "CONTRIBUTING.md", "SECURITY.md", "docs/PUBLIC_MVP_USAGE.md", "src/workspace.html", "src/workspace.js", "src/workspace-preferences.js", "src/workspace-registry.json", "src/fonts/inter.ttf", "src/fonts/jetbrains-mono.ttf", "src/fonts/inter-OFL.txt", "src/fonts/jetbrains-mono-OFL.txt", "src/public-workspace.js", "scripts/public_ci.py", "scripts/public_site.py", "migrations/0001_foundation.sql", "migrations/0013_lld_defaults.sql", "migrations/0014_workspace_preferences.sql", "src/workspace_preferences.rs", "fixtures/demo/checkout.before.rs", "fixtures/demo/checkout.after.rs", "licenses/native/sources.json", "licenses/javascript/sources.json"}
     required.update(LANDING_FILES)
     required.update(FOCUS_FILES)
+    required.update(STANDARD_FILES)
     missing = required - result.keys()
     if missing:
         raise ValueError("Release source is incomplete: " + ", ".join(sorted(missing)))
@@ -257,6 +264,7 @@ def build(output, revision, build_runtime=False, target=None, registry=None):
             runtime_names = {"README.md", "LICENSE", "THIRD_PARTY_NOTICES.md", "SECURITY.md", "CHANGELOG.md", "sbom.cdx.json", "src/workspace.html", "src/workspace.css", "src/workspace.js", "src/workspace-preferences.js", "src/workspace-registry.json", "src/fonts/inter.ttf", "src/fonts/jetbrains-mono.ttf", "src/fonts/inter-OFL.txt", "src/fonts/jetbrains-mono-OFL.txt", "src/public-workspace.js", "scripts/public_ci.py", "scripts/public_ci_budget.py", "scripts/public_site.py", "docs/prototypes/vendor/mermaid.tiny-12.1.0.js", "docs/prototypes/vendor/mermaid-LICENSE.txt"}
             runtime_names.update(LANDING_FILES)
             runtime_names.update(FOCUS_FILES)
+            runtime_names.update(STANDARD_FILES)
             runtime = {name: value for name, value in files.items() if name in runtime_names or name.startswith(("licenses/", "templates/public-ci/", "config/"))}
             runtime.update(executables)
             runtime["native-build.json"] = (encode(build_record), 0o644)
