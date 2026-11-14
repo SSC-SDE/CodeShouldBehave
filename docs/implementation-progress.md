@@ -35,7 +35,8 @@ per-review positions and stale/current authorization failures. Verification:
 - Browser reported no JavaScript exceptions; one evidence request was aborted during navigation/reload. The fixture contains one PR, so multi-PR position isolation was covered by regression tests rather than a multi-PR browser session.
 - Standard queue hides redundant timestamps, status and commit metadata; the exact comparison remains available under Evidence & scope.
 - Integration PR: https://github.com/SSC-SDE/CodeShouldBehave/pull/51; implementation commit `7d55ea69835cb66995b5752df13744d7f0d8f5d6`, base `7ea5246992372db6d438364356e20ff3dcded5c6`.
-- GitHub reported mergeable/CLEAN with successful `wake` nudge check. No branch protection/rulesets or required approvals are configured. The nudge is not test CI; the local test and browser evidence above are the verification gates. Owner authorized merge; provider-confirmed merge SHA will be recorded separately.
+- GitHub reported mergeable/CLEAN with successful `wake` nudge check. No branch protection/rulesets or required approvals are configured. The nudge is not test CI; the local test and browser evidence above are the verification gates.
+- Owner-authorized PR #51 was confirmed `MERGED` by GitHub at `2026-11-14T13:51:15Z`, squash merge commit `9ee885293f079ecc9d267d5a31f731c6cfbcde00`. This documentation-only follow-up records that provider identity; no direct push to main, deployment or release-pin change.
 
 ## 2026-11-08 — public canary activation preparation
 
