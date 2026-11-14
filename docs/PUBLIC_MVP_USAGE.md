@@ -66,7 +66,7 @@ Graphite, Blueprint, Terminal and Contrast. **HLD appearance** offers Studio
 (the Focus default) and Classic (the Standard default). Studio changes HLD
 presentation only; it does not change LLD or analysis evidence.
 
-The unreleased **Standard Character desk** keeps the authorized PR queue visible
+The hosted **Standard Character desk** keeps the authorized PR queue visible
 while you review. Search the queue by repository or PR. **Changes** shows supplied
 design-delta records, or factual changed-file counts when no design delta is
 available; it does not infer an author's intent. Four summaries are shown at a
@@ -89,7 +89,7 @@ controls the optional artwork; **Pause Ring** stops its motion. Reduced motion
 uses a static frame, and forced colors suppress the decoration. Artwork is not
 analysis evidence and has no effect on authorization.
 
-The unreleased **Focus Review desk** places changed boundaries beside a compact
+The hosted **Focus Review desk** places changed boundaries beside a compact
 Mermaid map and the selected element's commit-bound source evidence. **Overview**
 shows at most five boundaries from one source component; **Selected boundary**
 isolates one relationship. Use the boundary list, search, or Previous/Next to

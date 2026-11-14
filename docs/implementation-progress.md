@@ -37,7 +37,22 @@ intent `c0c491a5b6266f3a2019aa75aad7e4d55d64b0c8c6ab43f236fb444a9ab07f08`,
 artifact `14118173958`, served manifest
 `8bb347edadc192ceda039365bf6fc61dc1b84014bf3cca06c8742cea7e606bd7`.
 It expires at `2026-11-15T02:00:00Z` and may only resume the same immutable bytes.
-Final promotion receipt and browser acceptance remain pending.
+Recovery PR #55 merged at `5b81f1c8d5d6546c07800df2a2c227a49ce09a7a`.
+Controller https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/43606777038
+passed full readback, final attestation, durable commit and REST audit. Provider
+receipt `7789159796` confirms `site_promotion`, sequence 106, generation 17,
+the same manifest above and no pending promotion intent.
+Hosted browser acceptance followed PR53's exact check URL: Focus entry,
+Standard mode with etched Ring and working Pause, Focus HLD with rendered Moria
+(34,679 text characters), native LLD `fail` and exact baseline source all passed.
+390px Focus viewport had document width 390px. No JavaScript exceptions; two
+evidence requests were cancelled on navigation. Broad-scope HLD uncertainty is
+unchanged; this release does not claim to fix analysis precision.
+Ordinary controller https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/43607106677
+passed reconciliation and REST audit. PR53 now has current Architecture check
+`132484680958`, completed/neutral, **Ready · Changes to review**, with the same
+immutable report link opening the newly deployed UI. Neutral means reviewer
+judgment is required, not merge approval. Draft PR53 remains unmerged.
 
 ## 2026-11-14 - Standard Character desk implementation
 
