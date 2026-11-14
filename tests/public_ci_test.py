@@ -688,7 +688,7 @@ class PublicationTests(unittest.TestCase):
             body = writes[-1]
             self.assertEqual(body["conclusion"], conclusion)
             self.assertEqual(body["output"]["title"], title)
-            self.assertIn("&design=lld", body["details_url"])
+            self.assertIn("&design=hld", body["details_url"])
             self.assertIn("&mode=focus", body["details_url"])
             self.assertIn(f"[Open CodeShouldBehave report]({body['details_url']})", body["output"]["summary"])
             self.assertIn(self.request["proposal"], body["output"]["summary"])
@@ -706,7 +706,8 @@ class PublicationTests(unittest.TestCase):
         self.provider.api = lambda *a, **k: {"check_runs": [delivered]}
         ci.acknowledge_delivered_checks(self.config, self.previous, self.provider)
         self.assertEqual(self.previous["check_updates"], [])
-        for summary in ("Open Details", body["output"]["summary"].replace("e" * 64, "f" * 64)):
+        for summary in ("Open Details", body["output"]["summary"].replace("e" * 64, "f" * 64),
+                        body["output"]["summary"].replace("design=hld", "design=lld")):
             self.previous["check_updates"] = [update]
             delivered["output"] = {"summary": summary}
             ci.acknowledge_delivered_checks(self.config, self.previous, self.provider)

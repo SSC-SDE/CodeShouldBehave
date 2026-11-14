@@ -5,6 +5,16 @@ copied into this repository. Branch: `phase-6`; PR base: `main`.
 The standalone landing-page publication below uses `codex/public-landing`;
 it does not advance, merge or activate the Phase 6 App implementation.
 
+## 2026-11-14 — HLD-first check entry correction
+
+Owner reported that the hosted report still opened LLD. The publisher hardcoded
+`design=lld` in both check delivery and readback; deployment had preserved that
+incorrect entry decision. Both now select `design=hld&mode=focus`, retaining exact
+review/bundle identity. Explicit LLD navigation and all UI/ASCII assets are unchanged.
+64 publication tests passed, including rejection of an old LLD summary link during
+delivery acknowledgement. Browser entry with the corrected URL selected HLD with
+LLD hidden. Signed release promotion and actual PR check refresh remain pending.
+
 ## 2026-11-14 — hosted review desk release cutover
 
 Owner authorized fixing the hosted/local UI mismatch while preserving all approved

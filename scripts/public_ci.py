@@ -1501,7 +1501,7 @@ def acknowledge_delivered_checks(config: dict, state: dict, provider: GitHub, *,
         runs = value.get("check_runs")
         if not isinstance(runs, list) or len(runs) >= 100:
             raise Refusal("check delivery readback unavailable or truncated")
-        expected_url = None if update["public_report_id"] is None else config["site"]["origin"] + config["site"]["base_path"] + "workspace/#review=" + update["public_report_id"] + "&bundle=" + update["public_report_id"] + "&layout=architecture&side=diff&design=lld&mode=focus"
+        expected_url = None if update["public_report_id"] is None else config["site"]["origin"] + config["site"]["base_path"] + "workspace/#review=" + update["public_report_id"] + "&bundle=" + update["public_report_id"] + "&layout=architecture&side=diff&design=hld&mode=focus"
         matches = [item for item in runs if item.get("app", {}).get("slug") == "github-actions" and item.get("external_id") == "csb-public-v1:" + request["request_id"] and item.get("head_sha") == request["proposal"]]
         if len(matches) > 1:
             raise Refusal("ambiguous delivered check")
@@ -1553,7 +1553,7 @@ def repair_checks(config: dict, *, provider: GitHub, state: dict | None = None) 
             + f"\n\nBaseline: `{request['baseline']}` → Proposal: `{request['proposal']}`")}
         body = {"status": "completed", "conclusion": conclusion, "completed_at": timestamp(), "output": output}
         if update["public_report_id"] is not None:
-            body["details_url"] = config["site"]["origin"] + config["site"]["base_path"] + "workspace/#review=" + update["public_report_id"] + "&bundle=" + update["public_report_id"] + "&layout=architecture&side=diff&design=lld&mode=focus"
+            body["details_url"] = config["site"]["origin"] + config["site"]["base_path"] + "workspace/#review=" + update["public_report_id"] + "&bundle=" + update["public_report_id"] + "&layout=architecture&side=diff&design=hld&mode=focus"
             # GitHub Actions owns the Details destination and may replace it.
             # Keep a durable exact-report link in the rendered check summary.
             output["summary"] += f"\n\n[Open CodeShouldBehave report]({body['details_url']})"
