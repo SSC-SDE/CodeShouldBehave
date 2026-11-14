@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased: minimal Focus review
+
+- Refine HLD into the approved wide canvas with concise labels, Standard
+  typography and on-demand evidence.
+- Lead LLD with implementation flow and open a scoped Unified/Split source diff
+  on selection, preserving exact snapshot identity and correspondence safeguards.
+- Animate the existing Moria backdrop subtly, with Live/Still/Off controls,
+  reduced-motion support and hidden-tab pausing.
+- Preserve Standard/Ring presentation and HLD-first PR check entry.
+
 ## Unreleased: HLD-first PR check entry
 
 - Open Architecture check reports in Focus HLD rather than forcing LLD.

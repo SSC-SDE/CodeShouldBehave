@@ -2,7 +2,7 @@
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
-const {ReviewWorkspace,workspaceHttpError,clearHldEvidence,clearLldEvidence,clearReviewEvidence,LldCatalogView,LldSourcePairView,validateLldResponse,lldOutcome,lldCatalogRows,lldMermaid,lldEvidence,LLD_INITIAL_SCALE,diagramScale,encodeWorkspaceRoute,decodeWorkspaceRoute}=require('../src/workspace.js');
+const {ReviewWorkspace,workspaceHttpError,clearHldEvidence,clearLldEvidence,clearReviewEvidence,LldCatalogView,LldSourcePairView,focusLldFlowWindow,validateLldResponse,lldOutcome,lldCatalogRows,lldMermaid,lldEvidence,LLD_INITIAL_SCALE,diagramScale,encodeWorkspaceRoute,decodeWorkspaceRoute}=require('../src/workspace.js');
 
 const identity={review_id:'r-1',scope_version:'scope-1',parent_hld:'hld-proposal',component:'api'};
 const selection={parentHld:'hld-proposal',component:'api'};
@@ -278,7 +278,7 @@ test('unchanged exact-source pair preserves DOM and selection until code, absenc
   const changed={...comparison,proposal:{...comparison.proposal,text:'fn newly_authorized() {}'}};view.render(host,changed,payload);assert.notEqual(host.children[0],baseline);assert.match(host.textContent,/newly_authorized/);assert.equal(document.activeElement,null);
   const replacementHost=node('div');view.render(replacementHost,changed,payload);assert.match(replacementHost.textContent,/newly_authorized/);assert.equal(replacementHost.children.length,2,'a recreated inspector is never skipped merely because its source object is unchanged');
   view.render(replacementHost,null,payload);assert.equal(replacementHost.children.length,0);assert.equal(view.comparison,null);
-  view.render(replacementHost,{baseline:null,proposal:null,errors:[]},{baseline:null,proposal:{}});assert.match(replacementHost.textContent,/Absent in baseline/);assert.match(replacementHost.textContent,/No retained source/);
+  view.render(replacementHost,{baseline:null,proposal:null,errors:[]},{baseline:null,proposal:{}});assert.match(replacementHost.textContent,/Counterpart not observed; absence is not established/);assert.match(replacementHost.textContent,/No retained source/);
   view.clear();assert.equal(replacementHost.children.length,0);assert.equal(view.host,null);assert.equal(view.comparison,undefined,'authority clearing releases retained code references');
 });
 
@@ -288,4 +288,106 @@ test('presentation reuse never skips fresh detail authorization and current deni
   await value.selectReview('r-1');await value.loadLldCatalog(selection);const button=view.buttons.get('e-proposal').button;
   await value.loadLldDetail('e-proposal');await value.loadLldDetail('e-proposal');assert.equal(view.buttons.get('e-proposal').button,button);assert.equal(calls.filter(path=>path.includes('/lld/detail?')).length,2,'each user reload still calls the authorization boundary');
   denied=true;await value.loadLldDetail('e-proposal');assert.equal(calls.filter(path=>path.includes('/lld/detail?')).length,3);assert.equal(value.state.details,null);assert.equal(view.buttons.size,0);assert.equal(list.children.length,0);
+});
+
+test('scoped source diff selects only exact node evidence with original revision line numbers',()=>{
+  const payload=detail(),comparison={baseline:sourceFor('/lld/source?evidence=source-baseline&start_line=2&end_line=4'),proposal:sourceFor('/lld/source?evidence=source-proposal&start_line=2&end_line=4'),errors:[]};
+  const source={...sourceFor('/lld/source?evidence=node-proposal&start_line=3&end_line=3'),text:'  if v > 2 {}'},scope={side:'proposal',evidence:evidence('node-proposal','proposal',3,3),source};
+  const model=LldSourcePairView.rows(comparison,payload,scope);
+  assert.equal(model.paired,true);assert.equal(model.rows.length,1);assert.equal(model.rows[0].beforeLine,3);assert.equal(model.rows[0].afterLine,3);assert.equal(model.baseline.start_line,3);assert.equal(model.proposal.end_line,3);
+  const {node}=presentationDom(),host=node('div'),view=new LldSourcePairView({node});
+  for(const mode of ['unified','split']){view.render(host,comparison,payload,{scope,mode});assert.match(host.textContent,/if v > 1/);assert.match(host.textContent,/if v > 2/);assert.doesNotMatch(host.textContent,/fn handle/);assert.equal(host.dataset.diffMode,mode);}
+});
+
+test('missing, truncated, mismatched and unproven counterpart source stays neutral',()=>{
+  const payload=detail(),before=sourceFor('/lld/source?evidence=source-baseline&start_line=2&end_line=4'),after=sourceFor('/lld/source?evidence=source-proposal&start_line=2&end_line=4');
+  const source={...sourceFor('/lld/source?evidence=node-proposal&start_line=3&end_line=3'),text:'  if v > 2 {}'},scope={side:'proposal',evidence:evidence('node-proposal','proposal',3,3),source};
+  for(const [comparison,current] of [[{baseline:null,proposal:after,errors:['not retained']},payload],[{baseline:{...before,truncated:true},proposal:after,errors:[]},payload],[{baseline:before,proposal:{...after,blob_id:'wrong'},errors:[]},payload],[{baseline:before,proposal:after,errors:[]},{...payload,baseline:{...payload.baseline,entry:{...payload.baseline.entry,logical_key:'other'}}}]]){
+    const model=LldSourcePairView.rows(comparison,current,scope);assert.equal(model.paired,false);assert.equal(model.proposal.text,source.text);assert.equal(model.baseline,null);
+    const {node}=presentationDom(),host=node('div');new LldSourcePairView({node}).render(host,comparison,current,{scope,mode:'unified'});
+    const classes=item=>[item.className,...item.children.flatMap(classes)];assert.ok(classes(host).every(name=>!/\bdiff-line (added|removed)\b/.test(name)));assert.match(host.textContent,/unavailable or unproven/);
+  }
+});
+
+test('a smaller node never expands into adjacent operations from the same edit block',()=>{
+  const payload=detail(),baseline={...sourceFor('/lld/source?evidence=source-baseline&start_line=2&end_line=5'),text:'fn handle() {\nold_timing();\nold_save();\n}'},proposal={...sourceFor('/lld/source?evidence=source-proposal&start_line=2&end_line=5'),text:'fn handle() {\nnew_timing();\nnew_save();\n}'};
+  const scope={side:'proposal',evidence:evidence('node-proposal','proposal',3,3),source:{...proposal,evidence_id:'node-proposal',start_line:3,end_line:3,text:'new_timing();'}};
+  const model=LldSourcePairView.rows({baseline,proposal,errors:[]},payload,scope);assert.equal(model.paired,false);assert.equal(model.proposal.text,'new_timing();');assert.equal(model.baseline,null);
+});
+
+test('source scope identity and correspondence assertions cannot manufacture a pair',()=>{
+  const payload=detail(),source={...sourceFor('/lld/source?evidence=node-proposal&start_line=3&end_line=3'),text:'selected'},scope={side:'proposal',evidence:evidence('node-proposal','proposal',3,3),source:{...source,commit:'wrong'}};
+  assert.equal(LldSourcePairView.rows(null,payload,scope).proposal,null);
+  payload.baseline.entry.logical_key='old_name';assert.equal(LldSourcePairView.correspondence(payload),false);
+  payload.delta.correspondence=[{resolution:'user_assertion',kind:'rename',from_ids:['e-base'],to_ids:['e-proposal']}];assert.equal(LldSourcePairView.correspondence(payload),true);
+  payload.delta.correspondence[0].from_ids=['other'];assert.equal(LldSourcePairView.correspondence(payload),false);
+});
+
+
+function windowedDetail(){
+  const payload=detail();
+  for(const side of ['baseline','proposal']){
+    payload[side].graph.nodes=Array.from({length:25},(_,index)=>({id:`${side}-${index}`,operation:'call',label:`step ${index}`,region_id:'outer',evidence_id:`${side}-evidence-${index}`}));
+    payload[side].graph.edges=Array.from({length:24},(_,index)=>({from:`${side}-${index}`,to:`${side}-${index+1}`,kind:'next'}));
+    payload[side].evidence.push(...Array.from({length:25},(_,index)=>evidence(`${side}-evidence-${index}`,side,100+index,100+index)));
+  }
+  const source=side=>({...sourceFor(`/lld/source?evidence=source-${side}&start_line=100&end_line=124`),text:Array.from({length:25},(_,index)=>index===15?`${side}_changed();`:`step_${index}();`).join('\n')});
+  return {payload,comparison:{baseline:source('baseline'),proposal:source('proposal'),errors:[]}};
+}
+
+test('bounded flow defaults to six actual nodes around exact changed source, without mutating the graph',()=>{
+  const {payload,comparison}=windowedDetail(),original=JSON.stringify(payload),view=focusLldFlowWindow(payload,comparison);
+  for(const side of ['baseline','proposal']){
+    assert.equal(view.sides[side].localized,true);assert.equal(view.sides[side].start,13);assert.equal(view.sides[side].end,19);assert.equal(view.sides[side].total,25);
+    assert.deepEqual(view.payload[side].graph.nodes.map(node=>node.id),Array.from({length:6},(_,index)=>`${side}-${13+index}`));
+    assert.ok(view.payload[side].graph.edges.every(edge=>payload[side].graph.edges.includes(edge)),'retained edges are original observations, not contracted paths');
+  }
+  assert.equal(JSON.stringify(payload),original);
+});
+
+test('flow pagination counts crossing edges and full flow restores every retained node and edge',()=>{
+  const {payload,comparison}=windowedDetail(),view=focusLldFlowWindow(payload,comparison,{offsets:{baseline:6,proposal:12}});
+  assert.equal(view.sides.baseline.crossing,2);assert.equal(view.sides.baseline.omittedEdges,19);assert.equal(view.payload.baseline.graph.edges.length,5);
+  assert.deepEqual(view.payload.baseline.graph.edges.map(edge=>[edge.from,edge.to]),Array.from({length:5},(_,index)=>[`baseline-${index+6}`,`baseline-${index+7}`]));
+  assert.equal(view.sides.proposal.start,12);
+  const previous=focusLldFlowWindow(payload,comparison,{offsets:{baseline:0,proposal:6}});assert.equal(previous.sides.baseline.start,0);assert.equal(previous.sides.baseline.crossing,1);
+  const full=focusLldFlowWindow(payload,comparison,{full:true});assert.equal(full.payload.baseline.graph.nodes.length,25);assert.equal(full.payload.baseline.graph.edges.length,24);assert.equal(full.sides.baseline.omittedEdges,0);
+  const last=focusLldFlowWindow(payload,comparison,{offsets:{baseline:999}});assert.equal(last.sides.baseline.start,24);assert.equal(last.sides.baseline.end,25);
+});
+
+test('unavailable, truncated or unproven source does not block browsing or invent a localized change',()=>{
+  const {payload,comparison}=windowedDetail();
+  for(const source of [null,{...comparison,baseline:null},{...comparison,baseline:{...comparison.baseline,truncated:true}}]){
+    const view=focusLldFlowWindow(payload,source);assert.equal(view.sides.proposal.localized,false);assert.equal(view.sides.proposal.start,0);assert.equal(view.payload.proposal.graph.nodes.length,6);
+  }
+  payload.baseline.entry.logical_key='other';const unmatched=focusLldFlowWindow(payload,comparison);assert.equal(unmatched.sides.proposal.localized,false);
+  const anchored=focusLldFlowWindow(payload,null,{nodeId:'proposal-20'});assert.equal(anchored.sides.proposal.start,18);assert.ok(anchored.payload.proposal.graph.nodes.some(node=>node.id==='proposal-20'));
+});
+
+test('a boundary window retains an observed unknown frontier even when its incoming edge is outside the window',()=>{
+  const {payload}=windowedDetail();payload.proposal.graph.nodes[6].operation='unknown_exit';
+  const view=focusLldFlowWindow(payload,null,{offsets:{proposal:6},size:1});
+  assert.equal(view.payload.proposal.graph.edges.length,0);assert.equal(view.sides.proposal.crossing,2);
+  const rendered=lldMermaid(view.payload,'proposal');assert.equal(rendered.nodes.length,1);assert.equal(rendered.nodes[0].node.id,'proposal-6');
+});
+
+test('unified scoped edits group all removals before additions while split preserves side order',()=>{
+  const payload=detail(),baseline={...sourceFor('/lld/source?evidence=source-baseline&start_line=2&end_line=6'),text:'start\nold_one();\nold_two();\nold_three();\nend'},proposal={...sourceFor('/lld/source?evidence=source-proposal&start_line=2&end_line=4'),text:'start\nnew_one();\nend'};
+  const scope={side:'proposal',evidence:evidence('node-proposal','proposal',3,3),source:{...proposal,evidence_id:'node-proposal',start_line:3,end_line:3,text:'new_one();'}};
+  const {node}=presentationDom(),host=node('div'),view=new LldSourcePairView({node}),comparison={baseline,proposal,errors:[]};
+  const descendants=item=>[item,...item.children.flatMap(descendants)];
+  view.render(host,comparison,payload,{scope,mode:'unified'});
+  const lines=descendants(host).filter(item=>item.className.startsWith('diff-line'));
+  assert.deepEqual(lines.map(item=>item.className),['diff-line removed','diff-line removed','diff-line removed','diff-line added']);
+  assert.match(lines[0].textContent,/3\s+- old_one/);assert.match(lines[1].textContent,/4\s+- old_two/);assert.match(lines[2].textContent,/5\s+- old_three/);assert.match(lines[3].textContent,/3 \+ new_one/);
+  const identity=host.children.find(item=>item.tagName==='details');assert.equal(Boolean(identity.open),false);assert.match(identity.textContent,new RegExp(proposal.commit));
+  const headers=descendants(host).filter(item=>item.tagName==='p'&&!identity.contains(item));assert.ok(headers.every(item=>!item.textContent.includes(proposal.commit)));
+  view.render(host,comparison,payload,{scope,mode:'split'});
+  const panes=host.children.filter(item=>item.tagName==='section');assert.match(panes[0].textContent,/old_one[\s\S]*old_two[\s\S]*old_three/);assert.doesNotMatch(panes[0].textContent,/new_one/);assert.match(panes[1].textContent,/new_one/);
+});
+
+test('an identical selected source range is explicitly labelled unchanged',()=>{
+  const payload=detail(),baseline={...sourceFor('/lld/source?evidence=source-baseline&start_line=2&end_line=4'),text:'start\nsame();\nend'},proposal={...sourceFor('/lld/source?evidence=source-proposal&start_line=2&end_line=4'),text:'start\nsame();\nend'};
+  const scope={side:'proposal',evidence:evidence('node-proposal','proposal',3,3),source:{...proposal,evidence_id:'node-proposal',start_line:3,end_line:3,text:'same();'}};
+  assert.match(LldSourcePairView.rows({baseline,proposal,errors:[]},payload,scope).message,/^Unchanged in this scope\./);
 });

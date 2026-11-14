@@ -853,7 +853,7 @@
     "label": "Design findings and supporting details",
     "category": "HLD context",
     "region": "main",
-    "selector": "#hld-inspector>.preference-design-details,#hld-inspector>p.status,#lld-inspector>p.mono,.lld-entry .mono,.lld-mapping-warning",
+    "selector": "#hld-inspector .preference-design-details,#hld-inspector>p.status,#hld-inspector .focus-desk-selection-details>p.status,#lld-inspector>p.mono,.lld-entry .mono,.lld-mapping-warning",
     "standard": true,
     "focus": false,
     "dependencies": [],
@@ -863,7 +863,7 @@
   },
   {
     "id": "focusBackdrop",
-    "label": "Moria colored-text backdrop (Focus HLD only)",
+    "label": "Moria colored-text backdrop (Focus HLD and LLD)",
     "category": "HLD context",
     "region": "main",
     "selector": "#workspace-moria",

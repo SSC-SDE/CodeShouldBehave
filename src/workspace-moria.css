@@ -1,18 +1,45 @@
 /* Pigments belong to the artwork; native foreground and theme tokens stay intact. */
 #workspace-moria{display:none;position:fixed;inset:0;overflow:hidden;z-index:0;pointer-events:none;user-select:none;background:var(--bg)}
-#workspace-moria pre{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);margin:0;padding:0;border:0;background:none;border-radius:0;min-height:0;max-height:none;max-width:none;overflow:visible;white-space:pre;overflow-wrap:normal;font-family:var(--font-code);font-size:max(calc(100vw / 172.8),calc(100dvh / 120));line-height:1;letter-spacing:0;font-variant-ligatures:none;font-weight:400}
+#workspace-moria .moria-scene{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:max-content;height:max-content;opacity:.65}
+#workspace-moria pre{margin:0;padding:0;border:0;background:none;border-radius:0;min-height:0;max-height:none;max-width:none;overflow:visible;white-space:pre;overflow-wrap:normal;font-family:var(--font-code);font-size:max(calc(100vw / 172.8),calc(100dvh / 120));line-height:1;letter-spacing:0;font-variant-ligatures:none;font-weight:400}
+/* One immutable ASCII grid; masked light layers never move the scene or review. */
+#workspace-moria .moria-fire,#workspace-moria .moria-staff,#workspace-moria .moria-bridge,#workspace-moria .moria-embers{position:absolute;inset:0;display:none}
+#workspace-moria[data-motion=live] .moria-scene>div{display:block}
+#workspace-moria .moria-fire{mask-image:radial-gradient(ellipse at 78% 42%,black 4%,transparent 38%);-webkit-backdrop-filter:brightness(1.55);backdrop-filter:brightness(1.55);background:radial-gradient(ellipse at 78% 42%,color-mix(in srgb,var(--amber) 12%,transparent),transparent 38%);opacity:.18;animation:moria-fire 4.7s ease-in-out infinite alternate}
+#workspace-moria .moria-staff{background:radial-gradient(ellipse at 30% 60%,color-mix(in srgb,var(--blue) 36%,transparent),transparent 12%);mix-blend-mode:screen;opacity:.2;animation:moria-staff 4.2s ease-in-out infinite alternate}
+#workspace-moria .moria-bridge{background:radial-gradient(ellipse at 66% 75%,color-mix(in srgb,var(--amber) 20%,transparent),transparent 22%);mix-blend-mode:screen;opacity:.15;animation:moria-reflection 5.8s ease-in-out infinite alternate}
+#workspace-moria .moria-ember{position:absolute;left:72%;top:64%;color:var(--amber);font:14px/1 var(--font-code);text-shadow:0 0 4px var(--amber);opacity:0;animation:moria-ember 7s linear infinite}
+#workspace-moria .moria-ember:nth-child(2){left:79%;top:57%;animation-duration:8s;animation-delay:-2.3s}
+#workspace-moria .moria-ember:nth-child(3){left:85%;top:68%;animation-duration:6s;animation-delay:-4.1s}
+#workspace-moria .moria-ember:nth-child(4){left:69%;top:59%;animation-duration:9s;animation-delay:-6.7s}
+#workspace-moria .moria-ember:nth-child(5){left:88%;top:52%;animation-duration:8s;animation-delay:-3.4s}
+#workspace-moria .moria-ember:nth-child(6){left:76%;top:71%;animation-duration:7s;animation-delay:-5.2s}
+#workspace-moria .moria-scene>div,#workspace-moria .moria-ember{animation-play-state:paused}
+#workspace-moria[data-running=true] .moria-scene>div,#workspace-moria[data-running=true] .moria-ember{animation-play-state:running}
+@keyframes moria-fire{0%{opacity:.15;transform:translateY(0)}28%{opacity:.45}60%{opacity:.25}100%{opacity:.55;transform:translateY(-1px)}}
+@keyframes moria-staff{from{opacity:.2}to{opacity:.65}}
+@keyframes moria-reflection{from{opacity:.15}to{opacity:.42}}
+@keyframes moria-ember{0%{opacity:0;transform:translate(0,4px)}20%{opacity:.5}80%{opacity:.25}100%{opacity:0;transform:translate(-12px,-80px)}}
+.topbar .moria-control{display:none}
+body:is(.focus-desk-active,.focus-lld-active) .topbar .moria-control{display:flex;align-items:center;gap:8px;order:3;flex-shrink:0;color:var(--muted);font:12px/1.5 var(--font-ui);white-space:nowrap}
+body:is(.focus-desk-active,.focus-lld-active) .moria-control select{min-height:32px;padding:4px 8px;background:var(--panel);color:var(--text);border-color:var(--line);font:inherit}
 #workspace-moria-status{position:fixed;right:16px;bottom:12px;z-index:6;max-width:calc(100vw - 32px);margin:0;padding:6px 10px;border:1px solid var(--line);border-radius:var(--control);background:var(--panel);color:var(--muted);font:11px/1.5 var(--font-code);pointer-events:none}
 @media(forced-colors:none){
- body.focus-desk-active:has(>#workspace-moria[data-ready=true]:not(.preference-hidden)){isolation:isolate}
- body.focus-desk-active #workspace-moria[data-ready=true]:not(.preference-hidden){display:block}
- body.focus-desk-active:has(>#workspace-moria[data-ready=true]:not(.preference-hidden)) .topbar{background:color-mix(in srgb,var(--bg) 96%,transparent)}
- body.focus-desk-active:has(>#workspace-moria[data-ready=true]:not(.preference-hidden)) .focus-desk-heading{background:color-mix(in srgb,var(--bg) 66%,transparent)}
- body.focus-desk-active:has(>#workspace-moria[data-ready=true]:not(.preference-hidden)) .focus-desk-nav{background:color-mix(in srgb,var(--bg) 88%,transparent)}
- body.focus-desk-active:has(>#workspace-moria[data-ready=true]:not(.preference-hidden)) .focus-desk-canvas{background:color-mix(in srgb,var(--panel) 86%,transparent)}
- body.focus-desk-active:has(>#workspace-moria[data-ready=true]:not(.preference-hidden)) .focus-desk-inspector{background:color-mix(in srgb,var(--panel) 96%,transparent)}
+ body:is(.focus-desk-active,.focus-lld-active):has(>#workspace-moria[data-visible=true]){isolation:isolate}
+ body:is(.focus-desk-active,.focus-lld-active) #workspace-moria[data-visible=true]:not(.preference-hidden){display:block}
+ body:is(.focus-desk-active,.focus-lld-active):has(>#workspace-moria[data-visible=true]) .shell{position:relative;z-index:1}
+ body:is(.focus-desk-active,.focus-lld-active):has(>#workspace-moria[data-visible=true]) .topbar{background:color-mix(in srgb,var(--bg) 96%,transparent)}
+ body.focus-lld-active:has(>#workspace-moria[data-visible=true]) :is(.review,#review-content,#lld-review){background:transparent}
+ body.focus-desk-active:has(>#workspace-moria[data-visible=true]) .focus-desk-heading{background:color-mix(in srgb,var(--bg) 66%,transparent)}
+ body.focus-desk-active:has(>#workspace-moria[data-visible=true]) .focus-desk-nav{background:color-mix(in srgb,var(--bg) 88%,transparent)}
+ body.focus-desk-active:has(>#workspace-moria[data-visible=true]) .focus-desk-canvas{background:color-mix(in srgb,var(--panel) 86%,transparent)}
+ body.focus-desk-active:has(>#workspace-moria[data-visible=true]) .focus-desk-inspector{background:color-mix(in srgb,var(--panel) 96%,transparent)}
  @media(max-width:700px){
-  body.focus-desk-active:has(>#workspace-moria[data-ready=true]:not(.preference-hidden)) .focus-desk-heading{background:color-mix(in srgb,var(--bg) 90%,transparent)}
-  body.focus-desk-active:has(>#workspace-moria[data-ready=true]:not(.preference-hidden)) .focus-desk-canvas{background:color-mix(in srgb,var(--panel) 94%,transparent)}
+  body.focus-desk-active:has(>#workspace-moria[data-visible=true]) .focus-desk-heading{background:color-mix(in srgb,var(--bg) 90%,transparent)}
+  body.focus-desk-active:has(>#workspace-moria[data-visible=true]) .focus-desk-canvas{background:color-mix(in srgb,var(--panel) 94%,transparent)}
  }
 }
-@media(forced-colors:active){#workspace-moria,#workspace-moria-status{display:none}}
+@media(prefers-reduced-motion:reduce){
+ #workspace-moria .moria-scene>div,#workspace-moria .moria-ember{animation:none;display:none}
+}
+@media(forced-colors:active){#workspace-moria,#workspace-moria-status,body:is(.focus-desk-active,.focus-lld-active) .topbar .moria-control{display:none}}
