@@ -13,7 +13,10 @@ incorrect entry decision. Both now select `design=hld&mode=focus`, retaining exa
 review/bundle identity. Explicit LLD navigation and all UI/ASCII assets are unchanged.
 64 publication tests passed, including rejection of an old LLD summary link during
 delivery acknowledgement. Browser entry with the corrected URL selected HLD with
-LLD hidden. Signed release promotion and actual PR check refresh remain pending.
+LLD hidden. Source PR https://github.com/SSC-SDE/CodeShouldBehave/pull/57 merged
+at `45479202f0292704a6aefdabcec0d79233f9c726`. Trusted Linux build and attestation
+https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/43608166283 passed.
+Signed release promotion and actual PR check refresh remain pending.
 
 ## 2026-11-14 — hosted review desk release cutover
 
