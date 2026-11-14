@@ -1,6 +1,8 @@
 use crate::Storage;
 use rusqlite::{OptionalExtension, TransactionBehavior, params};
 
+mod backoff;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum JobLane {
     Warm,
@@ -419,11 +421,7 @@ impl<'a> Scheduler<'a> {
         verify_lease(&transaction, job, worker, now)?;
         let (state, available) = match class {
             RetryClass::Retryable if job.attempt < 5 => {
-                let exponent = u32::try_from(job.attempt.saturating_sub(1))
-                    .unwrap_or(31)
-                    .min(6);
-                let delay = 1_000_i64.saturating_mul(1_i64 << exponent).min(60_000);
-                ("retry", now.saturating_add(delay))
+                ("retry", backoff::available_at(now, job.attempt))
             }
             RetryClass::Retryable | RetryClass::Terminal => ("failed", now),
             RetryClass::Cancelled => ("cancelled", now),
