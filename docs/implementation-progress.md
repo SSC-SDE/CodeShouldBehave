@@ -5,6 +5,24 @@ copied into this repository. Branch: `phase-6`; PR base: `main`.
 The standalone landing-page publication below uses `codex/public-landing`;
 it does not advance, merge or activate the Phase 6 App implementation.
 
+## 2026-11-14 — hosted review desk release cutover
+
+Owner authorized fixing the hosted/local UI mismatch while preserving all approved
+design decisions. Release source is merged main `60b46619aefac3a18e0e7cfcd02a21f80b9ddfe5`.
+The Standard Character desk/Ring and Focus review desk/Moria artwork ship unchanged;
+native LLD and PR-check Focus entry remain intact. Draft PR #53 stays unmerged.
+
+Fresh authenticated billing UI observation confirmed GitHub Free and account-wide
+Actions/Packages USD 0 budgets with Usage blocked. No billing controls were changed.
+Only the independent release-build proof was refreshed; the activated runtime
+budget identity, scope, consent and controller authority remain unchanged.
+Trusted Linux build: https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/43605356067.
+Build and hosted attestation passed. Downloaded source/runtime checksums and
+offline provenance passed with exact source/signer SHA and hosted runners required.
+Release: https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-60b46619aefa.
+Both engine pin documents now select that verified package. Native preflight and
+live publication evidence remain pending.
+
 ## 2026-11-14 - Standard Character desk implementation
 
 Approved reference: Character A+B in the local Ring/Standard prototype. Work is
