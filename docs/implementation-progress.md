@@ -1278,3 +1278,87 @@ is claimed; deployed release still predates these fixes.
 - The two approved stale PR32 report URLs return 404 and the live catalog retains
   six non-retired reports. No site-cap or admission limit changed; beta remains
   disabled.
+## 2026-11-08 — approved phase 7 nested HLD implementation start
+
+- The owner approved the Mockup 2 C4-style HLD drilldown implementation plan.
+- Created branch `phase-7` from `origin/main` at `ddc0111`.
+- Scope: evidence-backed system → container → component hierarchy, relationship canvas, evidence inspector, and HLD-to-LLD drilldown. No runtime architecture claims will be inferred.
+- Implementation and public canary evidence are pending; no PR, release, or merge is claimed.
+
+## 2026-11-14 — plug-and-play AI extension plan (documentation only)
+
+- Recorded the owner-aligned optional-extension contract in the
+  [detailed AI implementation plan](AI_EXTENSION_IMPLEMENTATION_PLAN.md).
+  First proposed delivery is Explain this HLD boundary through a server-side
+  local Ollama adapter; existing Focus structure, HLD/LLD and source navigation
+  remain independently usable.
+- The plan defines provider-neutral contracts, capability/API states, immutable
+  evidence and cache identities, disclosure/endpoint restrictions, separate
+  admission limits, ordered Phase 7 substeps and acceptance/rollback evidence.
+  Hosted/static delivery limitations and later provider qualification are explicit.
+- AI implementation and acceptance remain pending. This record does not complete
+  existing Phase 7 steps or change the separately recorded nested-HLD scope.
+  No model download/call, source disclosure, provider credential, branch/PR
+  creation, merge, deployment, billing or activation is authorized or performed
+  by this documentation update.
+
+## Approved Focus Review desk — implemented locally, native verification blocked
+
+- Owner approved the Review desk layout and full-page Moria colored-text
+  backdrop, then authorized implementation in the maintained application.
+- Resuming the existing local `phase-7` branch at
+  `ddc01110ff8a0088e027b071ede4dd1c19f7b095`; remote `main` was observed at
+  that same commit. No matching Phase 7 PR or remote branch was returned.
+- Scope: real authorized HLD boundary navigation, bounded contextual Mermaid
+  maps, exact-source inspector, existing HLD-to-LLD navigation, and an optional
+  personal Focus backdrop. Standard and LLD presentation remain unchanged.
+- Existing unrelated design/backend edits are preserved. AI implementation,
+  release, deployment, phase completion, PR publication and merge are not
+  part of this UI change. No new commit or release identity is claimed.
+- Implemented Focus-only Review desk navigation, five-boundary overview pages,
+  isolated boundary graphs, native snapshot comparison, keyboard-selectable
+  nodes and exact-source inspector. Standard/LLD controls return to their
+  original containers when leaving Focus HLD.
+- Added the approved 288×120 colored-text Moria backdrop as same-origin assets.
+  Existing local/account preference validation migrates older documents without
+  resetting personal settings; backdrop, legend and zoom controls respect saved
+  preferences. Native/App/static/release asset allowlists include the new files.
+- Verification: JavaScript syntax checks passed for the main workspace and new
+  scripts; 146 tests passed across workspace, Focus model, HLD, LLD, public
+  transport and preference suites. Python 3.14 packaging checks passed:
+  public site 13, public release 6 and development asset host 2 tests.
+- Browser proof used the maintained source assets at
+  `http://127.0.0.1:3222/workspace/` with an existing authorized static fixture,
+  not a rebuilt native service. At 1440px and 390px: scoped graphs, comparison,
+  search, next boundary, zoom, exact proposal/baseline source, evidence reopening,
+  LLD drill-down, Standard restoration and backdrop save/reload were exercised.
+  The 390px viewport had no document horizontal overflow. Final browser error
+  collection was empty. The real integrated desktop surface was shown before
+  automated test suites; final screenshots followed interaction verification.
+- Native gate attempted:
+  `cargo test --locked --features github-app --lib workspace_`.
+  Compilation failed in existing unrelated backend edits: references to absent
+  `DesignVersion.sections` and a moved `root` in `src/design/generate.rs`.
+  The chained `github_app_setup::report_host::tests` command therefore did not
+  run. Native asset/preference tests remain unverified until that backend work
+  compiles; no unrelated backend edits were overwritten to force a green result.
+- Updated `CHANGELOG.md` and `docs/PUBLIC_MVP_USAGE.md` for the unreleased UI.
+
+### Focus merge preparation
+
+- The owner subsequently authorized merging the approved UI implementation.
+  `origin/main` remained `ddc01110ff8a0088e027b071ede4dd1c19f7b095`.
+  GitHub reported no branch protection or applicable branch rules for `main`.
+- The scoped index includes Focus UI, assets, preference migrations, associated
+  tests/docs and the previously requested AI plan (documentation only).
+  Unrelated in-progress design/backend changes remain unstaged and excluded.
+- A clean archive of the staged tree passed
+  `cargo test --locked --features github-app --lib workspace_` (11 tests) and
+  `cargo test --locked --features github-app --lib github_app_setup::report_host::tests`
+  (3 tests). This resolves the native verification gap for the merge scope;
+  it does not repair or discard the unrelated working-tree backend changes.
+- Rust formatting checks passed with edition 2024 for the four touched Rust
+  files. JavaScript syntax and Python compilation checks passed. The earlier
+  146 JavaScript tests, 21 packaging tests and browser evidence remain applicable.
+- Review, PR creation and provider-confirmed merge results will be recorded
+  separately; this entry does not claim a merge, deployment or Phase 7 completion.

@@ -1,0 +1,18 @@
+/* Pigments belong to the artwork; native foreground and theme tokens stay intact. */
+#workspace-moria{display:none;position:fixed;inset:0;overflow:hidden;z-index:0;pointer-events:none;user-select:none;background:var(--bg)}
+#workspace-moria pre{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);margin:0;padding:0;border:0;background:none;border-radius:0;min-height:0;max-height:none;max-width:none;overflow:visible;white-space:pre;overflow-wrap:normal;font-family:var(--font-code);font-size:max(calc(100vw / 172.8),calc(100dvh / 120));line-height:1;letter-spacing:0;font-variant-ligatures:none;font-weight:400}
+#workspace-moria-status{position:fixed;right:16px;bottom:12px;z-index:6;max-width:calc(100vw - 32px);margin:0;padding:6px 10px;border:1px solid var(--line);border-radius:var(--control);background:var(--panel);color:var(--muted);font:11px/1.5 var(--font-code);pointer-events:none}
+@media(forced-colors:none){
+ body.focus-desk-active:has(>#workspace-moria[data-ready=true]:not(.preference-hidden)){isolation:isolate}
+ body.focus-desk-active #workspace-moria[data-ready=true]:not(.preference-hidden){display:block}
+ body.focus-desk-active:has(>#workspace-moria[data-ready=true]:not(.preference-hidden)) .topbar{background:color-mix(in srgb,var(--bg) 96%,transparent)}
+ body.focus-desk-active:has(>#workspace-moria[data-ready=true]:not(.preference-hidden)) .focus-desk-heading{background:color-mix(in srgb,var(--bg) 66%,transparent)}
+ body.focus-desk-active:has(>#workspace-moria[data-ready=true]:not(.preference-hidden)) .focus-desk-nav{background:color-mix(in srgb,var(--bg) 88%,transparent)}
+ body.focus-desk-active:has(>#workspace-moria[data-ready=true]:not(.preference-hidden)) .focus-desk-canvas{background:color-mix(in srgb,var(--panel) 86%,transparent)}
+ body.focus-desk-active:has(>#workspace-moria[data-ready=true]:not(.preference-hidden)) .focus-desk-inspector{background:color-mix(in srgb,var(--panel) 96%,transparent)}
+ @media(max-width:700px){
+  body.focus-desk-active:has(>#workspace-moria[data-ready=true]:not(.preference-hidden)) .focus-desk-heading{background:color-mix(in srgb,var(--bg) 90%,transparent)}
+  body.focus-desk-active:has(>#workspace-moria[data-ready=true]:not(.preference-hidden)) .focus-desk-canvas{background:color-mix(in srgb,var(--panel) 94%,transparent)}
+ }
+}
+@media(forced-colors:active){#workspace-moria,#workspace-moria-status{display:none}}

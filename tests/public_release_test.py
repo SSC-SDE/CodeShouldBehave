@@ -70,6 +70,46 @@ class PublicReleaseTests(unittest.TestCase):
             self.assertNotIn(".git", names)
             self.assertNotIn("docs/evidence", names)
 
+    def test_runtime_packages_only_the_seven_approved_focus_assets(self):
+        approved = {
+            "src/workspace-focus-model.js",
+            "src/workspace-focus.js", "src/workspace-focus.css",
+            "src/workspace-moria.js", "src/workspace-moria.css",
+            "src/workspace-moria-palette.css", "src/workspace-moria.json",
+        }
+        self.assertEqual(release.FOCUS_FILES, approved)
+        files = dict(self.empty_notices, **{"Cargo.lock": (self.lock, 0o644)})
+        files.update({name: (name.encode(), 0o644) for name in approved})
+        files["src/workspace-unpublished.js"] = (b"not a runtime asset", 0o644)
+
+        def native_fixture(_files, _revision, staging, _target):
+            (staging / "native-source").mkdir()
+            (staging / "native-target").mkdir()
+            (staging / "native-build.log").write_bytes(b"")
+            return {"bin/flowdiff": (b"test executable", 0o755)}, {"target": "fixture-target"}
+
+        with patch.object(release, "distribution_files", return_value=files), \
+             patch.object(release, "build_native", side_effect=native_fixture):
+            manifest = release.build(self.root / "runtime", "a" * 40, build_runtime=True, registry=self.registry)
+        runtime = next(asset for asset in manifest["assets"] if asset["kind"] == "runtime")
+        with tarfile.open(self.root / "runtime" / runtime["path"], "r:gz") as archive:
+            for name in approved:
+                self.assertEqual(archive.extractfile(name).read(), name.encode())
+            self.assertNotIn("src/workspace-unpublished.js", archive.getnames())
+
+    def test_source_requires_each_focus_asset(self):
+        approved = {
+            "src/workspace-focus-model.js",
+            "src/workspace-focus.js", "src/workspace-focus.css",
+            "src/workspace-moria.js", "src/workspace-moria.css",
+            "src/workspace-moria-palette.css", "src/workspace-moria.json",
+        }
+        with patch.object(release, "git", return_value=b""):
+            with self.assertRaisesRegex(ValueError, "Release source is incomplete") as caught:
+                release.distribution_files("a" * 40)
+        for name in approved:
+            self.assertIn(name, str(caught.exception))
+
     def test_supplemental_notice_cannot_silently_survive_a_dependency_update(self):
         data = b"original upstream license"
         record = {"path": "licenses/native/fixture-LICENSE", "bytes": len(data),
