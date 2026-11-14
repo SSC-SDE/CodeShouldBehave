@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased: HLD-first PR check entry
+
+- Open Architecture check reports in Focus HLD rather than forcing LLD.
+- Keep exact review/bundle identity and explicit LLD navigation unchanged.
+- Reject stale LLD entry links during check delivery readback so repair remains pending.
+- Preserve Standard Ring and Focus Moria artwork and all presentation decisions.
+
 ## Unreleased: Standard Character review desk
 
 - Add the approved Character A+B Standard layout: persistent PR queue, larger
