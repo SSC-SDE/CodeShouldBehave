@@ -870,11 +870,8 @@ fn scoped_deferrals_preserve_observable_additions() {
     assert_eq!(delta.outcome, DesignOutcome::ChangeDetected);
     assert!(!delta.coverage.complete);
     assert!(
-        delta
-            .changes
-            .iter()
-            .any(|change| change.kind == "added"
-                && change.after_name.as_deref() == Some("lapin package")),
+        delta.changes.iter().any(|change| change.kind == "added"
+            && change.after_name.as_deref() == Some("lapin package")),
         "{:?}",
         delta.changes
     );
@@ -882,15 +879,13 @@ fn scoped_deferrals_preserve_observable_additions() {
         delta
             .changes
             .iter()
-            .any(|change| change.kind == "added"
-                && change.relation_id.is_some()),
+            .any(|change| change.kind == "added" && change.relation_id.is_some()),
         "{:?}",
         delta.changes
     );
     assert!(
         delta.changes.iter().any(|change| {
-            change.kind == "uncertain"
-                && change.after_name.as_deref() == Some("added_route")
+            change.kind == "uncertain" && change.after_name.as_deref() == Some("added_route")
         }),
         "{:?}",
         delta.changes
@@ -952,14 +947,16 @@ fn deferred_paths_scope_uncertainty_to_their_own_evidence() {
     covering.coverage.deferred_paths = vec!["src".into()];
     let blocked = compare_hld(&covering, &after).unwrap();
     assert!(
-        !blocked
-            .changes
-            .iter()
-            .any(|change| change.kind == "added"),
+        !blocked.changes.iter().any(|change| change.kind == "added"),
         "{:?}",
         blocked.changes
     );
-    assert!(blocked.changes.iter().all(|change| change.kind == "uncertain"));
+    assert!(
+        blocked
+            .changes
+            .iter()
+            .all(|change| change.kind == "uncertain")
+    );
 }
 
 /// An unavailable pinned tree hides every path, so it can never manufacture
@@ -982,6 +979,11 @@ fn unbounded_deferral_keeps_architectural_additions_unresolved() {
     unknown.coverage.deferred_paths = vec!["*".into()];
     let delta = compare_hld(&unknown, &after).unwrap();
     assert!(!delta.changes.is_empty());
-    assert!(delta.changes.iter().all(|change| change.kind == "uncertain"));
+    assert!(
+        delta
+            .changes
+            .iter()
+            .all(|change| change.kind == "uncertain")
+    );
     assert_eq!(delta.outcome, DesignOutcome::Incomplete);
 }
