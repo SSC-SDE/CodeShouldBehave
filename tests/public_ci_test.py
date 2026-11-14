@@ -89,6 +89,20 @@ class ConfigurationTests(unittest.TestCase):
         with self.assertRaisesRegex(ci.Refusal, "verified billing/trust"):
             ci.load_config(value, runtime=True)
 
+    def test_failure_reason_keeps_bounded_diagnostics(self):
+        self.assertEqual(
+            ci.failure_reason(ci.Refusal("deferred: application REST ticket exhausted")),
+            "deferred: application REST ticket exhausted",
+        )
+        self.assertEqual(
+            ci.failure_reason(ValueError("Site cap exceeded: 1 retained bytes\nnext")),
+            "ValueError: Site cap exceeded: 1 retained bytes next",
+        )
+        bounded = ci.failure_reason(RuntimeError("x" * 500))
+        self.assertTrue(bounded.startswith("RuntimeError: "))
+        self.assertLessEqual(len(bounded), len("RuntimeError: ") + 200)
+        self.assertEqual(ci.failure_reason(KeyError()), "KeyError")
+
     def test_unknown_config_and_insecure_origins_are_denied(self):
         for mutation in ({"untrusted": True}, {"site": {"origin": "https://attacker.example", "base_path": "/codeshouldbehave/"}}, {"context_path": "../secret"}):
             value = configuration(); value.update(mutation)
@@ -629,6 +643,33 @@ class PublicationTests(unittest.TestCase):
         self.assertEqual(final["state"]["site_artifact_id"], 44)
         self.assertIsNone(final["state"]["promotion_intent"])
         self.assertEqual(final["state"]["pages_deployment_id"], "pages-actual-id")
+
+    def test_repeated_commit_of_a_durable_state_converges_without_writing(self):
+        state = dict(self.previous, sequence=self.previous["sequence"] + 1,
+                     previous_receipt_sha256=ci.digest(ci.canonical(self.previous)))
+        subject = ci.receipt_subject(self.config, self.previous, state, run(self.config), kind="cursor_only")
+        expected = ci.digest(ci.canonical(subject))
+        self.provider.restore_state = lambda: subject["state"]
+
+        def api(path, **kwargs):
+            self.calls.append((path, kwargs))
+            self.assertNotIn("method", kwargs)
+            return [{"id": 91, "sha": "c" * 40, "payload": {"subject_sha256": expected}},
+                    {"id": 90, "sha": "c" * 40, "payload": {"subject_sha256": "f" * 64}}]
+
+        self.provider.api = api
+        result = ci.commit_receipt(self.config, subject, {}, provider=self.provider)
+        self.assertEqual(result["state_deployment_id"], 91)
+        self.assertEqual(result["subject_sha256"], expected)
+        self.assertTrue(self.calls)
+        self.assertTrue(all("/deployments?" in path for path, _ in self.calls))
+
+        # A target state already behind the restored one is still refused.
+        newer = dict(state, sequence=state["sequence"] + 1,
+                     previous_receipt_sha256=ci.digest(ci.canonical(state)))
+        self.provider.restore_state = lambda: newer
+        with self.assertRaisesRegex(ci.Refusal, "stale commit refused"):
+            ci.commit_receipt(self.config, subject, {}, provider=self.provider)
 
     def test_missing_receipt_or_readback_mismatch_cannot_finalize(self):
         publication = {"previous_state": self.previous, "state": self.plan["state"], "run": run(self.config), "site": {"site_sha256": "e" * 64}}

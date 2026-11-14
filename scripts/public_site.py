@@ -249,7 +249,7 @@ def assemble_site(bundles, output, observed_at, previous=None, previous_sha256=N
         metadata[key] = observation
         if len(metadata) > 100:
             raise SiteError("PR observation cap exceeded")
-    sources, expired, previous_metadata = {}, {}, {}
+    sources, expired, previous_metadata, added_identities = {}, {}, {}, set()
     if previous is not None:
         previous = Path(previous)
         verify_site(previous, previous_sha256)
@@ -272,6 +272,7 @@ def assemble_site(bundles, output, observed_at, previous=None, previous_sha256=N
         manifest, data = bundle(source)
         verify_producer(source, verifier, verifier_sha256)
         identity = manifest["public_report_id"]
+        added_identities.add(identity)
         if identity in sources:
             _, old_data = bundle(sources[identity])
             if old_data != data:
@@ -365,12 +366,20 @@ def assemble_site(bundles, output, observed_at, previous=None, previous_sha256=N
             destination = temporary / "expired" / (identity + ".json")
             destination.parent.mkdir(exist_ok=True)
             destination.write_bytes(canonical(record))
-        files, total = [], 0
+        files, total, added = [], 0, 0
         for path in tree_files(temporary):
             data = read_file(temporary / path, MAX_SITE_BYTES)
+            parts = path.split("/")
+            if len(parts) > 1 and parts[0] == "reviews" and parts[1] in added_identities:
+                added += len(data)
             total += len(data)
             if total > MAX_SITE_BYTES:
-                raise SiteError("Site cap exceeded; preserve previous generation")
+                # Name the exact split so the operator can choose a retirement
+                # instead of re-running the whole controller to learn the cause.
+                raise SiteError(
+                    f"Site cap exceeded: {total - added} retained bytes + {added} new bundle bytes "
+                    f"> {MAX_SITE_BYTES}; retire a nonprotected report before promotion"
+                )
             files.append({"path": path, "bytes": len(data), "sha256": digest(data)})
         (temporary / "site-manifest.json").write_bytes(canonical({"schema_version": SITE_SCHEMA, "observed_at": observed_at, "files": files}))
         result = verify_site(temporary)

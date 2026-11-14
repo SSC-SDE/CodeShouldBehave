@@ -230,6 +230,22 @@ class PublicSiteTests(unittest.TestCase):
         with self.assertRaisesRegex(site.SiteError, "new directory"):
             site.assemble_site([bundle], first, NOW, project_root=self.project)
 
+    def test_site_cap_refusal_names_retained_and_new_bytes(self):
+        bundle, _ = self.bundle()
+        first, _ = self.build([bundle], "first")
+        total = sum(
+            item["bytes"]
+            for item in json.loads((first / "site-manifest.json").read_text())["files"]
+        )
+        with patch.object(site, "MAX_SITE_BYTES", total - 1), self.assertRaisesRegex(
+            site.SiteError, "retained bytes"
+        ) as raised:
+            self.build([bundle], "over-cap")
+        message = str(raised.exception)
+        self.assertIn("new bundle bytes", message)
+        self.assertIn(str(total - 1), message)
+        self.assertFalse((self.root / "over-cap").exists())
+
     def test_duplicate_json_keys_and_non_finite_metadata_are_rejected(self):
         for data in (b'{"a":1,"a":2}', b'{"a":NaN}', b'{"a":Infinity}'):
             with self.subTest(data=data), self.assertRaises(site.SiteError):
