@@ -1885,6 +1885,7 @@ mod tests {
                 gaps: vec!["Runtime behavior unverified".into()],
                 deferred_element_kinds: vec!["contract".into()],
                 deferred_paths: vec![],
+                deferred_facts: vec![],
             },
             constraints: vec![],
             correspondence: vec![],

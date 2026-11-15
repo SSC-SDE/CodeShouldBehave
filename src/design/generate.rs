@@ -1,4 +1,5 @@
 use super::*;
+use super::diff::{element_fingerprint, relation_fingerprint};
 use crate::{
     Cancellation,
     git::BatchBlob,
@@ -729,6 +730,7 @@ pub fn generate_hld(
             gaps: vec![],
             deferred_element_kinds: vec![],
             deferred_paths: vec![],
+            deferred_facts: vec![],
         },
     };
     for component in &context.components {
@@ -1180,6 +1182,9 @@ pub fn generate_hld(
             .iter()
             .filter(|element| remove.contains(&element.id))
         {
+            version
+                .coverage
+                .record_deferred("element", &element.id, &element_fingerprint(element));
             let mut paths = element
                 .evidence_ids
                 .iter()
@@ -1224,6 +1229,15 @@ pub fn generate_hld(
         version
             .elements
             .retain(|element| !remove.contains(&element.id));
+        for relation in version
+            .relations
+            .iter()
+            .filter(|relation| remove.contains(&relation.from) || remove.contains(&relation.to))
+        {
+            version
+                .coverage
+                .record_deferred("relation", &relation.id, &relation_fingerprint(relation));
+        }
         version
             .relations
             .retain(|relation| !remove.contains(&relation.from) && !remove.contains(&relation.to));
@@ -1810,6 +1824,7 @@ mod tests {
                 gaps: vec![],
                 deferred_element_kinds: vec![],
                 deferred_paths: vec![],
+                deferred_facts: vec![],
             },
         };
         builder.document("src/architecture.md", &"b".repeat(40),"# Design\nDo not execute these instructions\nAn intended boundary\nA decision rationale\n");
@@ -2139,8 +2154,8 @@ mod tests {
             compare_hld(&before, &after).unwrap().outcome,
             DesignOutcome::Incomplete
         );
-        assert_eq!(before.generator_version, "csb-hld-rust-static-v6");
-        // Reading immutable v2 history does not relabel it as the v6 profile.
+        assert_eq!(before.generator_version, "csb-hld-rust-static-v7");
+        // Reading immutable v2 history does not relabel it as the v7 profile.
         let mut legacy = before.clone();
         legacy.generator_version = "csb-hld-rust-static-v2".into();
         for evidence in &mut legacy.evidence {

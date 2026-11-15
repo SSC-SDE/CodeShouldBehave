@@ -142,8 +142,15 @@ impl Fixture {
         let mut snapshots = vec![];
         for commit in [&baseline, &proposal] {
             let commit = SnapshotId::new(commit.clone()).unwrap();
-            let hld =
-                generate_hld(&root, &commit, &scope, &context, &Cancellation::default()).unwrap();
+            let hld = generate_hld(
+                &root,
+                &commit,
+                &scope,
+                &context,
+                &BTreeSet::new(),
+                &Cancellation::default(),
+            )
+            .unwrap();
             let lld = generate_lld(
                 &root,
                 &commit,

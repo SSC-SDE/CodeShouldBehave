@@ -1321,6 +1321,7 @@ pub fn lld_detail_design(
             gaps: detail.coverage.gaps.clone(),
             deferred_element_kinds: vec![],
             deferred_paths: vec![],
+            deferred_facts: vec![],
         },
         constraints: vec![],
         correspondence: vec![],

@@ -1150,3 +1150,39 @@ class ReviewerVerdictTests(unittest.TestCase):
         self.assertEqual(ci.verdict_conclusion(dict(conclusion='success', verdict='change_detected')), 'neutral')
         self.assertEqual(ci.verdict_conclusion(dict(conclusion='success', verdict='no_change_detected')), 'success')
         self.assertEqual(ci.verdict_conclusion(dict(conclusion='cancelled', verdict='no_change_detected')), 'cancelled')
+
+class ReportRetentionTests(unittest.TestCase):
+    def test_policy_is_repository_scoped_and_bounded(self):
+        config = configuration()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / ".codeshouldbehave").mkdir()
+            path = root / ".codeshouldbehave/report-retention.json"
+            path.write_text(json.dumps({"schema_version": ci.RETENTION_SCHEMA, "repository_id": config["repository"]["id"], "retire_on_merge": True, "grace_days": 14}))
+            self.assertEqual(ci._report_retention_policy(config, root)["grace_days"], 14)
+            path.write_text(json.dumps({"schema_version": ci.RETENTION_SCHEMA, "repository_id": config["repository"]["id"], "retire_on_merge": True, "grace_days": 91}))
+            with self.assertRaises(ci.Refusal):
+                ci._report_retention_policy(config, root)
+            path.write_text(json.dumps({"schema_version": ci.RETENTION_SCHEMA, "repository_id": config["repository"]["id"] + 1, "retire_on_merge": True, "grace_days": 0}))
+            with self.assertRaises(ci.Refusal):
+                ci._report_retention_policy(config, root)
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertIsNone(ci._report_retention_policy(config, Path(tmp)))
+
+    def test_merge_time_and_grace_drive_retirement(self):
+        now = datetime(2026, 11, 15, 12, 0, tzinfo=timezone.utc)
+        records = [
+            {"pr_number": 1, "public_report_id": "a" * 64},
+            {"pr_number": 2, "public_report_id": "b" * 64},
+            {"pr_number": 3, "public_report_id": "c" * 64},
+        ]
+        merged = {1: "2026-11-01T00:00:00Z", 2: "2026-11-12T00:00:00Z", 3: None}
+
+        def pull(number):
+            return {"number": number, "merged_at": merged[number]}
+
+        policy = {"retire_on_merge": True, "grace_days": 14}
+        self.assertEqual(ci.merged_report_retirements(policy, records, now, pull), ["a" * 64])
+        self.assertEqual(ci.merged_report_retirements(dict(policy, grace_days=0), records, now, pull), ["a" * 64, "b" * 64])
+        self.assertEqual(ci.merged_report_retirements(dict(policy, retire_on_merge=False), records, now, pull), [])
+        self.assertEqual(ci.merged_report_retirements(None, records, now, pull), [])

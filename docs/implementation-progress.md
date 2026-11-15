@@ -1621,3 +1621,34 @@ is claimed; deployed release still predates these fixes.
   difference rather than a confirmed addition.
 - PR #63 was later closed as demo-only and never merged. Nothing here
   authorizes deploying product code or completing any phase.
+
+### W1.2 certainty index and report retention implemented
+
+- Approved budget decisions: keep the 900 KiB per-version display envelope and
+  the 64 MiB expanded-byte site cap; add a compact deferred-fact index so
+  trimmed inventory stays provable; retire a report when its PR merges, with an
+  optional 14-day grace setting; keep per-item uncertainty labels explicit.
+- `DesignCoverage.deferred_facts` records 64-bit identity/fingerprint pairs for
+  elements and relations removed by bounded trimming. `compare_hld` resolves
+  one-sided facts from that index: matching fingerprints mean unchanged,
+  differing fingerprints mean modified, and only facts absent from both the
+  display set and the index remain `uncertain`. Generator profile
+  `csb-hld-rust-static-v6` → `v7`.
+- Verification: `cargo test --lib --features server` — 267 passed. New tests
+  cover an index-resolved unchanged/modified contract and real trimming
+  populating deferred facts.
+- Review artifacts omit rendered `markdown` and `mermaid` from both HLD
+  versions; the public report and CLI export regenerate them from retained
+  facts. Verification: `cargo test --features server --test public_report` —
+  18 passed.
+- Publication retention: `.codeshouldbehave/report-retention.json`
+  (`retire_on_merge: true`, `grace_days: 0`) authorizes merged-report
+  retirement; the publisher reads provider `merged_at` and retires reports only
+  after the configured grace. `python3 -m unittest discover -s tests -p
+  "*test.py"` — 269 passed (6 skipped).
+- Not included: ID interning, baseline+delta encoding, and compressed-byte site
+  accounting. They remain candidate follow-ups; none is required for the
+  decisions above.
+- PR [#70](https://github.com/SSC-SDE/CodeShouldBehave/pull/70) carries this
+  implementation with green checks. Nothing here authorizes merging, deploying,
+  or changing the release pin.

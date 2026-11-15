@@ -374,7 +374,7 @@ def validate_state(value: Any, config: dict) -> dict:
 
 
 def validate_pr(item: Any, config: dict) -> dict:
-    object_fields(item, {"number", "repository", "selected_baseline", "proposal", "state", "draft", "public", "consent"}, name="provider PR")
+    object_fields(item, {"number", "repository", "selected_baseline", "proposal", "state", "draft", "public", "consent"}, {"merged_at"}, name="provider PR")
     integer(item["number"], 1, 2**31 - 1, "PR number")
     if repository(item["repository"]) != config["repository"] or item["public"] is not True or item["consent"] is not True:
         raise Refusal("PR is outside approved public repository/consent")
@@ -382,6 +382,11 @@ def validate_pr(item: Any, config: dict) -> dict:
         text(item[key], COMMIT, key)
     if item["state"] not in ("open", "closed") or not isinstance(item["draft"], bool):
         raise Refusal("invalid provider PR state")
+    merged_at = item.get("merged_at")
+    if merged_at is not None:
+        utc(merged_at)
+        if item["state"] != "closed":
+            raise Refusal("open PR cannot carry a merge time")
     return dict(item)
 
 
@@ -681,7 +686,8 @@ class GitHub:
             raise Refusal("PR base repository differs from configured identity")
         return validate_pr({"number": item.get("number"), "repository": self.config["repository"],
                             "selected_baseline": item.get("base", {}).get("sha"), "proposal": item.get("head", {}).get("sha"),
-                            "state": item.get("state"), "draft": item.get("draft"), "public": True, "consent": True}, self.config)
+                            "state": item.get("state"), "draft": item.get("draft"), "public": True, "consent": True,
+                            "merged_at": item.get("merged_at")}, self.config)
 
     def artifact_inventory(self, reserve: int) -> int:
         total, self.handoff_bytes = 0, 0
@@ -1730,6 +1736,49 @@ def _authorized_report_retirements(config: dict, trusted_root: Path) -> list[str
     return sorted(identities)
 
 
+RETENTION_SCHEMA = "csb-public-report-retention-v1"
+
+
+def _report_retention_policy(config: dict, trusted_root: Path) -> dict | None:
+    """Read the repository owner's bounded retention policy, if present."""
+    path = trusted_root / ".codeshouldbehave/report-retention.json"
+    if path.parent.is_symlink() or path.is_symlink():
+        raise Refusal("linked report retention policy")
+    if not path.exists():
+        return None
+    value = read_json(path, MAX_CONFIG_BYTES)
+    object_fields(value, {"schema_version", "repository_id", "retire_on_merge", "grace_days"}, name="report retention policy")
+    if value["schema_version"] != RETENTION_SCHEMA or integer(value["repository_id"], 1, 2**63 - 1, "retention repository") != config["repository"]["id"]:
+        raise Refusal("report retention authority differs")
+    if not isinstance(value["retire_on_merge"], bool):
+        raise Refusal("report retention flag invalid")
+    integer(value["grace_days"], 0, 90, "report retention grace days")
+    return value
+
+
+def merged_report_retirements(policy: dict | None, records: list[dict], now: datetime,
+                              pull: Callable, limit: int = 50) -> list[str]:
+    """Reports whose PRs were provider-confirmed merged and past the grace period.
+
+    The policy file is the repository owner's authorization; merge time comes
+    from the provider, never from a closed PR state.
+    """
+    if policy is None or not policy["retire_on_merge"]:
+        return []
+    retired = []
+    for record in records[:limit]:
+        public_id = record.get("public_report_id")
+        number = record.get("pr_number")
+        if not isinstance(public_id, str) or isinstance(number, bool) or not isinstance(number, int) or number < 1:
+            continue
+        merged_at = pull(number).get("merged_at")
+        if merged_at is None:
+            continue
+        if (now - utc(merged_at)).total_seconds() >= policy["grace_days"] * 86400:
+            retired.append(public_id)
+    return retired
+
+
 def stage_publication(config: dict, plan_value: dict, handoffs: Path, output: Path, *,
                       provider: GitHub, project_root: Path, trusted_root: Path, verifier: Path, check_acks: dict | None = None, get: Callable = http_bytes) -> dict:
     if not config["operations"]["publication"]:
@@ -1773,10 +1822,12 @@ def stage_publication(config: dict, plan_value: dict, handoffs: Path, output: Pa
     expected_policy = public_policy_digest(config, trusted_root)
     retirements = _authorized_report_retirements(config, trusted_root)
     known_reports = set()
+    retained_records = []
     restored = restore_public_site(config, previous, output / "previous", get=get)
     if restored is not None:
         old_index = read_json(restored / "index.json", MAX_SITE_BYTES)
-        for record in old_index.get("reports", []):
+        retained_records = old_index.get("reports", [])
+        for record in retained_records:
             public_id = text(record.get("public_report_id"), SHA256, "restored report id")
             known_reports.add(public_id)
             old_manifest = read_json(restored / "reviews" / public_id / "manifest.json", MIB)
@@ -1790,6 +1841,13 @@ def stage_publication(config: dict, plan_value: dict, handoffs: Path, output: Pa
         if public_id not in state["withdrawn"]:
             state["withdrawn"].append(public_id)
             state["consent_epoch"] += 1
+    policy = _report_retention_policy(config, trusted_root)
+    if policy is not None:
+        candidates = [record for record in retained_records if record.get("public_report_id") not in state["withdrawn"]]
+        for public_id in merged_report_retirements(policy, candidates, datetime.now(timezone.utc), provider.pull):
+            if public_id in known_reports and public_id not in state["withdrawn"]:
+                state["withdrawn"].append(public_id)
+                state["consent_epoch"] += 1
     validate_state(state, config)
     for request_id, request in requests.items():
         directory = handoffs / ("csb-public-handoff-" + request_id)
