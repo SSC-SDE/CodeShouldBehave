@@ -10,6 +10,14 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::path::Path;
 
+/// Rendered views are derivable and omitted from the artifact payload; compare
+/// immutable facts without them.
+fn without_rendered(mut version: DesignVersion) -> DesignVersion {
+    version.markdown.clear();
+    version.mermaid.clear();
+    version
+}
+
 fn field<'a>(request: &'a Value, key: &str) -> Result<&'a str, String> {
     request[key]
         .as_str()
@@ -206,16 +214,25 @@ pub fn invoke(
     let scope = super::hld::candidate_scope(&value, repository)?;
     // The existing shared design boundary intersects current grants, accepted
     // context and immutable scope before any retained source/detail is returned.
-    let baseline_hld: DesignVersion = serde_json::from_value(value["hld"]["baseline"].clone())
+    let mut baseline_hld: DesignVersion = serde_json::from_value(value["hld"]["baseline"].clone())
         .map_err(|_| "LLD HLD parent unavailable")?;
-    let proposal_hld: DesignVersion = serde_json::from_value(value["hld"]["proposal"].clone())
+    let mut proposal_hld: DesignVersion = serde_json::from_value(value["hld"]["proposal"].clone())
         .map_err(|_| "LLD HLD parent unavailable")?;
-    if storage.load_design_version(repository, &baseline_hld.id, principal, grants)? != baseline_hld
-        || storage.load_design_version(repository, &proposal_hld.id, principal, grants)?
-            != proposal_hld
+    let stored_baseline = without_rendered(
+        storage.load_design_version(repository, &baseline_hld.id, principal, grants)?,
+    );
+    let stored_proposal = without_rendered(
+        storage.load_design_version(repository, &proposal_hld.id, principal, grants)?,
+    );
+    if stored_baseline != without_rendered(baseline_hld.clone())
+        || stored_proposal != without_rendered(proposal_hld.clone())
     {
         return Err("LLD parent differs from its immutable authorized design".into());
     }
+    baseline_hld.mermaid = flowdiff::design::render_hld_mermaid(&baseline_hld);
+    baseline_hld.markdown = flowdiff::design::render_hld_markdown(&baseline_hld);
+    proposal_hld.mermaid = flowdiff::design::render_hld_mermaid(&proposal_hld);
+    proposal_hld.markdown = flowdiff::design::render_hld_markdown(&proposal_hld);
     let parent = field(&request, "parent_hld")?;
     if parent != baseline_hld.id && parent != proposal_hld.id {
         return Err("LLD parent version mismatch".into());

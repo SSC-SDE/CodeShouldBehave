@@ -251,8 +251,8 @@ impl ReviewArtifact {
         let (sources, source_gaps) =
             design_sources(repository, &baseline, &proposal, cancellation)?;
         self.hld = Some(ArtifactHld {
-            baseline,
-            proposal,
+            baseline: without_rendered(baseline),
+            proposal: without_rendered(proposal),
             delta,
             sources,
             source_gaps,
@@ -330,6 +330,17 @@ impl ReviewArtifact {
         }
         Ok(bytes)
     }
+}
+
+/// Rendered markdown and mermaid are derivable from the retained facts and the
+/// public report regenerates them. Omitting them removes duplicate payload
+/// without changing the review.
+fn without_rendered(
+    mut version: crate::design::DesignVersion,
+) -> crate::design::DesignVersion {
+    version.markdown.clear();
+    version.mermaid.clear();
+    version
 }
 
 /// Retain only bounded, authorized evidence spans while the isolated mirror is
