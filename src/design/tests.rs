@@ -1017,6 +1017,111 @@ fn deferred_paths_scope_uncertainty_to_their_own_evidence() {
     );
 }
 
+#[test]
+fn deferred_inventory_index_proves_trimmed_facts_unchanged_or_modified() {
+    use super::diff::{element_fingerprint, relation_fingerprint};
+    let fixture = Fixture::new();
+    let source = fixture.simple();
+    let scope = scope();
+    let context = context(&source);
+    let generated = generate(&fixture, &source, &scope, &context);
+    let contract = generated
+        .elements
+        .iter()
+        .find(|element| element.kind == DesignElementKind::Contract)
+        .cloned()
+        .expect("fixture exposes a public contract");
+    let mut baseline = generated.clone();
+    baseline.coverage.complete = false;
+    baseline.elements.retain(|element| element.id != contract.id);
+    let removed_relations = generated
+        .relations
+        .iter()
+        .filter(|relation| relation.from == contract.id || relation.to == contract.id)
+        .cloned()
+        .collect::<Vec<_>>();
+    for relation in &removed_relations {
+        baseline
+            .coverage
+            .record_deferred("relation", &relation.id, &relation_fingerprint(relation));
+    }
+    baseline
+        .relations
+        .retain(|relation| relation.from != contract.id && relation.to != contract.id);
+    baseline
+        .coverage
+        .record_deferred("element", &contract.id, &element_fingerprint(&contract));
+    let unchanged = compare_hld(&baseline, &generated).unwrap();
+    assert!(unchanged.changes.is_empty(), "{:?}", unchanged.changes);
+    let mut proposal = generated.clone();
+    let mut changed = contract.clone();
+    changed.facts.push(DesignFact {
+        kind: "signature".into(),
+        value: "changed_signature".into(),
+        resolution: DesignResolution::ObservedStructure,
+        evidence_ids: vec![],
+    });
+    proposal.elements = proposal
+        .elements
+        .into_iter()
+        .map(|element| {
+            if element.id == contract.id {
+                changed.clone()
+            } else {
+                element
+            }
+        })
+        .collect();
+    let modified = compare_hld(&baseline, &proposal).unwrap();
+    assert!(
+        !modified.changes.iter().any(|change| {
+            change.kind == "uncertain"
+                && change.element_id.as_deref() == Some(contract.id.as_str())
+        }),
+        "{:?}",
+        modified.changes
+    );
+    assert!(
+        modified.changes.iter().any(|change| {
+            change.kind == "modified" && change.element_id.as_deref() == Some(contract.id.as_str())
+        }),
+        "{:?}",
+        modified.changes
+    );
+}
+
+#[test]
+fn bounded_trimming_records_deferred_fingerprints() {
+    let fixture = Fixture::new();
+    let baseline = fixture.simple();
+    let mut source = String::new();
+    for index in 0..2500 {
+        source.push_str(&format!("pub fn f{index}()->i32{{{index}}}\n"));
+    }
+    fixture.write("src/lib.rs", &source);
+    let commit = fixture.commit();
+    let scope = scope();
+    let context = context(&baseline);
+    let version = generate(&fixture, &commit, &scope, &context);
+    assert!(version.coverage.deferred > 0, "expected bounded trimming");
+    assert!(
+        version
+            .coverage
+            .deferred_facts
+            .iter()
+            .any(|fact| fact.kind == "element"),
+        "trimming must record deferred element fingerprints"
+    );
+    assert!(
+        version
+            .coverage
+            .gaps
+            .iter()
+            .any(|gap| gap.contains("HLD storage budget"))
+    );
+    assert!(serde_json::to_vec(&version).unwrap().len() <= 900 * 1024);
+}
+
 /// An unavailable pinned tree hides every path, so it can never manufacture
 /// additions or removals.
 #[test]

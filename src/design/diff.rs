@@ -12,6 +12,15 @@ fn semantic_element(element: &DesignElement) -> serde_json::Value {
 fn semantic_relation(relation: &DesignRelation) -> serde_json::Value {
     serde_json::json!({"from":relation.from,"to":relation.to,"kind":relation.kind,"direction":relation.direction,"protocol":relation.protocol,"synchrony":relation.synchrony})
 }
+/// Compact semantic identity used by the bounded inventory index.
+pub(crate) fn element_fingerprint(element: &DesignElement) -> String {
+    let value = serde_json::to_string(&semantic_element(element)).unwrap_or_default();
+    digest(&[&value])[..16].to_string()
+}
+pub(crate) fn relation_fingerprint(relation: &DesignRelation) -> String {
+    let value = serde_json::to_string(&semantic_relation(relation)).unwrap_or_default();
+    digest(&[&value])[..16].to_string()
+}
 fn fact_semantics(element: &DesignElement) -> BTreeMap<&str, BTreeSet<&str>> {
     let mut facts: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
     for fact in &element.facts {
@@ -189,17 +198,29 @@ pub fn compare_hld(
         let after = new.get(id).copied();
         let kind = match (before, after) {
             (None, Some(after)) => {
-                if absent_element_is_sound(&baseline.coverage, after, &proposal.evidence) {
-                    "added"
+                if let Some(fingerprint) = baseline.coverage.deferred_fingerprint("element", &after.id) {
+                    if fingerprint == element_fingerprint(after) {
+                        None
+                    } else {
+                        Some("modified")
+                    }
+                } else if absent_element_is_sound(&baseline.coverage, after, &proposal.evidence) {
+                    Some("added")
                 } else {
-                    "uncertain"
+                    Some("uncertain")
                 }
             }
             (Some(before), None) => {
-                if absent_element_is_sound(&proposal.coverage, before, &baseline.evidence) {
-                    "removed"
+                if let Some(fingerprint) = proposal.coverage.deferred_fingerprint("element", &before.id) {
+                    if fingerprint == element_fingerprint(before) {
+                        None
+                    } else {
+                        Some("modified")
+                    }
+                } else if absent_element_is_sound(&proposal.coverage, before, &baseline.evidence) {
+                    Some("removed")
                 } else {
-                    "uncertain"
+                    Some("uncertain")
                 }
             }
             (Some(before), Some(after)) if semantic_element(before) != semantic_element(after) => {
@@ -209,16 +230,17 @@ pub fn compare_hld(
                     baseline.coverage.complete,
                     proposal.coverage.complete,
                 ) {
-                    "uncertain"
+                    Some("uncertain")
                 } else if before.roots != after.roots && before.kind == DesignElementKind::Component
                 {
-                    "moved"
+                    Some("moved")
                 } else {
-                    "modified"
+                    Some("modified")
                 }
             }
-            _ => continue,
+            _ => None,
         };
+        let Some(kind) = kind else { continue; };
         if kind != "uncertain" {
             changed.insert(id.to_string());
             for element in before.into_iter().chain(after) {
@@ -331,26 +353,39 @@ pub fn compare_hld(
         }
         let kind = match (before, after) {
             (None, Some(after)) => {
-                if absent_relation_is_sound(&baseline.coverage, after, proposal, baseline) {
-                    "added"
+                if let Some(fingerprint) = baseline.coverage.deferred_fingerprint("relation", &after.id) {
+                    if fingerprint == relation_fingerprint(after) {
+                        None
+                    } else {
+                        Some("modified")
+                    }
+                } else if absent_relation_is_sound(&baseline.coverage, after, proposal, baseline) {
+                    Some("added")
                 } else {
-                    "uncertain"
+                    Some("uncertain")
                 }
             }
             (Some(before), None) => {
-                if absent_relation_is_sound(&proposal.coverage, before, baseline, proposal) {
-                    "removed"
+                if let Some(fingerprint) = proposal.coverage.deferred_fingerprint("relation", &before.id) {
+                    if fingerprint == relation_fingerprint(before) {
+                        None
+                    } else {
+                        Some("modified")
+                    }
+                } else if absent_relation_is_sound(&proposal.coverage, before, baseline, proposal) {
+                    Some("removed")
                 } else {
-                    "uncertain"
+                    Some("uncertain")
                 }
             }
             (Some(before), Some(after))
                 if semantic_relation(before) != semantic_relation(after) =>
             {
-                "modified"
+                Some("modified")
             }
-            _ => continue,
+            _ => None,
         };
+        let Some(kind) = kind else { continue; };
         let mut evidence = before
             .into_iter()
             .chain(after)

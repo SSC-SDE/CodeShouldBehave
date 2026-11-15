@@ -16,7 +16,7 @@ pub use diff::{compare_hld, evaluate_hld_constraints};
 pub use generate::generate_hld;
 pub use render::{render_hld_markdown, render_hld_mermaid};
 
-pub const HLD_GENERATOR_VERSION: &str = "csb-hld-rust-static-v6";
+pub const HLD_GENERATOR_VERSION: &str = "csb-hld-rust-static-v7";
 pub const HLD_PROFILE: &str = "Rust public declarations, explicit package dependencies, schema artifacts and static deployment configuration; runtime behavior unverified";
 
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -124,6 +124,17 @@ pub struct DesignSection {
     pub relation_ids: Vec<String>,
     pub unknowns: Vec<String>,
 }
+/// A fact that the bounded HLD profile observed but did not retain in the
+/// displayed inventory. The short identity prefix and semantic fingerprint let
+/// a later snapshot prove presence, absence or modification without storing
+/// the full element or relation.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct DeferredFact {
+    pub kind: String,
+    pub id: String,
+    pub fingerprint: String,
+}
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct DesignCoverage {
@@ -145,6 +156,11 @@ pub struct DesignCoverage {
     /// unknown region, such as an unavailable pinned tree.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub deferred_paths: Vec<String>,
+    /// Observed facts removed by bounded trimming, retained as short
+    /// identity/fingerprint pairs so comparisons can distinguish a trimmed
+    /// fact from an absent one.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub deferred_facts: Vec<DeferredFact>,
 }
 impl DesignCoverage {
     pub fn defers_element_kind(&self, kind: &DesignElementKind) -> bool {
@@ -157,6 +173,37 @@ impl DesignCoverage {
             .iter()
             .any(|deferred| deferred == "*" || path_intersects(deferred, path))
     }
+    /// Record a fact observed before bounded trimming. Identity and
+    /// fingerprint are stored as 16-hex prefixes; 64 bits make accidental
+    /// collisions negligible at this inventory scale.
+    pub fn record_deferred(&mut self, kind: &str, id: &str, fingerprint: &str) {
+        let id = fact_key(id);
+        if self
+            .deferred_facts
+            .iter()
+            .any(|fact| fact.kind == kind && fact.id == id)
+        {
+            return;
+        }
+        self.deferred_facts.push(DeferredFact {
+            kind: kind.into(),
+            id: id.into(),
+            fingerprint: fingerprint[..fingerprint.len().min(16)].into(),
+        });
+    }
+    /// Fingerprint of a fact this snapshot observed but did not retain.
+    pub fn deferred_fingerprint(&self, kind: &str, id: &str) -> Option<&str> {
+        let id = fact_key(id);
+        self.deferred_facts
+            .iter()
+            .find(|fact| fact.kind == kind && fact.id == id)
+            .map(|fact| fact.fingerprint.as_str())
+    }
+}
+/// 64-bit identity key: the trailing hash segment, not the kind prefix.
+fn fact_key(id: &str) -> &str {
+    let raw = id.rsplit_once('-').map(|(_, suffix)| suffix).unwrap_or(id);
+    &raw[..raw.len().min(16)]
 }
 pub fn element_kind_name(kind: &DesignElementKind) -> &'static str {
     match kind {
