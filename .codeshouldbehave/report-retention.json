@@ -1,0 +1,6 @@
+{
+  "schema_version": "csb-public-report-retention-v1",
+  "repository_id": 1423092555,
+  "retire_on_merge": true,
+  "grace_days": 0
+}
