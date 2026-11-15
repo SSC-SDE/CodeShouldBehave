@@ -1,12 +1,12 @@
 {
   "engine": {
-    "commit": "9862ceba0a46bfd3bc2c61d685fdda9681d72431",
+    "commit": "6b5fce6073fe29b0251fa38242792eaaedf18587",
     "exporter_sha256": "97b48871c02826de6a348dfe285af55268d26aa23d6a99b2ee49b49091835f89",
     "flowdiff_sha256": "358ca75e4c1ff1c89cd0535013e828d32353d01b16294d31c3d5c023f6effef9",
-    "package_attestation_sha256": "8e5c573e858336336331248a33c01d440fead34ddf212d1cd4379a0b1d9c9ff2",
-    "package_attestation_url": "https://github.com/SSC-SDE/CodeShouldBehave/releases/download/canary-9862ceba0a46/native-build.sigstore.json",
-    "package_sha256": "74d5f330602e02e10e6d652407767e625ced4c364ba079972b361063e9b96328",
+    "package_attestation_sha256": "03a5d31f5cb545f32972a0fe8a2c9600723ad9d0fc2821032c4742725cfae807",
+    "package_attestation_url": "https://github.com/SSC-SDE/CodeShouldBehave/releases/download/canary-6b5fce6073fe/native-build.sigstore.json",
+    "package_sha256": "a7b2e1ecfadae212575c97f618d6eebe3f0beb42537046c1c54b1e96a58bc3e4",
     "package_signer_workflow": "SSC-SDE/CodeShouldBehave/.github/workflows/csb-engine-build.yml",
-    "package_url": "https://github.com/SSC-SDE/CodeShouldBehave/releases/download/canary-9862ceba0a46/codeshouldbehave-x86_64-unknown-linux-gnu-9862ceba0a46.tar.gz"
+    "package_url": "https://github.com/SSC-SDE/CodeShouldBehave/releases/download/canary-6b5fce6073fe/codeshouldbehave-x86_64-unknown-linux-gnu-6b5fce6073fe.tar.gz"
   }
 }
