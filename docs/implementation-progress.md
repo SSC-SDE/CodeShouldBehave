@@ -1652,3 +1652,28 @@ is claimed; deployed release still predates these fixes.
 - PR [#70](https://github.com/SSC-SDE/CodeShouldBehave/pull/70) merged in
   `b785951bfe078c221ed82757c2e464b89f59a45b`. Nothing here authorizes deploying
   or changing the release pin.
+
+### Attested v7 engine release and hosted report
+
+- Release [canary-9862ceba0a46](https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-9862ceba0a46)
+  was built by the trusted Linux workflow from `9862ceba0a46` and attested
+  (`gh attestation verify` status 0). Package `74d5f330...`, `flowdiff`
+  `358ca75e...`, `csb-public-report` `97b48871...`, attestation `8e5c573e...`.
+- Pins: PR [#73](https://github.com/SSC-SDE/CodeShouldBehave/pull/73) merged in
+  `64c6b934f8cbb5a4b3ee1dd73b0cc833117d6165`; budget-activation compatibility
+  restored in PR [#74](https://github.com/SSC-SDE/CodeShouldBehave/pull/74),
+  merged in `8077ac130ba7b4e619f0501297015117ae4ef44d`. The budget block remains
+  the activated digest `2ba54f78...`; changing it is refused as a policy change
+  without a new activation.
+- Controller run on the v7 pin succeeded and retired merged reports at
+  `grace_days: 0`, reducing the live index from 8 reports to 4 before the demo
+  refresh. Live site manifest: 40,935,662 B of 64 MiB, 5 report directories
+  after the refresh.
+- Demo PR #63 was reopened for one review and closed again. Its v7 report is
+  `1dc94cd6b7850784a3d7e12b7304235a1a2402b219692fa46ae15ba958ef209e`
+  (`hld_generator: csb-hld-rust-static-v7`) with 145 added (72 elements +
+  73 relations) and 1 uncertain (the root component boundary). The superseded
+  v4 report `9361992db51ac9822d5f3b6efe8ba5e61637fe820e13fd6e86ac20600cf83054`
+  remains published until explicitly retired.
+- Local v7 proof on the same pair: 2,982,294 B artifact, 1,400 deferred facts
+  (107,102 B), versions 678,209/645,895 B.
