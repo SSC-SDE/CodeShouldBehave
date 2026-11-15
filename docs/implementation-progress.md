@@ -1677,3 +1677,24 @@ is claimed; deployed release still predates these fixes.
   remains published until explicitly retired.
 - Local v7 proof on the same pair: 2,982,294 B artifact, 1,400 deferred facts
   (107,102 B), versions 678,209/645,895 B.
+
+### Landing page redesigned and published
+
+- PR [#76](https://github.com/SSC-SDE/CodeShouldBehave/pull/76) merged in
+  `6b5fce6073fe29b0251fa38242792eaaedf18587`: Inter body with JetBrains Mono
+  labels, a heavier display headline, layered HLD/LLD hero evidence, a
+  three-step walkthrough, a bounded-evidence trust band, status-chipped setup
+  paths, and an expanded footer. No JavaScript; CSP and asset pipeline
+  unchanged.
+- The publisher assembles the landing from the pinned engine package, so
+  publishing required a new attested release: `canary-6b5fce6073fe` (package
+  `a7b2e1ec...`, attestation `03a5d31f...`), pinned in PR
+  [#77](https://github.com/SSC-SDE/CodeShouldBehave/pull/77), merged
+  `fc04b811b05d7247c2cabcaea9654f745a2fb58c`. The activated budget block was
+  left unchanged.
+- The superseded v4 report `9361992d...` was retired in the same PR; the live
+  index now holds four reports (PRs 53, 63, 48, 24).
+- Controller run 43747152410 succeeded. Live `index.html` and
+  `assets/landing.css` hashes match the repository; verified at 1440, 1024,
+  768, 390 and 320 px in light and dark, with no horizontal overflow and no
+  console errors.
