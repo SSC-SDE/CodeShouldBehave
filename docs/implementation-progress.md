@@ -1649,3 +1649,6 @@ is claimed; deployed release still predates these fixes.
 - Not included: ID interning, baseline+delta encoding, and compressed-byte site
   accounting. They remain candidate follow-ups; none is required for the
   decisions above.
+- PR [#70](https://github.com/SSC-SDE/CodeShouldBehave/pull/70) carries this
+  implementation with green checks. Nothing here authorizes merging, deploying,
+  or changing the release pin.
