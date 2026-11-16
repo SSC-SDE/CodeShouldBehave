@@ -399,6 +399,7 @@ mod replay {
             &SnapshotId::new(commit.into())?,
             &scope,
             &context,
+            &BTreeSet::new(),
             &Cancellation::default(),
         )
     }
@@ -680,6 +681,7 @@ mod replay {
                 &SnapshotId::new(commit.into())?,
                 &scope,
                 &context,
+                &BTreeSet::new(),
                 &Cancellation::default(),
             )
         };
@@ -751,6 +753,7 @@ mod replay {
             &SnapshotId::new(head.clone())?,
             &scope,
             &context,
+            &BTreeSet::new(),
             &cancel,
         )
         .is_ok()
@@ -788,6 +791,7 @@ mod replay {
             &SnapshotId::new(boundary_commit.clone())?,
             &scope,
             &boundary_context,
+            &BTreeSet::new(),
             &Cancellation::default(),
         )?;
         if compare_hld(&merged_design, &boundary_design)?.outcome != DesignOutcome::ChangeDetected {
