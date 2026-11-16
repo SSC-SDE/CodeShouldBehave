@@ -12,6 +12,7 @@ test('observed references remain uncertain rather than claiming architectural ad
   const payload=fixture(),[scope]=model.boundaries(payload);
   assert.equal(model.state(scope),'uncertain');
   assert.match(model.description(scope,'combined'),/addition is not established/);
+  assert.match(model.description(scope,'combined'),/trimmed or left unresolved/);
   const graph=model.diagram(payload,[scope],scope,'combined');
   assert.equal(graph.connected,1);assert.match(graph.source,/only observed after/);
   payload.baseline.relations=structuredClone(payload.proposal.relations);

@@ -1,7 +1,7 @@
 'use strict';
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
-const {ReviewWorkspace,hldOutcome,hldExportAllowed,hldComparison,hldDiagramElements,hldMermaid,hldEvidenceFor,hldCorrection,encodeWorkspaceRoute,decodeWorkspaceRoute}=require('../src/workspace.js');
+const {ReviewWorkspace,hldOutcome,hldDeferredCoverage,hldDeferredPathUrl,hldExportAllowed,hldComparison,hldDiagramElements,hldMermaid,hldEvidenceFor,hldCorrection,encodeWorkspaceRoute,decodeWorkspaceRoute}=require('../src/workspace.js');
 
 function version(id,commit,name='API') {
   return {id,snapshot:commit,scope_version:'scope-1',generator_version:'hld-v1',review_state:'partial',coverage:{complete:false,gaps:['Runtime behavior is unverified']},elements:[
@@ -28,6 +28,25 @@ test('HLD outcome never upgrades incomplete coverage to no impact',()=>{
   assert.equal(hldOutcome({outcome:'incomplete'}),'Unable to determine completely');
   assert.equal(hldOutcome({outcome:'no_change_detected_within_scope'}),'No HLD change detected within covered scope');
   assert.equal(hldOutcome({outcome:'change_detected'}),'HLD change detected');
+});
+
+test('trimmed inventory is labelled as deferred, not as an observed HLD change',()=>{
+  const data=payload();
+  data.baseline.coverage.deferred_paths=['src/old.rs','*'];
+  data.proposal.coverage.deferred_paths=['src/new.rs'];
+  data.proposal.coverage.deferred_element_kinds=['contract'];
+  const combined=hldDeferredCoverage(data,'combined');
+  assert.deepEqual(combined.paths,['*','src/new.rs','src/old.rs']);
+  assert.deepEqual(combined.kinds,['contract']);
+  assert.equal(combined.commits.get('src/old.rs'),'a'.repeat(40));
+  assert.equal(combined.commits.get('src/new.rs'),'b'.repeat(40));
+  assert.deepEqual(hldDeferredCoverage(data,'baseline').paths,['*','src/old.rs']);
+  assert.deepEqual(hldDeferredCoverage(data,'proposal').kinds,['contract']);
+  const repository={owner:'SSC-SDE',name:'CodeShouldBehave'};
+  assert.equal(hldDeferredPathUrl(repository,'b'.repeat(40),'src/new.rs'),`https://github.com/SSC-SDE/CodeShouldBehave/tree/${'b'.repeat(40)}/src/new.rs`);
+  assert.equal(hldDeferredPathUrl(repository,'b'.repeat(40),'*'),`https://github.com/SSC-SDE/CodeShouldBehave/tree/${'b'.repeat(40)}`);
+  assert.equal(hldDeferredPathUrl(repository,'b'.repeat(40),'../secret'),null);
+  assert.equal(hldDeferredPathUrl(repository,'not-a-commit','src/new.rs'),null);
 });
 
 test('HLD comparison uses stable logical IDs and server semantic classifications',()=>{

@@ -100,7 +100,7 @@ function mount(hooks){
     const heading=inspector.querySelector('h3');if(!heading)return null;
     const top=el('header','focus-desk-inspector-heading'),close=button('×',()=>{showInspector(false);evidence.focus();});close.setAttribute('aria-label','Close HLD evidence');top.append(el('span','','Evidence'),close);inspector.prepend(top);
     heading.classList.add('focus-desk-selected-name');heading.before(el('span','focus-desk-selected-kind',model.kinds[selected.kind]||selected.kind));
-    const status=model.state(scope),statusText=comparisonMode==='accepted'?'Accepted architecture':status==='same'?'Shared context':status==='uncertain'?'? Observation difference · unverified':({added:'+ Added',removed:'− Removed',modified:'~ Modified'}[status]);
+    const status=model.state(scope),statusText=comparisonMode==='accepted'?'Accepted architecture':status==='same'?'Shared context':status==='uncertain'?'? Not an observed change · inventory trimmed or unresolved':({added:'+ Added',removed:'− Removed',modified:'~ Modified'}[status]);
     const tag=el('p','focus-desk-selected-status',selected.id===scope.target.id?statusText:'Component context');heading.after(tag);
     const explanation=el('p','focus-desk-description',selected.id===scope.target.id?model.description(scope,comparisonMode):selected.responsibility||'Component responsibility is not established. Inspect the retained source evidence.');tag.after(explanation);
     const snapshots=el('div','focus-desk-snapshots');
