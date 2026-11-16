@@ -1,0 +1,22 @@
+# Merge into .gitlab-ci.yml. The image must be reachable from your runners.
+csb-review:
+  image: ghcr.io/ssc-sde/csb:latest
+  stage: test
+  variables:
+    GIT_DEPTH: "0"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+  script:
+    - |
+      csb review \
+        --repo "$CI_PROJECT_DIR" \
+        --base "$CI_MERGE_REQUEST_DIFF_BASE_SHA" \
+        --head "$CI_COMMIT_SHA" \
+        --out-dir "$CI_PROJECT_DIR/csb-review" \
+        --allow-dirty \
+        --summary check
+  artifacts:
+    when: always
+    paths:
+      - csb-review/
+    expire_in: 30 days

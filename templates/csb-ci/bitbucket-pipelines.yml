@@ -1,0 +1,21 @@
+# Merge into bitbucket-pipelines.yml.
+image: ghcr.io/ssc-sde/csb:latest
+
+pipelines:
+  pull-requests:
+    "**":
+      - step:
+          name: CodeShouldBehave review
+          clone:
+            depth: full
+          script:
+            - |
+              csb review \
+                --repo "$BITBUCKET_CLONE_DIR" \
+                --base "$BITBUCKET_PR_DESTINATION_COMMIT" \
+                --head "$BITBUCKET_COMMIT" \
+                --out-dir "$BITBUCKET_CLONE_DIR/csb-review" \
+                --allow-dirty \
+                --summary check
+          artifacts:
+            - csb-review/**
