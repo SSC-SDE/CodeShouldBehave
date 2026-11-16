@@ -223,6 +223,19 @@ fn existing_output_is_never_overwritten() {
 }
 
 #[test]
+fn empty_existing_output_directory_is_allowed() {
+    let repo = Repo::new();
+    let base = repo.git(&["rev-parse", "HEAD"]);
+    let head = repo.change_and_commit();
+    let scratch = Scratch::new();
+    let out = scratch.join("out");
+    fs::create_dir_all(&out).unwrap();
+    let output = review(&repo, &base, &head, &out, &[]);
+    assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
+    assert!(out.join("index.html").is_file());
+}
+
+#[test]
 fn review_emits_index_manifest_sources_and_summary() {
     let repo = Repo::new();
     let base = repo.git(&["rev-parse", "HEAD"]);

@@ -47,10 +47,22 @@ pub fn emit(
     design: Option<&DesignArtifacts>,
 ) -> Result<SiteManifest, String> {
     if directory.exists() {
-        return Err(format!(
-            "{} already exists. Choose a new --out-dir; existing output is never overwritten.",
-            directory.display()
-        ));
+        if !directory.is_dir() {
+            return Err(format!(
+                "{} exists and is not a directory. Choose a new --out-dir.",
+                directory.display()
+            ));
+        }
+        let empty = fs::read_dir(directory)
+            .map_err(|error| format!("Cannot read {}: {error}", directory.display()))?
+            .next()
+            .is_none();
+        if !empty {
+            return Err(format!(
+                "{} already exists and is not empty. Choose a new --out-dir; existing output is never overwritten.",
+                directory.display()
+            ));
+        }
     }
     fs::create_dir_all(directory.join("sources"))
         .map_err(|error| format!("Cannot create {}: {error}", directory.display()))?;

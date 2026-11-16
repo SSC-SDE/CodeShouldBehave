@@ -58,7 +58,7 @@ Usage:\n\
 Review:\n\
   --base, --head       Exact 40-character commit IDs. HEAD, branch names, tags\n\
                        and abbreviated IDs are rejected.\n\
-  --out-dir            Must not exist. Existing output is never overwritten.\n\
+  --out-dir            New or empty directory. Existing output is never overwritten.\n\
   --merge-base         Compare the merge base of base/head with head.\n\
   --context            Explicit scope manifest for additional local evidence.\n\
   --summary            Stdout format: check (default), markdown or json.\n\
@@ -219,10 +219,24 @@ fn review(arguments: Vec<String>) -> Result<u8, CliError> {
         return Err(CliError::usage("--base and --head must differ"));
     }
     if options.out.exists() {
-        return Err(CliError::usage(format!(
-            "{} already exists. Choose a new --out-dir.",
-            options.out.display()
-        )));
+        if !options.out.is_dir() {
+            return Err(CliError::usage(format!(
+                "{} exists and is not a directory. Choose a new --out-dir.",
+                options.out.display()
+            )));
+        }
+        let empty = std::fs::read_dir(&options.out)
+            .map_err(|error| {
+                CliError::usage(format!("Cannot read {}: {error}", options.out.display()))
+            })?
+            .next()
+            .is_none();
+        if !empty {
+            return Err(CliError::usage(format!(
+                "{} already exists and is not empty. Choose a new --out-dir.",
+                options.out.display()
+            )));
+        }
     }
     if let Some(context) = &options.context {
         if !context.is_file() {

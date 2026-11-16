@@ -13,7 +13,8 @@ It is deliberately narrow:
   commit IDs. `HEAD`, branch names, tags and abbreviated IDs are rejected.
 - **Deterministic.** The same repository and commit pair produce byte-identical
   output. Every artifact is hashed in `manifest.json`.
-- **Never overwrites.** `--out-dir` must not exist.
+- **Never overwrites.** `--out-dir` may be a new path or an empty directory;
+  any existing artifact is refused.
 
 ## Install
 
@@ -91,7 +92,7 @@ csb review --repo <path> --base <sha> --head <sha> --out-dir <new-dir>
 |---|---|
 | `--repo` | Repository path. Must be a Git worktree. |
 | `--base`, `--head` | Exact 40-character commit IDs. Required. |
-| `--out-dir` | New directory. Existing paths are refused. |
+| `--out-dir` | New path or empty directory. Non-empty paths are refused. |
 | `--merge-base` | Compare the merge base of base/head with head. |
 | `--context` | Explicit local scope manifest for additional evidence. |
 | `--cache-dir` | Analysis cache. Defaults to a per-repository temp directory. |
