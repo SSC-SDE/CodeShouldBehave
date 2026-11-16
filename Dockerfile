@@ -6,6 +6,7 @@ COPY Cargo.toml Cargo.lock ./
 COPY src/ src/
 COPY fixtures/ fixtures/
 COPY migrations/ migrations/
+COPY examples/ examples/
 RUN cargo build --release --locked --bin csb \
     && strip target/release/csb
 
