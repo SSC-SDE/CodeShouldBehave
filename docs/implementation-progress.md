@@ -1698,3 +1698,21 @@ is claimed; deployed release still predates these fixes.
   `assets/landing.css` hashes match the repository; verified at 1440, 1024,
   768, 390 and 320 px in light and dark, with no horizontal overflow and no
   console errors.
+
+### W3.3 and W2.2 implemented, awaiting merge
+
+- [PR #81](https://github.com/SSC-SDE/CodeShouldBehave/pull/81) implements the
+  two open workstream items. W3.3 renders “Trimmed inventory, not an observed
+  change” in Focus and Standard HLD, with deferred paths linked to the exact
+  analyzed commit; uncertain Focus states now say they are not observed
+  changes. W2.2 reads the signed retained site manifest before discovery and
+  reserves 9 MiB per admitted report (`SITE_REPORT_RESERVATION`), deferring
+  work with `site_capacity_reservation` instead of analyzing a report that the
+  64 MiB cap will refuse.
+- One bounded retry covers a transient Pages manifest read. Restore and
+  preflight share `site_manifest_inventory`, so both validate the same signed
+  inventory and expanded-byte cap.
+- Verification at implementation head `28b5aa4`: 70 public CI tests, 136 public
+  Python tests (6 skipped), 207 JavaScript tests, 267 Rust library tests and 18
+  `public_report` tests pass. No live deployment or release-pin change is
+  claimed. Owner merge remains pending.

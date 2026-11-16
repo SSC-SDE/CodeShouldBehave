@@ -126,12 +126,16 @@ below. PR numbers refer to SSC-SDE/CodeShouldBehave.
 
 ## Open items
 
-1. Regenerate the `a849afb→3bc3def` review with v7 and measure: uncertain count,
-   `deferred_facts` size, artifact bytes, and retention effects. Unit tests
-   prove the logic; the production artifact has not been regenerated.
-2. W3.3: render explicit "trimmed inventory, not an observed change" labels with
-   deferred-path links in the Focus HLD.
-3. W2.2: pre-flight publication admission against the dynamic retained set.
+1. ~~Regenerate the `a849afb→3bc3def` review with v7 and measure.~~
+   Measured: 145 added (72 elements + 73 relations), 1 uncertain (root
+   component boundary), 2,982,294 B artifact, 1,400 deferred facts
+   (107,102 B), versions 678,209/645,895 B. Recorded in
+   [implementation progress](implementation-progress.md).
+2. W3.3 implemented in [PR #81](https://github.com/SSC-SDE/CodeShouldBehave/pull/81):
+   Focus/Standard HLD now render the trimmed-inventory notice and deferred
+   paths, with exact-commit links. Merge pending.
+3. W2.2 implemented in PR #81: the planner reads the signed retained site
+   manifest and reserves report capacity before analysis. Merge pending.
 4. Remaining dedupe: ID interning, baseline+delta, compressed-byte accounting.
 
 ## Boundaries
