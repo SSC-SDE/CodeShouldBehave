@@ -13,13 +13,14 @@ issues and contributions belong in the public
 ## Current status
 
 The repository's **Actions → Architecture check → hosted Focus dashboard** demo
-is working. [PR #24's check](https://github.com/SSC-SDE/CodeShouldBehave/runs/127446113035)
-was followed in-browser through HLD, LLD and exact baseline/proposal source diffs.
-[Controller 42083656278](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/42083656278)
-passed publication and check delivery; its application REST audit used 71/100 calls.
+is working. The [public index](https://ssc-sde.github.io/CodeShouldBehave/index.json)
+currently lists five published reports (PRs 24, 48, 53, 63 and 80); open one in
+the workspace to inspect HLD, LLD and exact baseline/proposal source diffs.
+[Controller 43828772901](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/43828772901)
+passed its plan/publish evidence stage on merged `main` without a new deployment.
 This is own-repository acceptance, not a general hosted-service or capacity claim.
 
-The deployed [signed Linux release](https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-5fb135fb7f3f)
+The deployed [signed Linux release](https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-6b5fce6073fe)
 passed signature, checksum, production bootstrap and native sandbox verification.
 See [release evidence](docs/RELEASE_STATUS.md).
 
@@ -50,9 +51,9 @@ See the [execution checkpoint](docs/APP_EXECUTION_DEVELOPMENT.md) and
 
 The [public homepage](https://ssc-sde.github.io/CodeShouldBehave/) is live, with
 system light/dark themes and real captures of a published PR review.
-**Open workspace** preserves reviewer entry. Six original reports remain
-byte-for-byte unchanged; only the two explicitly approved obsolete PR24/PR31
-versions were retired, with expiry records. Actions/Pages setup and the
+**Open workspace** preserves reviewer entry. Five reports remain in the live
+index (PRs 24, 48, 53, 63 and 80); obsolete report versions are retired only
+through the explicit ledger, with expiry records. Actions/Pages setup and the
 unavailable App route stay separate.
 See [deployment evidence](docs/RELEASE_STATUS.md#landing-page-deployed-and-approved-history-retired)
 and [image provenance](docs/PUBLIC_MVP_USAGE.md#public-landing-page).

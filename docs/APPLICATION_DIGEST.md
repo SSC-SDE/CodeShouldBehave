@@ -30,9 +30,9 @@ merge, and does not prove runtime behavior.
 | Review artifact | `csb-review-artifact-v1` |
 | Public bundle | `csb-public-report-v1` |
 | Live site | https://ssc-sde.github.io/CodeShouldBehave/ |
-| Live reports | **4** — PRs 53, 63, 48, 24 |
+| Live reports | **5** — PRs 53, 63, 48, 80, 24 |
 | Live landing | `index.html` `c476b28f…`, `assets/landing.css` `a4749237…` |
-| Site bytes | 33,437,294 B of 64 MiB |
+| Site bytes | 40,080,029 B of 64 MiB |
 | Rust tests | 267 lib passed |
 | Integration tests | 18 public-report passed |
 | Python tests | 269 passed, 6 skipped |
@@ -43,8 +43,8 @@ Two facts explain most of the current shape:
    from `main`. A landing or site change ships only after a new attested engine
    release is pinned.
 2. The site keeps a bounded archive. Reports retire explicitly or on merge under
-   the retention policy; the live count is not the historical count. Older
-   README text (“six reports”, an older release tag) is historical.
+   the retention policy; the live count is not the historical count. This digest
+   and README now record the 2026-11-16 live index and pinned release.
 
 ## 3. The problem it addresses
 
@@ -403,11 +403,12 @@ Explicit non-claims:
 | Public site build/verify tests | 20 passed, 6 skipped |
 | Landing responsive check | 1440 / 1024 / 768 / 390 / 320 px, light and dark, no overflow |
 | Live landing hashes | match `main` |
-| Live index | 4 reports; no stale v4 report |
+| Live index | 5 reports; no stale v4 report |
 | Engine attestation | `gh attestation verify` status 0 |
 
-The live site is currently 33,437,294 B of 64 MiB. Four reports remain: PRs 53,
-63, 48 and 24. The PR 63 report is the v7 report with 145 added and 1 uncertain.
+The live site is currently 40,080,029 B of 64 MiB. Five reports remain: PRs 53,
+63, 48, 80 and 24. The PR 63 report is the v7 report with 145 added and 1
+uncertain (the root component boundary).
 
 ## 14. Repository map
 
@@ -432,19 +433,27 @@ The live site is currently 33,437,294 B of 64 MiB. Four reports remain: PRs 53,
 
 ## 15. Known gaps and next work
 
-1. **App activation.** Backend hosting, signed workers, independent authorities,
-   external recovery freshness and live fresh-repository acceptance are not done.
-2. **Uncertainty labels.** W3.3: render explicit “trimmed inventory, not an
-   observed change” labels with deferred-path links in the Focus HLD.
-3. **Pre-flight publication admission.** W2.2: refuse or plan before analysis
-   when retained site bytes plus a new report exceed the cap.
-4. **Remaining dedupe.** ID interning, baseline+delta encoding and compressed-byte
-   site accounting are measured candidates, not shipped.
-5. **Documentation freshness.** README/status notes contain historical counts,
-   old release tags and pre-redesign landing references; this digest is the
-   current snapshot.
+1. **App activation (external).** Backend hosting, signed workers, independent
+   authorities, external recovery freshness and live fresh-repository acceptance
+   still require owner-provided infrastructure and credentials.
+2. **Uncertainty labels (closed).** W3.3 shipped in
+   [PR #81](https://github.com/SSC-SDE/CodeShouldBehave/pull/81), merged
+   `864ec896e7e540ef31310250b5acb0d0a1690efc`. Focus/Standard HLD render the
+   trimmed-inventory notice with deferred-path links.
+3. **Pre-flight publication admission (closed).** W2.2 shipped in PR #81: the
+   planner reads the signed retained site manifest and reserves 9 MiB per
+   admitted report before analysis.
+4. **Dedupe (deferred).** ID interning, baseline+delta encoding and compressed-
+   byte site accounting remain measured candidates. W2.2 now prevents analysis
+   from outrunning publication capacity, so none is required for the current
+   profile.
+5. **Documentation freshness (closed).** README, this digest and the decisions
+   record were refreshed on 2026-11-16. Historical release evidence remains
+   historical by design.
 6. **One residual uncertainty.** The v7 demo’s single uncertain item is the root
-   component boundary, not a contract/relation.
+   component boundary, not a contract or relation. It is reported, not hidden.
+7. **AI extension (deferred).** The optional explanation feature remains outside
+   the public first-release profile; no provider is connected.
 
 ## 16. Glossary
 

@@ -1717,3 +1717,19 @@ is claimed; deployed release still predates these fixes.
   Python tests (6 skipped), 207 JavaScript tests, 267 Rust library tests and 18
   `public_report` tests pass. The merge commit above is provider-confirmed. No
   live deployment or release-pin change is claimed.
+
+### 2026-11-16: remaining backlog disposition
+
+- W3.3 and W2.2 are closed by PR #81. README and the application digest now
+  record the current five live reports (40,080,029 B of 64 MiB), the pinned
+  `canary-6b5fce6073fe` release and the latest passing controller evidence.
+- Dedupe (ID interning, baseline+delta, compressed-byte accounting) remains
+  deliberately deferred by D5; W2.2 makes capacity admission explicit, so none
+  is required for the current profile.
+- Demo PR #80 stays an open draft walkthrough for the video and must not merge.
+  Its published report remains immutable until explicit retirement.
+- External App activation gates remain unchanged: qualified USD 0 hosting,
+  signed worker release, live OAuth, backup authority/fencing and
+  fresh-repository acceptance require owner-provided infrastructure.
+- The root component boundary remains the v7 demo's only uncertain item; it is
+  rendered explicitly rather than hidden.

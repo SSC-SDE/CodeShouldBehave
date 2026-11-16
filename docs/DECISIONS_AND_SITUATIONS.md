@@ -66,6 +66,11 @@ below. PR numbers refer to SSC-SDE/CodeShouldBehave.
   `deferred_facts` and comparison semantics changed.
 - Comparisons across profiles remain an error by design.
 
+### D9. Demo PR #80
+- Keep #80 open as a draft walkthrough surface for the recorded video. It is not
+  product work and must never merge. Its published report stays immutable until
+  an explicit retirement entry is authorized.
+
 ## Situations faced
 
 ### S1. `origin/main` would not advance
@@ -138,7 +143,9 @@ below. PR numbers refer to SSC-SDE/CodeShouldBehave.
 3. W2.2 implemented in PR #81, merged `864ec896e7e540ef31310250b5acb0d0a1690efc`:
    the planner reads the signed retained site manifest and reserves report
    capacity before analysis.
-4. Remaining dedupe: ID interning, baseline+delta, compressed-byte accounting.
+4. Dedupe remains deferred by D5: ID interning, baseline+delta encoding and
+   compressed-byte site accounting are measured candidates, not required after
+   W2.2 made capacity admission explicit. No further HLD work is planned here.
 
 ## Boundaries
 
