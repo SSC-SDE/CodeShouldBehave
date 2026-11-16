@@ -174,6 +174,32 @@ class FairnessTests(unittest.TestCase):
         self.config["policy_sha256"] = "b" * 64
         self.assertEqual(len(ci.plan(self.config, state, observed, "2026-10-17T06:01:00Z")["admitted"]), 1)
 
+    def test_site_capacity_is_reserved_before_analysis(self):
+        observations = [observation(self.config, 1)]
+        fits = ci.plan(self.config, self.state, observations, "2026-10-17T06:00:00Z",
+                       retained_site_bytes=ci.MAX_SITE_BYTES - ci.SITE_REPORT_RESERVATION)
+        self.assertEqual([item["pr_number"] for item in fits["admitted"]], [1])
+        self.assertEqual(fits["site_reservation"]["admitted_bytes"], ci.SITE_REPORT_RESERVATION)
+        full = ci.plan(self.config, self.state, observations, "2026-10-17T06:00:00Z",
+                       retained_site_bytes=ci.MAX_SITE_BYTES - ci.SITE_REPORT_RESERVATION + 1)
+        self.assertFalse(full["admitted"])
+        self.assertEqual(full["state"]["pending"][0]["reason"], "site_capacity_reservation")
+        self.assertEqual(full["site_reservation"]["retained_bytes"], ci.MAX_SITE_BYTES - ci.SITE_REPORT_RESERVATION + 1)
+
+    def test_retained_site_inventory_must_match_the_signed_manifest(self):
+        self.config["site"] = {"origin": "https://ssc-sde.github.io", "base_path": "/code"}
+        data = ci.canonical({"schema_version": "csb-public-site-v1", "observed_at": "2026-10-17T06:00:00Z",
+                             "files": [{"path": "a.json", "bytes": 3, "sha256": ci.digest(b"abc")}]})
+        state = dict(ci.empty_state(self.config), site_generation=1, site_manifest_sha256=ci.digest(data),
+                     pages_deployment_id="pages-1")
+        self.assertEqual(ci.published_site_bytes(self.config, state, get=lambda url, limit: data), len(data) + 3)
+        wrong = dict(state, site_manifest_sha256="b" * 64)
+        with self.assertRaisesRegex(ci.Refusal, "differs"):
+            ci.published_site_bytes(self.config, wrong, get=lambda url, limit: data)
+        with self.assertRaisesRegex(ci.Refusal, "byte budget"):
+            ci.site_manifest_inventory(ci.canonical({"schema_version": "csb-public-site-v1", "observed_at": "2026-10-17T06:00:00Z",
+                                                     "files": [{"path": "huge", "bytes": ci.MAX_SITE_BYTES, "sha256": "c" * 64}]}))
+
     def test_retries_are_bounded_and_no_report_still_advances_state(self):
         result = ci.plan(self.config, self.state, [observation(self.config, 1)], "2026-10-17T06:00:00Z", existing_handoff_bytes=32 * ci.MIB)
         self.assertFalse(result["admitted"])
@@ -936,7 +962,7 @@ class BudgetedPipelineTests(unittest.TestCase):
                 plan_budget = ci.stage_budget(config, manifest, pass_root / "budget", "plan")
                 provider = ci.GitHub(config, transport=transport, budget=plan_budget)
                 env = {"GITHUB_ACTIONS": "false", "GITHUB_RUN_ID": str(current["run"]), "GITHUB_RUN_ATTEMPT": "1"}
-                with patch.dict(os.environ, env), patch.object(ci, "verify_receipt_with_gh", return_value=[]):
+                with patch.dict(os.environ, env), patch.object(ci, "verify_receipt_with_gh", return_value=[]), patch.object(ci, "published_site_bytes", return_value=0):
                     planned = ci.github_plan(config, root, pass_root / "plan.json", provider=provider)
                     self.assertEqual(len(planned["requests"]), 3)
                     manifest = module.assign_requests(manifest, [request["request_id"] for request in planned["requests"]])
@@ -1006,7 +1032,7 @@ class BudgetedPipelineTests(unittest.TestCase):
             manifest = module.make_manifest(config, 113, 1)
             budget = ci.stage_budget(config, manifest, root / "capacity-budget", "plan")
             capacity_provider = ci.GitHub(config, transport=transport, budget=budget)
-            with patch.dict(os.environ, GITHUB_ACTIONS="false", GITHUB_RUN_ID="113", GITHUB_RUN_ATTEMPT="1"), patch.object(ci, "verify_receipt_with_gh", return_value=[]):
+            with patch.dict(os.environ, GITHUB_ACTIONS="false", GITHUB_RUN_ID="113", GITHUB_RUN_ATTEMPT="1"), patch.object(ci, "verify_receipt_with_gh", return_value=[]), patch.object(ci, "published_site_bytes", return_value=0):
                 constrained = ci.github_plan(config, root, root / "capacity-plan.json", provider=capacity_provider)
             self.assertEqual(len(constrained["requests"]), 1)
             reservation = constrained["repository_reservation"]

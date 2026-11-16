@@ -46,6 +46,7 @@ function boundaries(payload,{mode='combined',changedOnly=true,status=new Map()}=
 function description(scope,mode){
   if(mode==='accepted')return 'Reference in the accepted architecture; this is not a claim about runtime execution.';
   if(scope.reason)return scope.reason;
+  if(state(scope)==='uncertain')return 'Inventory was trimmed or left unresolved at this boundary. Architectural addition is not established by absence here, and neither removal nor replacement is observed; inspect deferred coverage before drawing a behavioral conclusion.';
   if(scope.source.id===scope.target.id)return scope.changed?'Element evidence differs between the snapshots. Inspect the exact records before drawing behavioral conclusions.':'Retained element context. No confirmed change is established by these observations.';
   const before=observed(scope,'baseline'),after=observed(scope,'proposal');
   if(!before&&after)return 'Reference observed in the proposal, not observed in the covered baseline. Architectural addition is not established by observation alone.';

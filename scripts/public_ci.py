@@ -48,6 +48,10 @@ MAX_REPORT_COMPRESSED = 4 * MIB
 MAX_HANDOFF_BYTES = 5 * MIB
 MAX_HANDOFF_TOTAL = 32 * MIB
 MAX_SITE_BYTES = 64 * MIB
+# Each admitted report may consume the full public bundle cap plus its index
+# and generated-view overhead. Reserve both before analysis so a report is not
+# analyzed only to be refused at publication.
+SITE_REPORT_RESERVATION = MAX_BUNDLE_BYTES + MIB
 MAX_SITE_ARCHIVE = 70 * MIB
 MAX_SITE_READBACK_SECONDS = 120
 MAX_REPOSITORY_ARTIFACT_BYTES = 172 * MIB
@@ -397,10 +401,12 @@ def comparison_key(config: dict, item: dict) -> str:
 
 
 def plan(config: dict, previous: dict, observations: list[dict], observed_at: str, *,
-         existing_handoff_bytes: int = 0, rate_remaining: int = 5000, rate_limit: int = 5000, admission_limit: int = 6) -> dict:
+         existing_handoff_bytes: int = 0, rate_remaining: int = 5000, rate_limit: int = 5000, admission_limit: int = 6,
+         retained_site_bytes: int = 0) -> dict:
     state = validate_state(previous, config)
     utc(observed_at)
     integer(existing_handoff_bytes, 0, MAX_HANDOFF_TOTAL, "handoff inventory")
+    integer(retained_site_bytes, 0, MAX_SITE_BYTES, "retained site bytes")
     integer(rate_limit, 1, 1_000_000, "provider rate limit")
     integer(rate_remaining, 0, rate_limit, "provider rate remaining")
     if not isinstance(observations, list) or len(observations) > 100:
@@ -439,16 +445,19 @@ def plan(config: dict, previous: dict, observations: list[dict], observed_at: st
                            "queue_sequence": position, "attempts": 0, "status": "pending", "reason": ""}
     selected = sorted((item for item in pending.values() if item["status"] != "failed"), key=lambda item: item["queue_sequence"])[:20]
     integer(admission_limit, 0, 6, "admission limit")
-    slots = min(admission_limit, (MAX_HANDOFF_TOTAL - existing_handoff_bytes) // MAX_HANDOFF_BYTES)
+    handoff_slots = (MAX_HANDOFF_TOTAL - existing_handoff_bytes) // MAX_HANDOFF_BYTES
+    site_slots = (MAX_SITE_BYTES - retained_site_bytes) // SITE_REPORT_RESERVATION
     if rate_remaining < max(1, (rate_limit + 4) // 5) + 20:
-        slots = 0
+        handoff_slots = 0
+    slots = min(admission_limit, handoff_slots, site_slots)
+    deferred_reason = "site_capacity_reservation" if site_slots < handoff_slots else "quota_or_rate_reservation"
     admitted = []
     for index, item in enumerate(selected):
         if index < slots:
             item["status"], item["reason"] = "running", ""
             admitted.append(dict(item))
         else:
-            item["status"], item["reason"] = "deferred", "quota_or_rate_reservation"
+            item["status"], item["reason"] = "deferred", deferred_reason
     state["pending"] = sorted(pending.values(), key=lambda item: item["queue_sequence"])
     state["completed"] = sorted(completed.values(), key=lambda item: item["pr_number"])
     state["sequence"] += 1
@@ -457,6 +466,9 @@ def plan(config: dict, previous: dict, observations: list[dict], observed_at: st
     validate_state(state, config)
     return {"schema_version": "csb-public-plan-v1", "state": state, "admitted": admitted,
             "max_parallel": 2, "handoff_reservation_bytes": len(admitted) * MAX_HANDOFF_BYTES,
+            "site_reservation": {"retained_bytes": retained_site_bytes, "capacity_bytes": MAX_SITE_BYTES,
+                                 "report_bytes": SITE_REPORT_RESERVATION,
+                                 "admitted_bytes": len(admitted) * SITE_REPORT_RESERVATION},
             "deferred": len(state["pending"]) - len(admitted)}
 
 
@@ -800,6 +812,7 @@ def github_plan(config: dict, trusted_root: Path, output: Path, *, provider: Git
         return result
     now = datetime.now(timezone.utc)
     activated = budget_activation(config, trusted_root, previous, now)
+    retained_site_bytes = published_site_bytes(config, previous)
     policy = read_json(trusted_root / config["policy_path"], MAX_CONFIG_BYTES)
     if policy.get("repository") != config["repository"] or policy.get("public") is not True or policy.get("publication_consent") is not True or policy.get("baseline_mode") not in ("exact", "merge_base"):
         raise Refusal("base-owned public scope policy unavailable")
@@ -818,7 +831,8 @@ def github_plan(config: dict, trusted_root: Path, output: Path, *, provider: Git
     artifacts = provider.artifact_inventory(0)
     repository_slots = max(0, min(3, (MAX_REPOSITORY_ARTIFACT_BYTES - artifacts - MIB) // MAX_HANDOFF_BYTES))
     result = plan(config, previous, list(observations.values()), timestamp(now), existing_handoff_bytes=integer(provider.handoff_bytes, 0, MAX_HANDOFF_TOTAL, "handoff inventory"),
-                  rate_remaining=integer(rate.get("remaining"), 0, 1_000_000, "rate remaining"), rate_limit=integer(rate.get("limit"), 1, 1_000_000, "rate limit"), admission_limit=repository_slots)
+                  rate_remaining=integer(rate.get("remaining"), 0, 1_000_000, "rate remaining"), rate_limit=integer(rate.get("limit"), 1, 1_000_000, "rate limit"), admission_limit=repository_slots,
+                  retained_site_bytes=retained_site_bytes)
     result["state"]["discovery_page"] = page + 1 if len(discovered) == 80 else 1
     result["state"]["maintenance_cursor"] = maintenance_cursor
     result["state"]["budget_activation"] = activated
@@ -1287,6 +1301,52 @@ def http_bytes(url: str, cap: int, *, timeout: float = 10) -> bytes:
     return value
 
 
+def site_manifest_inventory(data: bytes) -> tuple[dict, int, list[tuple[str, int, str]]]:
+    """Validate one signed site manifest and return its exact expanded inventory."""
+    try:
+        manifest = json.loads(data)
+    except (ValueError, UnicodeError) as exc:
+        raise Refusal("published manifest invalid") from exc
+    object_fields(manifest, {"schema_version", "observed_at", "files"}, name="site manifest")
+    if manifest["schema_version"] != "csb-public-site-v1" or not isinstance(manifest["files"], list) or len(manifest["files"]) > 20_000:
+        raise Refusal("unsupported/bounded site manifest required")
+    total, seen, entries = len(data), {"site-manifest.json"}, []
+    for item in manifest["files"]:
+        object_fields(item, {"path", "bytes", "sha256"}, name="site file")
+        rel = relative_path(item["path"])
+        if rel in seen:
+            raise Refusal("duplicate restored site file")
+        seen.add(rel)
+        size = integer(item["bytes"], 0, MAX_SITE_BYTES, "site file byte length")
+        total += size
+        if total > MAX_SITE_BYTES:
+            raise Refusal("site byte budget exhausted")
+        expected = text(item["sha256"], SHA256, "site file digest")
+        if rel == ".nojekyll" and (size != 0 or expected != digest(b"")):
+            raise Refusal("invalid deployment marker in signed manifest")
+        entries.append((rel, size, expected))
+    return manifest, total, entries
+
+
+def published_site_bytes(config: dict, state: dict, *, get: Callable = http_bytes) -> int:
+    """Read the exact retained site size before admitting any new analysis."""
+    if state["site_generation"] == 0:
+        return 0
+    url = config["site"]["origin"] + config["site"]["base_path"] + "site-manifest.json"
+    for attempt in range(2):
+        try:
+            data = get(url, 4 * MIB)
+            break
+        except urllib.error.HTTPError as exc:
+            if attempt or exc.code not in (429, 500, 502, 503, 504):
+                raise
+            time.sleep(.25)
+    if digest(data) != state["site_manifest_sha256"]:
+        raise Refusal("retained site manifest differs from the trusted generation")
+    _, total, _ = site_manifest_inventory(data)
+    return total
+
+
 def restore_public_site(config: dict, state: dict, output: Path, *, get: Callable = http_bytes,
                         lagging_manifest_sha256: str | None = None, sleep: Callable = time.sleep) -> Path | None:
     """Restore only exact digest-pinned inert bytes, including the live-state fence."""
@@ -1315,30 +1375,9 @@ def restore_public_site(config: dict, state: dict, output: Path, *, get: Callabl
         if lagging_manifest_sha256 is None or actual != lagging_manifest_sha256 or attempt == 11:
             raise Refusal("indeterminate live Pages generation; promotion refused")
         sleep(5)
-    try:
-        manifest = json.loads(data)
-    except (ValueError, UnicodeError) as exc:
-        raise Refusal("published manifest invalid") from exc
-    object_fields(manifest, {"schema_version", "observed_at", "files"}, name="site manifest")
-    if manifest["schema_version"] != "csb-public-site-v1" or not isinstance(manifest["files"], list) or len(manifest["files"]) > 20_000:
-        raise Refusal("unsupported/bounded site manifest required")
     # Validate the entire signed inventory before any source request. The total
     # declared size bounds all in-flight bytes, not just files already written.
-    total, seen, entries = len(data), {"site-manifest.json"}, []
-    for item in manifest["files"]:
-        object_fields(item, {"path", "bytes", "sha256"}, name="site file")
-        rel = relative_path(item["path"])
-        if rel in seen:
-            raise Refusal("duplicate restored site file")
-        seen.add(rel)
-        size = integer(item["bytes"], 0, MAX_SITE_BYTES, "site file byte length")
-        total += size
-        if total > MAX_SITE_BYTES:
-            raise Refusal("site restore deadline/byte budget exhausted")
-        expected = text(item["sha256"], SHA256, "site file digest")
-        if rel == ".nojekyll" and (size != 0 or expected != digest(b"")):
-            raise Refusal("invalid deployment marker in signed manifest")
-        entries.append((rel, size, expected))
+    _, _, entries = site_manifest_inventory(data)
     output.mkdir(parents=True)
     deadline = time.monotonic() + MAX_SITE_READBACK_SECONDS
     def read(entry):

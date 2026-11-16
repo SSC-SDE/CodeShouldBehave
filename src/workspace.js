@@ -697,6 +697,29 @@ function hldOutcome(delta) {
   return 'Unable to determine completely';
 }
 
+// Inventory that was trimmed or never read cannot establish an addition,
+// removal or replacement. Keep the paths visible beside that claim.
+function hldDeferredCoverage(payload = {}, mode = 'combined') {
+  const versions = mode === 'accepted' ? [payload?.accepted] : mode === 'baseline' ? [payload?.baseline] : mode === 'proposal' ? [payload?.proposal] : [payload?.baseline, payload?.proposal];
+  const paths = new Set(), kinds = new Set(), commits = new Map();
+  for (const version of versions) {
+    for (const path of version?.coverage?.deferred_paths || []) if (typeof path === 'string' && path) {
+      paths.add(path);
+      if (typeof version?.snapshot === 'string' && !commits.has(path)) commits.set(path, version.snapshot);
+    }
+    for (const kind of version?.coverage?.deferred_element_kinds || []) if (typeof kind === 'string' && kind) kinds.add(kind);
+  }
+  return {paths: [...paths].sort(), kinds: [...kinds].sort(), commits};
+}
+
+function hldDeferredPathUrl(repository, commit, path) {
+  const owner = repository?.owner, name = repository?.name;
+  if (!owner || !name || typeof commit !== 'string' || !/^[0-9a-f]{40}$/.test(commit) || typeof path !== 'string' || !path || path.includes('..') || /[\u0000-\u001f\u007f]/.test(path)) return null;
+  const base = `https://github.com/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/tree/${commit}`;
+  if (path === '*') return base;
+  return `${base}/${path.split('/').filter(Boolean).map(encodeURIComponent).join('/')}`;
+}
+
 function validateLldResponse(value, {reviewId,parentHld = null,component = null,entry = null,scopeVersion = null} = {}) {
   if (!value || value.review_id !== reviewId || (value.parent_hld || null) !== parentHld || (value.component || null) !== component || (entry && value.entry_id !== entry) || typeof value.scope_version !== 'string' || (scopeVersion && value.scope_version !== scopeVersion)) throw new Error('LLD response does not match this review, scope or drill-down');
   return value;
@@ -1308,7 +1331,7 @@ async function workspaceHttpError(response) {
   return error;
 }
 
-if (typeof module !== 'undefined') module.exports = {focusHldPayload, focusLldCatalog, focusLldDetail, focusLldFlowWindow, ReviewWorkspace, workspaceHttpError, clearHldEvidence, clearLldEvidence, clearReviewEvidence, LldCatalogView, LldSourcePairView, graphItems, filterGraphItems, clusterEdges, mergeGraphs, diffLines, architectureMeaning, architectureAreas, architectureMermaid, hldOutcome, hldExportAllowed, hldComparison, hldDiagramElements, hldMermaid, hldEvidenceFor, hldCorrection, validateLldResponse, lldOutcome, lldCatalogRows, lldMermaid, lldEvidence, LLD_INITIAL_SCALE, observationAge, filterChangedFiles, diagramScale, parseScopePaths, summarizeReviewState, classifyFinding, groupFindings, encodeWorkspaceRoute, decodeWorkspaceRoute, resolvePublicWorkspaceRoute, betaFeedbackRecord, importBetaFeedback, BetaFeedbackDraft};
+if (typeof module !== 'undefined') module.exports = {focusHldPayload, focusLldCatalog, focusLldDetail, focusLldFlowWindow, ReviewWorkspace, workspaceHttpError, clearHldEvidence, clearLldEvidence, clearReviewEvidence, LldCatalogView, LldSourcePairView, graphItems, filterGraphItems, clusterEdges, mergeGraphs, diffLines, architectureMeaning, architectureAreas, architectureMermaid, hldOutcome, hldDeferredCoverage, hldDeferredPathUrl, hldExportAllowed, hldComparison, hldDiagramElements, hldMermaid, hldEvidenceFor, hldCorrection, validateLldResponse, lldOutcome, lldCatalogRows, lldMermaid, lldEvidence, LLD_INITIAL_SCALE, observationAge, filterChangedFiles, diagramScale, parseScopePaths, summarizeReviewState, classifyFinding, groupFindings, encodeWorkspaceRoute, decodeWorkspaceRoute, resolvePublicWorkspaceRoute, betaFeedbackRecord, importBetaFeedback, BetaFeedbackDraft};
 if (typeof window !== 'undefined') Object.assign(window, {ReviewWorkspace, encodeWorkspaceRoute, decodeWorkspaceRoute});
 
 if (typeof document !== 'undefined' && document.getElementById('session-form')) {
@@ -2690,6 +2713,24 @@ if (typeof document !== 'undefined' && document.getElementById('session-form')) 
     if (counts) container.append(node('p','',counts));
     if(coverage.profile)container.append(node('p','',coverage.profile));
     if (coverage.complete!==true || payload.delta?.outcome==='incomplete') container.append(node('p','warning','Coverage is partial. Unresolved or out-of-scope interactions can still affect system behavior.'));
+    const deferred=hldDeferredCoverage(payload,hldMode==='compare'?'combined':hldMode);
+    if(deferred.paths.length||deferred.kinds.length){
+      const notice=node('p','warning'),counts=[];
+      if(deferred.paths.length)counts.push(`${deferred.paths.length} source path${deferred.paths.length===1?'':'s'} deferred`);
+      if(deferred.kinds.length)counts.push(`${deferred.kinds.length} element class${deferred.kinds.length===1?'':'es'} trimmed`);
+      notice.append(node('strong','','Trimmed inventory, not an observed change. '),document.createTextNode(`${counts.join(' · ')}. Absence here does not establish an addition, removal or replacement.`));
+      container.append(notice);
+      const links=node('p','hld-deferred-paths');links.append(node('span','','Deferred paths: '));
+      deferred.paths.forEach((path,index)=>{
+        if(index)links.append(document.createTextNode(' · '));
+        const url=hldDeferredPathUrl(activePr?.repository,deferred.commits.get(path),path);
+        let item;
+        if(url){item=node('a','',path==='*'?'all paths (analysis boundary unknown)':path);item.href=url;item.target='_blank';item.rel='noopener noreferrer';item.title='Open this path at the exact analyzed commit on GitHub';}
+        else item=node('code','',path==='*'?'all paths (analysis boundary unknown)':path);
+        links.append(item);
+      });
+      container.append(links);
+    }
     const gaps=[...new Set([...(coverage.gaps || []),...(payload.baseline?.coverage?.gaps || []),...(payload.proposal?.coverage?.gaps || [])])].slice(0,20);
     for (const gap of gaps) container.append(node('p','',String(gap)));
     const omitted=hldComparison(payload,hldMode==='compare'?'combined':hldMode).omitted;
