@@ -116,6 +116,12 @@ The planned App route moves this work into the service. It needs a real backend
 and isolated workers; free static hosting alone cannot provide it. No hosted
 App service or new spending is activated by this implementation.
 
+Other delivery modes are proposed in
+[Integration avenues beyond the GitHub App](docs/INTEGRATION_AVENUES.md):
+a stable local CLI, a container usable by any CI provider, GitHub/GitLab adapters
+without an App install, and a self-hosted single-tenant service. None is shipped
+yet; the CLI is the recommended first step.
+
 GitHub Actions produces this profile's check. It does not impersonate the
 registered CodeShouldBehave GitHub App. A complete check is advisory and does
 not approve merging. Unsupported, limited or deferred analysis is explicit.
