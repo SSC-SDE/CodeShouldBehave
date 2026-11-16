@@ -413,7 +413,14 @@ mod replay {
         authorize(Action::Source, &principal, &scope, &grants, None)?;
         let root = output.join(format!("repo-{}", case.repository));
         let snapshot = SnapshotId::new(commit.into())?;
-        let hld = generate_hld(&root, &snapshot, &scope, &context, &Cancellation::default())?;
+        let hld = generate_hld(
+            &root,
+            &snapshot,
+            &scope,
+            &context,
+            &BTreeSet::new(),
+            &Cancellation::default(),
+        )?;
         let lld = generate_lld(
             &root,
             &snapshot,
@@ -879,7 +886,14 @@ mod replay {
         let (scope, context, principal, grants) = request(&case)?;
         let generate = |commit: &str| -> Result<Bundle, String> {
             let snapshot = SnapshotId::new(commit.into())?;
-            let hld = generate_hld(&root, &snapshot, &scope, &context, &Cancellation::default())?;
+            let hld = generate_hld(
+                &root,
+                &snapshot,
+                &scope,
+                &context,
+                &BTreeSet::new(),
+                &Cancellation::default(),
+            )?;
             let lld = generate_lld(
                 &root,
                 &snapshot,

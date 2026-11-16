@@ -43,6 +43,18 @@
           <a class="text-link" href="#how-it-works">Read the method <span aria-hidden="true">↓</span></a>
         </div>
         <p class="hero-note">Published reports are public. Baseline and proposal commits stay pinned.</p>
+        <div class="cli-quickstart" aria-label="Run locally">
+          <div class="cli-quickstart-head">
+            <span class="chip chip-working">Available now</span>
+            <span>Local CLI · no token · no network</span>
+          </div>
+          <pre><code>docker run --rm -v "$PWD:/repo" -v "$PWD/review:/out" \
+  ghcr.io/ssc-sde/csb review --repo /repo \
+  --base &lt;commit-sha&gt; --head &lt;commit-sha&gt; --out-dir /out
+docker run --rm -p 8080:8080 -v "$PWD/review:/review" \
+  ghcr.io/ssc-sde/csb serve --dir /review --host 0.0.0.0</code></pre>
+          <p>Or <code>cargo install --path . --bin csb</code>. Exact commits only. Output is deterministic and recheckable with <code>csb verify</code>.</p>
+        </div>
       </div>
       <div class="hero-stack">
         <figure class="shot shot-main" aria-label="Published architecture review">
@@ -152,6 +164,14 @@
           <p>Start with the hosted report, run the CLI locally, or install the repository profile after reviewed activation.</p>
         </div>
         <div class="setup-rows">
+          <article class="setup-row">
+            <div>
+              <span class="chip chip-working">Available now</span>
+              <h3>Local CLI + container</h3>
+              <p>Run one exact commit pair on any machine or CI provider. No GitHub App, token, telemetry or network access. The output is a self-contained review site plus a content-addressed manifest.</p>
+            </div>
+            <a class="button" href="https://github.com/SSC-SDE/CodeShouldBehave/blob/main/docs/CLI_USAGE.md">Read the CLI guide <span aria-hidden="true">↗</span></a>
+          </article>
           <article class="setup-row">
             <div>
               <span class="chip chip-working">Working on this repository</span>

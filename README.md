@@ -26,6 +26,7 @@ See [release evidence](docs/RELEASE_STATUS.md).
 
 | Installation | Status | Maintainer setup | Reviewer entry |
 | --- | --- | --- | --- |
+| Local CLI + container | Available now for any Git repository | Run `csb review` on an exact commit pair; no token, network or App | `csb serve` → self-contained review site |
 | Repository Actions + Pages | Working on this repository; available for reviewed public-repo setup | Confirm paths/components, prepare pinned config/workflows, configure Pages and budget controls, approve activation | Architecture check → Open CodeShouldBehave report → Focus |
 | GitHub App install-and-confirm | In development; not available for installation yet | Target: install App, choose repo, preview/confirm scope in browser | Automatic App check → Focus |
 
@@ -58,6 +59,23 @@ unavailable App route stay separate.
 See [deployment evidence](docs/RELEASE_STATUS.md#landing-page-deployed-and-approved-history-retired)
 and [image provenance](docs/PUBLIC_MVP_USAGE.md#public-landing-page).
 
+
+## Run locally
+
+The `csb` CLI compares two exact commits and writes a self-contained review
+site. It needs no GitHub App, token, telemetry or network access, and it never
+executes reviewed code.
+
+```sh
+csb review --repo . --base "$(git rev-parse HEAD~1)" --head "$(git rev-parse HEAD)" --out-dir review/
+csb serve --dir review/ --open
+csb verify --dir review/
+```
+
+Container: `docker run --rm ghcr.io/ssc-sde/csb:latest --help`.
+CI templates for GitHub Actions, GitLab and Bitbucket live in
+[`templates/csb-ci/`](templates/csb-ci/). Full reference:
+[`docs/CLI_USAGE.md`](docs/CLI_USAGE.md).
 
 ## Reviewer journey
 

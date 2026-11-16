@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased: local CLI and container
+
+- Add `csb review`, `serve`, `verify`, `version` and `help` as a network-free,
+  exact-commit review path with a self-contained site and a content-addressed
+  manifest.
+- Reject symbolic refs, abbreviated IDs, non-commit objects and non-empty
+  outputs. Accept an existing empty output directory so container bind mounts
+  work.
+- Add a multi-stage container, a GHCR publish workflow and copy-ready GitHub
+  Actions, GitLab CI and Bitbucket Pipelines templates.
+- Put the local CLI/container path on the landing page and document it in
+  `docs/CLI_USAGE.md`.
+
 ## Unreleased: minimal Focus review
 
 - Refine HLD into the approved wide canvas with concise labels, Standard
