@@ -321,6 +321,54 @@ pub(crate) fn git(repo: &Path, args: &[&str], limit: usize) -> Result<Vec<u8>, S
     }
 }
 
+/// Resolve a commit reference that must already be an exact 40-character
+/// hexadecimal commit ID. Symbolic refs, tags, abbreviated IDs and 64-character
+/// object IDs are rejected so a published comparison cannot move underneath a
+/// reviewer. The returned ID is lowercase.
+pub fn resolve_to_exact_sha(repository: &Path, input: &str) -> Result<String, String> {
+    let normalized = input.to_ascii_lowercase();
+    if normalized.len() != 40 || !normalized.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err(format!(
+            "{input}: commits must be exact 40-character hexadecimal commit IDs, not HEAD, branch names, tags or abbreviated IDs"
+        ));
+    }
+    let kind = git(repository, &["cat-file", "-t", &normalized], 64)
+        .map_err(|_| format!("{input}: commit not found in this repository"))?;
+    let kind = String::from_utf8(kind)
+        .map_err(|_| "Invalid Git object type")?
+        .trim()
+        .to_string();
+    if kind != "commit" {
+        return Err(format!("{input}: object is not a commit"));
+    }
+    let commit = format!("{normalized}^{{commit}}");
+    let bytes = git(
+        repository,
+        &["rev-parse", "--verify", "--end-of-options", &commit],
+        256,
+    )
+    .map_err(|_| format!("{input}: commit not found in this repository"))?;
+    let resolved = String::from_utf8(bytes)
+        .map_err(|_| "Invalid Git object ID")?
+        .trim()
+        .to_ascii_lowercase();
+    if resolved != normalized {
+        return Err(format!("{input}: object is not a commit"));
+    }
+    Ok(resolved)
+}
+
+/// True when the repository has no staged or unstaged tracked changes and no
+/// untracked files. Ignored files do not make a worktree dirty.
+pub fn is_worktree_clean(repository: &Path) -> Result<bool, String> {
+    let bytes = git(
+        repository,
+        &["status", "--porcelain", "--untracked-files=normal"],
+        1024 * 1024,
+    )?;
+    Ok(bytes.iter().all(|byte| byte.is_ascii_whitespace()))
+}
+
 pub(crate) fn resolve(repo: &Path, reference: &str) -> Result<String, String> {
     let commit = format!("{reference}^{{commit}}");
     let bytes = git(
@@ -563,6 +611,102 @@ pub fn review(
 mod tests {
     use super::*;
     use std::io::Cursor;
+
+    struct TestRepo(std::path::PathBuf);
+
+    impl TestRepo {
+        fn new() -> Self {
+            static NEXT: AtomicU64 = AtomicU64::new(0);
+            let path = std::env::temp_dir().join(format!(
+                "flowdiff-git-{}-{}",
+                std::process::id(),
+                NEXT.fetch_add(1, Ordering::SeqCst)
+            ));
+            std::fs::create_dir_all(&path).unwrap();
+            git(&path, &["init", "-q"], 1024).unwrap();
+            git(&path, &["config", "user.name", "Test"], 1024).unwrap();
+            git(&path, &["config", "user.email", "t@example.invalid"], 1024).unwrap();
+            std::fs::write(path.join("a.txt"), "one\n").unwrap();
+            git(&path, &["add", "a.txt"], 1024).unwrap();
+            git(&path, &["commit", "-qm", "one"], 1024).unwrap();
+            Self(path)
+        }
+
+        fn sha(&self, reference: &str) -> String {
+            String::from_utf8(git(&self.0, &["rev-parse", reference], 256).unwrap())
+                .unwrap()
+                .trim()
+                .into()
+        }
+    }
+
+    impl Drop for TestRepo {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn exact_commit_sha_is_accepted_and_lowercased() {
+        let repo = TestRepo::new();
+        let sha = repo.sha("HEAD");
+        assert_eq!(resolve_to_exact_sha(&repo.0, &sha).unwrap(), sha);
+        assert_eq!(
+            resolve_to_exact_sha(&repo.0, &sha.to_uppercase()).unwrap(),
+            sha
+        );
+    }
+
+    #[test]
+    fn symbolic_and_abbreviated_refs_are_rejected() {
+        let repo = TestRepo::new();
+        let short = repo.sha("HEAD")[..12].to_string();
+        for input in ["HEAD", "main", "refs/heads/main", &short, "HEAD~0"] {
+            assert!(
+                resolve_to_exact_sha(&repo.0, input).is_err(),
+                "{input} must be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn sixty_four_character_sha_is_rejected() {
+        let repo = TestRepo::new();
+        let sha = format!("{}{}", repo.sha("HEAD"), "0".repeat(24));
+        assert!(resolve_to_exact_sha(&repo.0, &sha).is_err());
+    }
+
+    #[test]
+    fn unknown_commit_is_rejected() {
+        let repo = TestRepo::new();
+        assert!(resolve_to_exact_sha(&repo.0, &"f".repeat(40)).is_err());
+    }
+
+    #[test]
+    fn non_commit_object_is_rejected() {
+        let repo = TestRepo::new();
+        let blob = repo.sha("HEAD:a.txt");
+        assert!(resolve_to_exact_sha(&repo.0, &blob).is_err());
+    }
+
+    #[test]
+    fn missing_repository_is_an_error() {
+        let path = std::env::temp_dir().join(format!("flowdiff-missing-{}", std::process::id()));
+        assert!(resolve_to_exact_sha(&path, &"a".repeat(40)).is_err());
+        assert!(is_worktree_clean(&path).is_err());
+    }
+
+    #[test]
+    fn clean_then_dirty_then_untracked_worktree() {
+        let repo = TestRepo::new();
+        assert!(is_worktree_clean(&repo.0).unwrap());
+        std::fs::write(repo.0.join("a.txt"), "two\n").unwrap();
+        assert!(!is_worktree_clean(&repo.0).unwrap());
+        git(&repo.0, &["checkout", "--", "a.txt"], 1024).unwrap();
+        assert!(is_worktree_clean(&repo.0).unwrap());
+        std::fs::write(repo.0.join("untracked.txt"), "x\n").unwrap();
+        assert!(!is_worktree_clean(&repo.0).unwrap());
+    }
 
     fn oid(byte: char) -> String {
         std::iter::repeat_n(byte, 40).collect()

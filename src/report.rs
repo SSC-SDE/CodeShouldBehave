@@ -117,11 +117,9 @@ fn review_markdown(review: &Review) -> String {
     out.push_str("## Repository architecture diff\n\nFile and directory topology covers the indexed repository; connection arrows are lexical call-name candidates, not verified execution paths.\n\n");
     let _ = writeln!(
         out,
-        "{} baseline files → {} proposed files; {} blobs analyzed, {} reused from cache.\n",
+        "{} baseline files → {} proposed files.\n",
         review.architecture.before.len(),
-        review.architecture.after.len(),
-        review.architecture.analyzed,
-        review.architecture.reused
+        review.architecture.after.len()
     );
     for note in &review.architecture.notes {
         let _ = writeln!(out, "> {}\n", md(note));
@@ -315,11 +313,9 @@ fn architecture_html(review: &Review) -> String {
     );
     let _ = write!(
         out,
-        "<div class='architecture-revisions'><span>BASE <code>{}</code></span><span>→</span><span>PROPOSAL <code>{}</code></span><small>{} analyzed · {} cached</small></div>",
+        "<div class='architecture-revisions'><span>BASE <code>{}</code></span><span>→</span><span>PROPOSAL <code>{}</code></span></div>",
         esc(&review.base),
-        esc(&review.head),
-        arch.analyzed,
-        arch.reused
+        esc(&review.head)
     );
     for note in &arch.notes {
         let _ = write!(out, "<div class='notice'>{}</div>", esc(note));

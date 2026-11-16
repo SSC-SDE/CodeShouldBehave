@@ -3,6 +3,8 @@ mod analysis;
 mod architecture;
 mod context;
 mod core;
+pub mod csb_serve;
+pub mod csb_site;
 #[cfg(feature = "server")]
 pub mod design;
 #[cfg(feature = "server")]
@@ -55,7 +57,7 @@ pub use core::{
     RepositoryAccess, ReviewEngine, ReviewRequest, ScopeVersion, SnapshotId, SystemClock,
     analyze_index, analyze_review,
 };
-pub use git::MirrorReadLease;
+pub use git::{MirrorReadLease, is_worktree_clean, resolve_to_exact_sha};
 #[cfg(feature = "server")]
 pub use github_check::{ARCHITECTURE_CHECK_NAME, ArchitectureCheckDraft, CheckOutput, CheckTarget};
 #[cfg(feature = "server")]
