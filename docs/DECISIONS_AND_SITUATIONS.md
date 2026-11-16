@@ -131,11 +131,13 @@ below. PR numbers refer to SSC-SDE/CodeShouldBehave.
    component boundary), 2,982,294 B artifact, 1,400 deferred facts
    (107,102 B), versions 678,209/645,895 B. Recorded in
    [implementation progress](implementation-progress.md).
-2. W3.3 implemented in [PR #81](https://github.com/SSC-SDE/CodeShouldBehave/pull/81):
-   Focus/Standard HLD now render the trimmed-inventory notice and deferred
-   paths, with exact-commit links. Merge pending.
-3. W2.2 implemented in PR #81: the planner reads the signed retained site
-   manifest and reserves report capacity before analysis. Merge pending.
+2. W3.3 implemented in [PR #81](https://github.com/SSC-SDE/CodeShouldBehave/pull/81),
+   merged `864ec896e7e540ef31310250b5acb0d0a1690efc`: Focus/Standard HLD now
+   render the trimmed-inventory notice and deferred paths, with exact-commit
+   links.
+3. W2.2 implemented in PR #81, merged `864ec896e7e540ef31310250b5acb0d0a1690efc`:
+   the planner reads the signed retained site manifest and reserves report
+   capacity before analysis.
 4. Remaining dedupe: ID interning, baseline+delta, compressed-byte accounting.
 
 ## Boundaries

@@ -1699,10 +1699,11 @@ is claimed; deployed release still predates these fixes.
   768, 390 and 320 px in light and dark, with no horizontal overflow and no
   console errors.
 
-### W3.3 and W2.2 implemented, awaiting merge
+### W3.3 and W2.2 implemented and merged
 
-- [PR #81](https://github.com/SSC-SDE/CodeShouldBehave/pull/81) implements the
-  two open workstream items. W3.3 renders “Trimmed inventory, not an observed
+- [PR #81](https://github.com/SSC-SDE/CodeShouldBehave/pull/81) merged in
+  `864ec896e7e540ef31310250b5acb0d0a1690efc` and implements the two open
+  workstream items. W3.3 renders “Trimmed inventory, not an observed
   change” in Focus and Standard HLD, with deferred paths linked to the exact
   analyzed commit; uncertain Focus states now say they are not observed
   changes. W2.2 reads the signed retained site manifest before discovery and
@@ -1714,5 +1715,5 @@ is claimed; deployed release still predates these fixes.
   inventory and expanded-byte cap.
 - Verification at implementation head `28b5aa4`: 70 public CI tests, 136 public
   Python tests (6 skipped), 207 JavaScript tests, 267 Rust library tests and 18
-  `public_report` tests pass. No live deployment or release-pin change is
-  claimed. Owner merge remains pending.
+  `public_report` tests pass. The merge commit above is provider-confirmed. No
+  live deployment or release-pin change is claimed.
