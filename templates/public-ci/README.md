@@ -46,13 +46,14 @@ workflow source, hosted runner and certificate-bound run/attempt.
 
 ## Prerequisites and installation boundary
 
-The own-repository live demo is accepted: [PR #24 Architecture check](https://github.com/SSC-SDE/CodeShouldBehave/runs/127446113035)
-opens Focus with HLD, LLD and exact source diffs. Signed recovery and automatic
-controller [42083656278](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/42083656278)
-passed; its complete application REST evidence used 71 of 100 calls. This does
-not establish arbitrary-repository, fork or 100+ PR/day capacity acceptance.
+The own-repository demo has five published reports (PRs 24, 48, 53, 63 and 80)
+in the [live index](https://ssc-sde.github.io/CodeShouldBehave/index.json).
+Controller [43828772901](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/43828772901)
+passed its plan/publish evidence stage on merged `main` without a new deployment.
+This does not establish arbitrary-repository, fork or 100+ PR/day capacity
+acceptance.
 
-The deployed [canary-c46c28a509b6](https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-c46c28a509b6)
+The deployed [canary-6b5fce6073fe](https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-6b5fce6073fe)
 passed signed bootstrap and Linux sandbox startup. Current exact engine pins
 are in `.codeshouldbehave/engine-pins.json`; use the [release record](../../docs/RELEASE_STATUS.md)
 for evidence. New repositories still need their own review/activation below.
