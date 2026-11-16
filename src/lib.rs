@@ -3,6 +3,7 @@ mod analysis;
 mod architecture;
 mod context;
 mod core;
+pub mod demo_walkthrough;
 #[cfg(feature = "server")]
 pub mod design;
 #[cfg(feature = "server")]
