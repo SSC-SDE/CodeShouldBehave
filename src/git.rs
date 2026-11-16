@@ -361,6 +361,10 @@ pub fn resolve_to_exact_sha(repository: &Path, input: &str) -> Result<String, St
 /// True when the repository has no staged or unstaged tracked changes and no
 /// untracked files. Ignored files do not make a worktree dirty.
 pub fn is_worktree_clean(repository: &Path) -> Result<bool, String> {
+    let bare = git(repository, &["rev-parse", "--is-bare-repository"], 64)?;
+    if String::from_utf8_lossy(&bare).trim() == "true" {
+        return Ok(true);
+    }
     let bytes = git(
         repository,
         &["status", "--porcelain", "--untracked-files=normal"],
@@ -706,6 +710,27 @@ mod tests {
         assert!(is_worktree_clean(&repo.0).unwrap());
         std::fs::write(repo.0.join("untracked.txt"), "x\n").unwrap();
         assert!(!is_worktree_clean(&repo.0).unwrap());
+    }
+
+    #[test]
+    fn bare_repository_has_no_dirty_worktree() {
+        static BARE_NEXT: AtomicU64 = AtomicU64::new(0);
+        let repo = TestRepo::new();
+        let bare = std::env::temp_dir().join(format!(
+            "flowdiff-bare-{}-{}",
+            std::process::id(),
+            BARE_NEXT.fetch_add(1, Ordering::SeqCst)
+        ));
+        let status = std::process::Command::new("git")
+            .arg("-C")
+            .arg(&repo.0)
+            .args(["clone", "--bare", "."])
+            .arg(&bare)
+            .status()
+            .unwrap();
+        assert!(status.success());
+        assert!(is_worktree_clean(&bare).unwrap());
+        let _ = std::fs::remove_dir_all(bare);
     }
 
     fn oid(byte: char) -> String {
