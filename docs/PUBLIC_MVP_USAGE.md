@@ -13,13 +13,14 @@ issues and contributions belong in the public
 ## Current status
 
 The repository's **Actions → Architecture check → hosted Focus dashboard** demo
-is working. [PR #24's check](https://github.com/SSC-SDE/CodeShouldBehave/runs/127446113035)
-was followed in-browser through HLD, LLD and exact baseline/proposal source diffs.
-[Controller 42083656278](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/42083656278)
-passed publication and check delivery; its application REST audit used 71/100 calls.
+is working. The [public index](https://ssc-sde.github.io/CodeShouldBehave/index.json)
+currently lists five published reports (PRs 24, 48, 53, 63 and 80); open one in
+the workspace to inspect HLD, LLD and exact baseline/proposal source diffs.
+[Controller 43828772901](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/43828772901)
+passed its plan/publish evidence stage on merged `main` without a new deployment.
 This is own-repository acceptance, not a general hosted-service or capacity claim.
 
-The deployed [signed Linux release](https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-c46c28a509b6)
+The deployed [signed Linux release](https://github.com/SSC-SDE/CodeShouldBehave/releases/tag/canary-6b5fce6073fe)
 passed signature, checksum, production bootstrap and native sandbox verification.
 See [release evidence](RELEASE_STATUS.md).
 
