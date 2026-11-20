@@ -1756,3 +1756,29 @@ is claimed; deployed release still predates these fixes.
 - Not addressed: CLI reports still omit HLD/LLD because `csb review` passes no
   design artifacts; `--features server` alone does not change that.
 - No merge, release, tag or container republish is claimed.
+
+## 2026-11-21 — provisional HLD/LLD design mode
+
+- Branch `feature/design-auto` from the merged #89 commit `6277e0e9`; draft
+  [PR #91](https://github.com/SSC-SDE/CodeShouldBehave/pull/91).
+- `csb review --design auto` derives a provisional component model from the
+  committed Cargo workspace and generates HLD/LLD without web onboarding.
+  `--design-context` accepts a confirmed accepted-context file whose `commit`
+  matches `--head`. `--design off` remains the default.
+- `ContextAuthority::{Confirmed, Provisional}` controls assertion text and adds
+  a mandatory provisional gap. Authority is recorded on the artifact and
+  rendered as a badge; storage schema and `DesignVersion` are unchanged.
+- Bounded `design.md` and `artifact.json` are added to the manifest. The
+  self-contained report renders structured HLD/LLD rows, questions, gaps and
+  collapsed Mermaid source; no Mermaid JS dependency was added.
+- The container now builds with `--features server`, runs `--design auto` and
+  `csb verify` in its smoke test and measures 37.5 MB. The GitHub Actions
+  template uses `--design auto`.
+- Gates: Rust 1.87 formatting; strict Clippy in both profiles; full server and
+  core-only test suites; 207 JavaScript tests; 136 Python tests (6 skipped);
+  Docker build and in-image smoke; browser render at 1440px and 390px with no
+  horizontal overflow. `csb verify` passed on a real workspace fixture.
+- Not verified: no merge, tag, image publish or deployment; `--design-context`
+  used a synthetic confirmed context, not a real onboarding export. When M1
+  started, `refs/tags/v0.2.0` was not visible on the remote. The provisional
+  model is explicitly not confirmed architecture.
