@@ -1,5 +1,15 @@
 # Copy to .github/workflows/csb-review.yml in your repository.
-# Requires a published image: ghcr.io/ssc-sde/csb
+# Requires the published image: ghcr.io/ssc-sde/csb
+#
+# This workflow always:
+#   - generates and verifies the interactive report from the pull request's
+#     exact base/head commits;
+#   - posts or updates one pull-request summary comment;
+#   - uploads the report as a 30-day workflow artifact.
+#
+# It never commits reports. To publish a browsable report on this repository's
+# own GitHub Pages, also install `github-actions-pages.yml` and read
+# `templates/csb-ci/README.md`.
 name: CodeShouldBehave Review
 
 on:
@@ -9,6 +19,13 @@ on:
 permissions:
   contents: read
   pull-requests: write
+
+concurrency:
+  group: csb-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  CSB_IMAGE: ghcr.io/ssc-sde/csb:latest
 
 jobs:
   review:
@@ -23,7 +40,7 @@ jobs:
           docker run --rm \
             -v "$GITHUB_WORKSPACE:/repo" \
             -v "$RUNNER_TEMP/csb-review:/out" \
-            ghcr.io/ssc-sde/csb:latest review \
+            "$CSB_IMAGE" review \
               --repo /repo \
               --base "${{ github.event.pull_request.base.sha }}" \
               --head "${{ github.event.pull_request.head.sha }}" \
@@ -31,6 +48,13 @@ jobs:
               --allow-dirty \
               --summary markdown > "$RUNNER_TEMP/summary.md"
         continue-on-error: true
+
+      - name: Verify report integrity
+        if: always()
+        run: |
+          docker run --rm \
+            -v "$RUNNER_TEMP/csb-review:/review:ro" \
+            "$CSB_IMAGE" verify --dir /review
 
       - name: Post review summary
         if: always()
@@ -41,12 +65,17 @@ jobs:
             const path = `${process.env.RUNNER_TEMP}/summary.md`;
             if (!fs.existsSync(path)) return;
             const marker = '<!-- csb-review -->';
-            const body = `${marker}\n${fs.readFileSync(path, 'utf8')}`;
-            const { data: comments } = await github.rest.issues.listComments({
+            const linkMarker = '<!-- csb-pages -->';
+            const previous = await github.rest.issues.listComments({
               ...context.repo,
               issue_number: context.issue.number,
             });
-            const existing = comments.find(comment => comment.body?.includes(marker));
+            const existing = previous.data.find(comment => comment.body?.includes(marker));
+            const pages = existing?.body.includes(linkMarker)
+              ? existing.body.slice(existing.body.indexOf(linkMarker))
+              : '';
+            const body = `${marker}\n${fs.readFileSync(path, 'utf8')}` +
+              (pages ? `\n\n${pages}` : '');
             if (existing) {
               await github.rest.issues.updateComment({
                 ...context.repo,

@@ -10,6 +10,10 @@
   work.
 - Add a multi-stage container, a GHCR publish workflow and copy-ready GitHub
   Actions, GitLab CI and Bitbucket Pipelines templates.
+- Verify the generated manifest in the GitHub Actions template and add an
+  optional companion workflow that deploys the report to the adopter's own
+  GitHub Pages when `CSB_PAGES=true`. Pages holds only the latest report and
+  nothing is committed to the repository.
 - Put the local CLI/container path on the landing page and document it in
   `docs/CLI_USAGE.md`.
 

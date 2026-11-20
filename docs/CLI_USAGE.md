@@ -149,6 +149,16 @@ Ready-to-copy templates live in [`templates/csb-ci/`](../templates/csb-ci/):
 All templates pass exact commit IDs from the provider. `--allow-dirty` is used
 because CI worktrees commonly contain untracked build outputs.
 
+The GitHub Actions template verifies the manifest after generation. An optional
+companion workflow (`github-actions-pages.yml`) deploys the report to the
+adopter's own GitHub Pages. Set the repository variable `CSB_PAGES` to `true`
+and choose **GitHub Actions** as the Pages source. The companion runs on the
+default branch after the review run, because Pages branch protection commonly
+rejects pull-request refs. Reports are never committed: Pages receives the
+run's temporary output directory, and a new pull request replaces the previous
+report. Fork pull requests still receive the summary comment and artifact but
+are not deployed.
+
 ## Determinism and verification
 
 Two runs over the same repository and commit pair produce identical bytes. The
