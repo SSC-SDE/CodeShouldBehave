@@ -4,3 +4,4 @@
 /review.md
 __pycache__/
 *.py[cod]
+/.omp/

@@ -50,6 +50,8 @@ fn help() -> &'static str {
 Usage:\n\
   csb review --repo <path> --base <commit-sha> --head <commit-sha> --out-dir <new-dir>\n\
              [--merge-base] [--context <scope.json>] [--cache-dir <path>]\n\
+             [--design off|auto] [--design-context <accepted-context.json>]\n\
+             [--disable-hld] [--disable-lld]\n\
              [--allow-dirty] [--summary check|markdown|json]\n\
   csb serve --dir <review-dir> [--host <addr>] [--port <port>] [--open]\n\
   csb verify --dir <review-dir>\n\
@@ -62,6 +64,13 @@ Review:\n\
   --merge-base         Compare the merge base of base/head with head.\n\
   --context            Explicit scope manifest for additional local evidence.\n\
   --summary            Stdout format: check (default), markdown or json.\n\
+  --design auto        Derive provisional HLD/LLD from the committed Cargo\n\
+                       workspace. Components are workspace-derived, not\n\
+                       human-confirmed, and are labeled provisional.\n\
+  --design-context     Use a bounded accepted-context JSON as confirmed design\n\
+                       input (requires --features server).\n\
+  --disable-hld        Skip HLD generation (also disables LLD).\n\
+  --disable-lld        Skip LLD generation.\n\
   --allow-dirty        Skip the clean-worktree check (analysis still reads\n\
                        committed objects only).\n\n\
 Exit codes:\n\
@@ -75,6 +84,8 @@ fn review_help() -> &'static str {
     "csb review — analyze one exact commit pair\n\n\
 Usage: csb review --repo <path> --base <sha> --head <sha> --out-dir <new-dir>\n\
                    [--merge-base] [--context <scope.json>] [--cache-dir <path>]\n\
+                   [--design off|auto] [--design-context <accepted-context.json>]\n\
+                   [--disable-hld] [--disable-lld]\n\
                    [--allow-dirty] [--summary check|markdown|json]\n"
 }
 
@@ -96,6 +107,13 @@ enum SummaryFormat {
     Json,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum DesignMode {
+    Off,
+    Auto,
+    Context(PathBuf),
+}
+
 struct ReviewOptions {
     repository: PathBuf,
     base: String,
@@ -106,6 +124,9 @@ struct ReviewOptions {
     cache: Option<PathBuf>,
     allow_dirty: bool,
     summary: SummaryFormat,
+    design: DesignMode,
+    disable_hld: bool,
+    disable_lld: bool,
 }
 
 fn value(args: &mut impl Iterator<Item = String>, flag: &str) -> Result<String, CliError> {
@@ -123,6 +144,9 @@ fn parse_review(arguments: Vec<String>) -> Result<Option<ReviewOptions>, CliErro
     let mut cache = None;
     let mut allow_dirty = false;
     let mut summary = SummaryFormat::Check;
+    let mut design = DesignMode::Off;
+    let mut disable_hld = false;
+    let mut disable_lld = false;
     let mut args = arguments.into_iter();
     while let Some(flag) = args.next() {
         match flag.as_str() {
@@ -138,6 +162,22 @@ fn parse_review(arguments: Vec<String>) -> Result<Option<ReviewOptions>, CliErro
             "--out-dir" => out = Some(PathBuf::from(value(&mut args, "--out-dir")?)),
             "--context" => context = Some(PathBuf::from(value(&mut args, "--context")?)),
             "--cache-dir" => cache = Some(PathBuf::from(value(&mut args, "--cache-dir")?)),
+            "--design" => {
+                design = match value(&mut args, "--design")?.as_str() {
+                    "off" => DesignMode::Off,
+                    "auto" => DesignMode::Auto,
+                    other => {
+                        return Err(CliError::usage(format!(
+                            "--design must be off or auto (got {other}); use --design-context for a confirmed file"
+                        )));
+                    }
+                }
+            }
+            "--design-context" => {
+                design = DesignMode::Context(PathBuf::from(value(&mut args, "--design-context")?));
+            }
+            "--disable-hld" => disable_hld = true,
+            "--disable-lld" => disable_lld = true,
             "--summary" => {
                 summary = match value(&mut args, "--summary")?.as_str() {
                     "check" => SummaryFormat::Check,
@@ -168,6 +208,9 @@ fn parse_review(arguments: Vec<String>) -> Result<Option<ReviewOptions>, CliErro
         cache,
         allow_dirty,
         summary,
+        design,
+        disable_hld,
+        disable_lld,
     }))
 }
 
@@ -187,6 +230,247 @@ fn default_cache(repository: &Path) -> PathBuf {
         .unwrap_or_else(|_| repository.to_path_buf());
     let digest = csb_site::sha256(canonical.to_string_lossy().as_bytes());
     env::temp_dir().join("csb-cache").join(&digest[..16])
+}
+
+#[cfg(not(feature = "server"))]
+fn build_design(
+    options: &ReviewOptions,
+    _: &Path,
+    _: &flowdiff::AnalysisResult,
+    _: &[Grant],
+    _: &Cancellation,
+) -> Result<Option<csb_site::DesignArtifacts>, CliError> {
+    let _ = (options.disable_hld, options.disable_lld);
+    if options.design == DesignMode::Off {
+        Ok(None)
+    } else {
+        Err(CliError::usage(
+            "--design requires a build with --features server",
+        ))
+    }
+}
+
+#[cfg(feature = "server")]
+fn build_design(
+    options: &ReviewOptions,
+    repository: &Path,
+    result: &flowdiff::AnalysisResult,
+    grants: &[Grant],
+    cancellation: &Cancellation,
+) -> Result<Option<csb_site::DesignArtifacts>, CliError> {
+    if options.design == DesignMode::Off {
+        return Ok(None);
+    }
+    if options.disable_hld && !options.disable_lld {
+        return Err(CliError::usage(
+            "--disable-hld requires --disable-lld because LLD needs an HLD parent",
+        ));
+    }
+    if options.disable_hld && options.disable_lld {
+        return Ok(None);
+    }
+    let confirmed = match &options.design {
+        DesignMode::Off => unreachable!(),
+        DesignMode::Auto => flowdiff::design::auto::provisional_context(
+            repository,
+            &result.proposal,
+            result.scope(),
+        )
+        .map_err(CliError::usage)?,
+        DesignMode::Context(path) => {
+            let value = read_design_context(path)?;
+            if value["commit"].as_str() != Some(result.proposal.as_str()) {
+                return Err(CliError::usage(
+                    "--design-context commit does not match the reviewed --head",
+                ));
+            }
+            value
+        }
+    };
+    let mut artifact = flowdiff::ReviewArtifact::from_analysis(result);
+    if !options.disable_hld {
+        artifact
+            .generate_hld(result, repository, &confirmed, grants, cancellation)
+            .map_err(CliError::internal)?;
+    }
+    if !options.disable_lld {
+        artifact
+            .generate_lld(result, repository, &confirmed, grants, cancellation)
+            .map_err(CliError::internal)?;
+    }
+    Ok(Some(design_artifacts(&artifact)))
+}
+
+#[cfg(feature = "server")]
+fn read_design_context(path: &Path) -> Result<serde_json::Value, CliError> {
+    let metadata = std::fs::symlink_metadata(path).map_err(|_| {
+        CliError::usage(format!(
+            "{} is not a readable design context",
+            path.display()
+        ))
+    })?;
+    if metadata.file_type().is_symlink() || !metadata.is_file() || metadata.len() > 1024 * 1024 {
+        return Err(CliError::usage(format!(
+            "{} must be a regular design context file of at most 1 MiB",
+            path.display()
+        )));
+    }
+    let bytes = std::fs::read(path).map_err(|_| {
+        CliError::usage(format!(
+            "{} is not a readable design context",
+            path.display()
+        ))
+    })?;
+    let value: serde_json::Value = serde_json::from_slice(&bytes)
+        .map_err(|_| CliError::usage("Design context is not valid JSON"))?;
+    Ok(value.get("confirmed_context").cloned().unwrap_or(value))
+}
+
+#[cfg(feature = "server")]
+fn design_artifacts(artifact: &flowdiff::ReviewArtifact) -> csb_site::DesignArtifacts {
+    use csb_site::{DesignReport, DesignRow};
+    let authority = artifact
+        .hld
+        .as_ref()
+        .map(|hld| hld.authority.clone())
+        .unwrap_or_else(|| "unavailable".into());
+    let cap = |value: &str| value.chars().take(500).collect::<String>();
+    let component = |binding: Option<&flowdiff::lld::LldParentBinding>| {
+        binding
+            .and_then(|binding| binding.component_id.clone())
+            .unwrap_or_else(|| "—".into())
+    };
+    let hld_rows = artifact
+        .hld
+        .as_ref()
+        .map(|hld| {
+            hld.delta
+                .changes
+                .iter()
+                .take(100)
+                .map(|change| DesignRow {
+                    kind: cap(&change.kind),
+                    before: cap(change.before_name.as_deref().unwrap_or("—")),
+                    after: cap(change.after_name.as_deref().unwrap_or("—")),
+                    detail: cap(&change.reason),
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let hld_questions = artifact
+        .hld
+        .as_ref()
+        .map(|hld| {
+            hld.delta
+                .questions
+                .iter()
+                .take(50)
+                .map(|item| cap(item))
+                .collect()
+        })
+        .unwrap_or_default();
+    let hld_gaps = artifact
+        .hld
+        .as_ref()
+        .map(|hld| {
+            hld.delta
+                .coverage
+                .gaps
+                .iter()
+                .take(50)
+                .map(|item| cap(item))
+                .collect()
+        })
+        .unwrap_or_default();
+    let hld_mermaid = artifact
+        .hld
+        .as_ref()
+        .map(|hld| hld.delta.mermaid.chars().take(256 * 1024).collect())
+        .unwrap_or_default();
+    let lld_rows = artifact
+        .lld
+        .as_ref()
+        .map(|lld| {
+            lld.delta
+                .changes
+                .iter()
+                .take(100)
+                .map(|change| DesignRow {
+                    kind: cap(&change.kind),
+                    before: cap(&component(change.before_parent.as_ref())),
+                    after: cap(&component(change.after_parent.as_ref())),
+                    detail: cap(&format!(
+                        "{} · {}{}",
+                        change.classification,
+                        change.logical_key,
+                        if change.limitations.is_empty() {
+                            String::new()
+                        } else {
+                            format!(" · {}", change.limitations.join("; "))
+                        }
+                    )),
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let lld_gaps = artifact
+        .lld
+        .as_ref()
+        .map(|lld| {
+            lld.delta
+                .limitations
+                .iter()
+                .take(50)
+                .map(|item| cap(item))
+                .collect()
+        })
+        .unwrap_or_default();
+    let mut markdown = format!(
+        "# High-level design ({authority})\n\nHLD status: {}\nLLD status: {}\n\n",
+        artifact.hld_status, artifact.lld_status
+    );
+    if let Some(hld) = &artifact.hld {
+        markdown.push_str("## Baseline\n\n");
+        markdown.push_str(&flowdiff::design::render_hld_markdown(&hld.baseline));
+        markdown.push_str("\n\n## Proposal\n\n");
+        markdown.push_str(&flowdiff::design::render_hld_markdown(&hld.proposal));
+        markdown.push_str("\n\n## Delta\n\n```mermaid\n");
+        markdown.push_str(&hld.delta.mermaid);
+        markdown.push_str("\n```\n\n");
+    }
+    if !lld_rows.is_empty() {
+        markdown.push_str(
+            "## LLD changes\n\n| Change | Before | After | Detail |\n|---|---|---|---|\n",
+        );
+        for row in &lld_rows {
+            markdown.push_str(&format!(
+                "| {} | {} | {} | {} |\n",
+                row.kind, row.before, row.after, row.detail
+            ));
+        }
+    }
+    let json = serde_json::json!({
+        "authority": authority.as_str(),
+        "hld_status": artifact.hld_status,
+        "lld_status": artifact.lld_status,
+        "hld": &artifact.hld,
+        "lld": &artifact.lld,
+    });
+    csb_site::DesignArtifacts {
+        markdown,
+        json,
+        report: DesignReport {
+            authority,
+            hld_status: artifact.hld_status.into(),
+            lld_status: artifact.lld_status.into(),
+            hld_rows,
+            hld_questions,
+            hld_gaps,
+            hld_mermaid,
+            lld_rows,
+            lld_gaps,
+        },
+    }
 }
 
 fn review(arguments: Vec<String>) -> Result<u8, CliError> {
@@ -305,7 +589,9 @@ fn review(arguments: Vec<String>) -> Result<u8, CliError> {
         .authorize(Action::Export, &grants, None)
         .map_err(|error| CliError::internal(format!("export refused: {error}")))?;
 
-    let manifest = csb_site::emit(&options.out, &result, None).map_err(CliError::internal)?;
+    let design = build_design(&options, repository, &result, &grants, &cancellation)?;
+    let manifest =
+        csb_site::emit(&options.out, &result, design.as_ref()).map_err(CliError::internal)?;
 
     match options.summary {
         SummaryFormat::Check => println!("{}", csb_site::coverage_line(&result)),

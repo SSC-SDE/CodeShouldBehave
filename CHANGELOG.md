@@ -14,6 +14,10 @@
   optional companion workflow that deploys the report to the adopter's own
   GitHub Pages when `CSB_PAGES=true`. Pages holds only the latest report and
   nothing is committed to the repository.
+- Add `csb review --design auto` for provisional HLD/LLD derived from the
+  committed Cargo workspace, plus `--design-context` for a confirmed context.
+  Provisional boundaries, assertions and gaps are labeled in the artifact and
+  report; the default remains `--design off`.
 - Put the local CLI/container path on the landing page and document it in
   `docs/CLI_USAGE.md`.
 

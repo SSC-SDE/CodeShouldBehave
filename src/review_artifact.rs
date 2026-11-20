@@ -26,6 +26,7 @@ pub struct ReviewArtifact {
 }
 #[derive(Serialize)]
 pub struct ArtifactHld {
+    pub authority: String,
     pub baseline: crate::design::DesignVersion,
     pub proposal: crate::design::DesignVersion,
     pub delta: crate::design::DesignDelta,
@@ -251,6 +252,7 @@ impl ReviewArtifact {
         let (sources, source_gaps) =
             design_sources(repository, &baseline, &proposal, cancellation)?;
         self.hld = Some(ArtifactHld {
+            authority: context.authority.as_str().into(),
             baseline: without_rendered(baseline),
             proposal: without_rendered(proposal),
             delta,
@@ -335,9 +337,7 @@ impl ReviewArtifact {
 /// Rendered markdown and mermaid are derivable from the retained facts and the
 /// public report regenerates them. Omitting them removes duplicate payload
 /// without changing the review.
-fn without_rendered(
-    mut version: crate::design::DesignVersion,
-) -> crate::design::DesignVersion {
+fn without_rendered(mut version: crate::design::DesignVersion) -> crate::design::DesignVersion {
     version.markdown.clear();
     version.mermaid.clear();
     version

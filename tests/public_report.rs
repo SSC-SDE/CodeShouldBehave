@@ -1,5 +1,5 @@
 #![cfg(feature = "server")]
-use flowdiff::design::{ConfirmedDesignContext, generate_hld};
+use flowdiff::design::{ConfirmedDesignContext, ContextAuthority, generate_hld};
 use flowdiff::lld::{LldReview, compare_lld, generate_lld};
 use flowdiff::public_report::{
     ExpectedComparison, PublicPolicy, PublicRepository, canonical_json, export_public_report,
@@ -138,6 +138,7 @@ impl Fixture {
             providers: vec![],
             integrations: vec![],
             gaps: vec![],
+            authority: ContextAuthority::Confirmed,
         };
         let mut snapshots = vec![];
         for commit in [&baseline, &proposal] {

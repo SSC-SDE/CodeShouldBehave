@@ -198,7 +198,9 @@ pub fn compare_hld(
         let after = new.get(id).copied();
         let kind = match (before, after) {
             (None, Some(after)) => {
-                if let Some(fingerprint) = baseline.coverage.deferred_fingerprint("element", &after.id) {
+                if let Some(fingerprint) =
+                    baseline.coverage.deferred_fingerprint("element", &after.id)
+                {
                     if fingerprint == element_fingerprint(after) {
                         None
                     } else {
@@ -211,7 +213,10 @@ pub fn compare_hld(
                 }
             }
             (Some(before), None) => {
-                if let Some(fingerprint) = proposal.coverage.deferred_fingerprint("element", &before.id) {
+                if let Some(fingerprint) = proposal
+                    .coverage
+                    .deferred_fingerprint("element", &before.id)
+                {
                     if fingerprint == element_fingerprint(before) {
                         None
                     } else {
@@ -240,7 +245,9 @@ pub fn compare_hld(
             }
             _ => None,
         };
-        let Some(kind) = kind else { continue; };
+        let Some(kind) = kind else {
+            continue;
+        };
         if kind != "uncertain" {
             changed.insert(id.to_string());
             for element in before.into_iter().chain(after) {
@@ -353,7 +360,10 @@ pub fn compare_hld(
         }
         let kind = match (before, after) {
             (None, Some(after)) => {
-                if let Some(fingerprint) = baseline.coverage.deferred_fingerprint("relation", &after.id) {
+                if let Some(fingerprint) = baseline
+                    .coverage
+                    .deferred_fingerprint("relation", &after.id)
+                {
                     if fingerprint == relation_fingerprint(after) {
                         None
                     } else {
@@ -366,7 +376,10 @@ pub fn compare_hld(
                 }
             }
             (Some(before), None) => {
-                if let Some(fingerprint) = proposal.coverage.deferred_fingerprint("relation", &before.id) {
+                if let Some(fingerprint) = proposal
+                    .coverage
+                    .deferred_fingerprint("relation", &before.id)
+                {
                     if fingerprint == relation_fingerprint(before) {
                         None
                     } else {
@@ -385,7 +398,9 @@ pub fn compare_hld(
             }
             _ => None,
         };
-        let Some(kind) = kind else { continue; };
+        let Some(kind) = kind else {
+            continue;
+        };
         let mut evidence = before
             .into_iter()
             .chain(after)

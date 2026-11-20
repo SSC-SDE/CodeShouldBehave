@@ -35,6 +35,16 @@ struct Repo {
 }
 
 impl Repo {
+    #[cfg(feature = "server")]
+    fn bare() -> Self {
+        let scratch = Scratch::new();
+        let repo = Self { scratch };
+        repo.git(&["init", "-q"]);
+        repo.git(&["config", "user.name", "csb test"]);
+        repo.git(&["config", "user.email", "test@example.invalid"]);
+        repo
+    }
+
     fn new() -> Self {
         let scratch = Scratch::new();
         let repo = Self { scratch };
@@ -89,6 +99,44 @@ impl Repo {
             "fn add(a: i32, b: i32) -> i32 {\n    a + b\n}\n\nfn multiply(a: i32, b: i32) -> i32 {\n    a * b\n}\n",
         );
         self.commit("add multiply")
+    }
+
+    #[cfg(feature = "server")]
+    fn cargo_workspace(&self) -> String {
+        self.write(
+            "Cargo.toml",
+            "[workspace]\nmembers = [\"crates/core\", \"crates/app\"]\nresolver = \"2\"\n",
+        );
+        self.write(
+            "crates/core/Cargo.toml",
+            "[package]\nname = \"core\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+        );
+        self.write(
+            "crates/app/Cargo.toml",
+            "[package]\nname = \"app\"\nversion = \"0.1.0\"\nedition = \"2021\"\n[dependencies]\ncore = { path = \"../core\" }\n",
+        );
+        self.write(
+            "crates/core/src/lib.rs",
+            "pub fn add(a: i32, b: i32) -> i32 {\n    a + b\n}\n",
+        );
+        self.write(
+            "crates/app/src/lib.rs",
+            "use core::add;\npub fn total() -> i32 {\n    add(1, 2)\n}\n",
+        );
+        self.commit("workspace baseline")
+    }
+
+    #[cfg(feature = "server")]
+    fn change_workspace(&self) -> String {
+        self.write(
+            "crates/core/src/lib.rs",
+            "pub fn add(a: i32, b: i32) -> i32 {\n    a.checked_add(b).unwrap_or(0)\n}\n\npub fn subtract(a: i32, b: i32) -> i32 {\n    a - b\n}\n",
+        );
+        self.write(
+            "crates/app/src/lib.rs",
+            "use core::{add, subtract};\npub fn total() -> i32 {\n    add(1, 2) - subtract(3, 1)\n}\n",
+        );
+        self.commit("change workspace")
     }
 }
 
@@ -438,4 +486,185 @@ fn serve_rejects_directories_without_review_output() {
     let output = csb(&["serve", "--dir", scratch.0.to_str().unwrap(), "--port", "0"]);
     assert_eq!(output.status.code(), Some(2));
     assert!(stderr(&output).contains("run `csb review` first"));
+}
+
+#[cfg(feature = "server")]
+#[test]
+fn auto_design_emits_provisional_hld_and_lld() {
+    let repo = Repo::bare();
+    let base = repo.cargo_workspace();
+    let head = repo.change_workspace();
+    let scratch = Scratch::new();
+    let out = scratch.join("out");
+    let output = review(&repo, &base, &head, &out, &["--design", "auto"]);
+    assert!(
+        matches!(output.status.code(), Some(0 | 1)),
+        "{}",
+        stderr(&output)
+    );
+    for file in ["design.md", "artifact.json"] {
+        assert!(out.join(file).is_file(), "missing {file}");
+    }
+    let artifact: serde_json::Value =
+        serde_json::from_slice(&fs::read(out.join("artifact.json")).unwrap()).unwrap();
+    assert_eq!(artifact["authority"], "provisional");
+    assert_eq!(artifact["hld_status"], "change_detected");
+    assert_eq!(artifact["lld_status"], "change_detected");
+    let index = fs::read_to_string(out.join("index.html")).unwrap();
+    assert!(index.contains("Provisional"), "missing provisional label");
+    assert!(index.contains("High-level design"), "missing HLD section");
+    assert!(index.contains("Low-level design"), "missing LLD section");
+    let manifest: serde_json::Value =
+        serde_json::from_slice(&fs::read(out.join("manifest.json")).unwrap()).unwrap();
+    let paths = manifest["files"].as_array().unwrap();
+    assert!(paths.iter().any(|entry| entry["path"] == "design.md"));
+    assert!(paths.iter().any(|entry| entry["path"] == "artifact.json"));
+    let verify = csb(&["verify", "--dir", out.to_str().unwrap()]);
+    assert!(verify.status.success(), "{}", stderr(&verify));
+}
+
+#[cfg(feature = "server")]
+#[test]
+fn auto_design_is_deterministic() {
+    let repo = Repo::bare();
+    let base = repo.cargo_workspace();
+    let head = repo.change_workspace();
+    let scratch = Scratch::new();
+    let first = scratch.join("first");
+    let second = scratch.join("second");
+    assert!(matches!(
+        review(&repo, &base, &head, &first, &["--design", "auto"])
+            .status
+            .code(),
+        Some(0 | 1)
+    ));
+    assert!(matches!(
+        review(&repo, &base, &head, &second, &["--design", "auto"])
+            .status
+            .code(),
+        Some(0 | 1)
+    ));
+    assert_eq!(
+        fs::read(first.join("manifest.json")).unwrap(),
+        fs::read(second.join("manifest.json")).unwrap()
+    );
+    assert_eq!(
+        fs::read(first.join("design.md")).unwrap(),
+        fs::read(second.join("design.md")).unwrap()
+    );
+}
+
+#[cfg(feature = "server")]
+#[test]
+fn auto_design_requires_a_cargo_manifest() {
+    let repo = Repo::new();
+    let base = repo.git(&["rev-parse", "HEAD"]);
+    let head = repo.change_and_commit();
+    let scratch = Scratch::new();
+    let out = scratch.join("out");
+    let output = review(&repo, &base, &head, &out, &["--design", "auto"]);
+    assert_eq!(output.status.code(), Some(2), "{}", stderr(&output));
+    assert!(stderr(&output).contains("Cargo.toml"));
+}
+
+#[test]
+fn design_off_remains_the_default() {
+    let repo = Repo::new();
+    let base = repo.git(&["rev-parse", "HEAD"]);
+    let head = repo.change_and_commit();
+    let scratch = Scratch::new();
+    let out = scratch.join("out");
+    assert_eq!(
+        review(&repo, &base, &head, &out, &[]).status.code(),
+        Some(0)
+    );
+    assert!(!out.join("design.md").exists());
+    assert!(!out.join("artifact.json").exists());
+    let index = fs::read_to_string(out.join("index.html")).unwrap();
+    assert!(index.contains("HLD unavailable"));
+}
+
+#[cfg(feature = "server")]
+#[test]
+fn design_context_accepts_a_confirmed_local_file() {
+    let repo = Repo::new();
+    let base = repo.git(&["rev-parse", "HEAD"]);
+    let head = repo.change_and_commit();
+    let name = repo
+        .path()
+        .file_name()
+        .unwrap()
+        .to_string_lossy()
+        .to_string();
+    let context = serde_json::json!({
+        "version": "csb-accepted-context-v1",
+        "usable": true,
+        "sensitive_paths_excluded": true,
+        "repository": {
+            "security_domain": "local-cli",
+            "provider": "local-git",
+            "owner": "local-user",
+            "name": name,
+        },
+        "commit": head,
+        "session_id": "confirmed-test",
+        "session_revision": 1,
+        "input_fingerprint": "a".repeat(64),
+        "proposal_fingerprint": "b".repeat(64),
+        "confirmation": {
+            "input_fingerprint": "a".repeat(64),
+            "proposal_fingerprint": "b".repeat(64),
+            "confirmed_at_ms": 1,
+            "actor": "test",
+        },
+        "components": [{
+            "id": "root",
+            "name": "root",
+            "role": "Rust workspace",
+            "repository_index": 0,
+            "roots": ["."],
+            "stack_candidates": ["rust"],
+            "signals": [],
+            "evidence": [],
+            "confidence": "candidate",
+            "contradictions": [],
+            "decision": "confirmed",
+        }],
+        "providers": [],
+        "integrations": [],
+        "contexts": [],
+        "gaps": [],
+    });
+    let scratch = Scratch::new();
+    let context_path = scratch.join("context.json");
+    fs::write(&context_path, serde_json::to_vec(&context).unwrap()).unwrap();
+    let out = scratch.join("out");
+    let output = review(
+        &repo,
+        &base,
+        &head,
+        &out,
+        &["--design-context", context_path.to_str().unwrap()],
+    );
+    assert!(
+        matches!(output.status.code(), Some(0 | 1)),
+        "{}",
+        stderr(&output)
+    );
+    let artifact: serde_json::Value =
+        serde_json::from_slice(&fs::read(out.join("artifact.json")).unwrap()).unwrap();
+    assert_eq!(artifact["authority"], "confirmed");
+}
+
+#[cfg(not(feature = "server"))]
+#[test]
+fn design_requires_a_server_build() {
+    let repo = Repo::new();
+    let base = repo.git(&["rev-parse", "HEAD"]);
+    let head = repo.change_and_commit();
+    let scratch = Scratch::new();
+    let out = scratch.join("out");
+    let output = review(&repo, &base, &head, &out, &["--design", "auto"]);
+    assert_eq!(output.status.code(), Some(2));
+    assert!(stderr(&output).contains("--features server"));
 }

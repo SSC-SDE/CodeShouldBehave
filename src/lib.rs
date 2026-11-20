@@ -119,6 +119,10 @@ pub fn render_html(result: &Review) -> String {
     report::html(result)
 }
 
+pub fn render_html_with_design(result: &Review, design: &csb_site::DesignReport) -> String {
+    report::html_with_design(result, design)
+}
+
 pub fn render_markdown(result: &Review) -> String {
     report::markdown(result)
 }

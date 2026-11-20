@@ -3,6 +3,9 @@ target
 .github
 tests
 docs
+!docs/prototypes/
+!docs/prototypes/vendor/
+!docs/prototypes/vendor/mermaid.tiny-12.1.0.js
 scripts
 templates
 *.md

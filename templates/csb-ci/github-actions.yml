@@ -46,6 +46,7 @@ jobs:
               --head "${{ github.event.pull_request.head.sha }}" \
               --out-dir /out \
               --allow-dirty \
+              --design auto \
               --summary markdown > "$RUNNER_TEMP/summary.md"
         continue-on-error: true
 

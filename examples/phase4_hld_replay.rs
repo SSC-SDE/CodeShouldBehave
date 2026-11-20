@@ -17,8 +17,8 @@ fn main() {
 #[cfg(feature = "server")]
 mod replay {
     use flowdiff::design::{
-        ConfirmedDesignContext, DesignDelta, DesignOutcome, DesignVersion, compare_hld,
-        generate_hld,
+        ConfirmedDesignContext, ContextAuthority, DesignDelta, DesignOutcome, DesignVersion,
+        compare_hld, generate_hld,
     };
     use flowdiff::{
         Action, Cancellation, ClaimedJob, ComparisonMode, ComponentDecision, ComponentProposal,
@@ -381,6 +381,7 @@ mod replay {
             providers: vec![],
             integrations: vec![],
             gaps: vec![],
+            authority: ContextAuthority::Confirmed,
         };
         let principal = PrincipalId::new("synthetic-hld-reviewer")?;
         let grants = vec![Grant {

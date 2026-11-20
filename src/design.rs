@@ -1,5 +1,6 @@
 //! Source-backed High-Level Design. User intent, static facts and runtime
 //! unknowns remain separate. This module never executes reviewed code.
+pub mod auto;
 mod diff;
 pub(crate) mod generate;
 mod render;
@@ -303,6 +304,25 @@ fn is_hld(level: &DesignLevel) -> bool {
     *level == DesignLevel::Hld
 }
 
+/// How the component boundaries were established. `Provisional` means they
+/// were derived from committed workspace structure without human confirmation;
+/// every derived statement must stay labeled accordingly.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ContextAuthority {
+    #[default]
+    Confirmed,
+    Provisional,
+}
+
+impl ContextAuthority {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Confirmed => "confirmed",
+            Self::Provisional => "provisional",
+        }
+    }
+}
+
 /// Trusted confirmed-context handoff, not an authorization token. Hosted
 /// callers must independently check fresh repository/path grants.
 #[derive(Clone, Debug)]
@@ -316,6 +336,7 @@ pub struct ConfirmedDesignContext {
     pub providers: Vec<ComponentProviderMapping>,
     pub integrations: Vec<IntegrationCandidate>,
     pub gaps: Vec<String>,
+    pub authority: ContextAuthority,
 }
 
 pub(crate) fn digest(parts: &[&str]) -> String {
@@ -394,6 +415,11 @@ impl ConfirmedDesignContext {
             providers,
             integrations,
             gaps,
+            authority: if value["authority"].as_str() == Some("provisional") {
+                ContextAuthority::Provisional
+            } else {
+                ContextAuthority::Confirmed
+            },
         };
         context.validate(scope)?;
         if value["confirmation"]["input_fingerprint"] != context.input_fingerprint
