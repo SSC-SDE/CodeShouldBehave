@@ -55,6 +55,9 @@ Usage:\n\
              [--allow-dirty] [--summary check|markdown|json]\n\
   csb serve --dir <review-dir> [--host <addr>] [--port <port>] [--open]\n\
   csb verify --dir <review-dir>\n\
+  csb explain --dir <review-dir> --boundary <hld-change-id> --model <id>\n\
+              [--provider ollama|openai] [--endpoint <url>]\n\
+              [--key-file <path>] [--send] [--out <prefix>]\n\
   csb version\n\
   csb help\n\n\
 Review:\n\
@@ -74,10 +77,12 @@ Review:\n\
   --allow-dirty        Skip the clean-worktree check (analysis still reads\n\
                        committed objects only).\n\n\
 Exit codes:\n\
-  0 complete review · 1 incomplete coverage · 2 usage · 3 Git · 4 internal\n\n\
-The command never contacts the network, installs packages or executes reviewed\n\
-code. Serve the output directory with `csb serve`; this is required when a\n\
-browser refuses local file access.\n"
+  0 complete review · 1 incomplete coverage · 2 usage · 3 Git · 4 internal ·\n\
+  5 AI/provider failure\n\n\
+review, serve and verify never contact the network. `explain --send` contacts\n\
+only the selected AI provider. The command never installs packages or executes\n\
+reviewed code. Serve the output directory with `csb serve`; this is required\n\
+when a browser refuses local file access.\n"
 }
 
 fn review_help() -> &'static str {
@@ -704,6 +709,99 @@ fn verify(arguments: Vec<String>) -> Result<u8, CliError> {
     Ok(EXIT_OK)
 }
 
+fn explain_help() -> &'static str {
+    "csb explain — advisory AI over a verified review\n\n\
+Usage: csb explain --dir <review-dir> --boundary <hld-change-id> --model <id>\n\
+                   [--provider ollama|openai] [--endpoint <url>]\n\
+                   [--key-file <path>] [--send] [--out <prefix>]\n\n\
+Defaults: provider ollama, endpoint http://127.0.0.1:11434, preview only.\n\
+--send is required to contact the provider. --out writes <prefix>.md/.json;\n\
+the default is <review-dir>/ai.md and ai.json. Preview is ai-preview.json.\n\
+OpenAI-compatible keys come from CSB_AI_API_KEY or a 0600 --key-file.\n"
+}
+
+#[cfg(not(feature = "ai"))]
+fn explain(arguments: Vec<String>) -> Result<u8, CliError> {
+    if arguments
+        .iter()
+        .any(|argument| argument == "--help" || argument == "-h")
+    {
+        print!("{}", explain_help());
+        return Ok(EXIT_OK);
+    }
+    Err(CliError::usage(
+        "csb explain requires a build with --features ai",
+    ))
+}
+
+#[cfg(feature = "ai")]
+fn explain(arguments: Vec<String>) -> Result<u8, CliError> {
+    use flowdiff::csb_explain::{ExplainOptions, Provider};
+    let mut dir = None;
+    let mut boundary = None;
+    let mut provider = Provider::Ollama;
+    let mut model = None;
+    let mut endpoint = None;
+    let mut key_file = None;
+    let mut send = false;
+    let mut out = None;
+    let mut args = arguments.into_iter();
+    while let Some(flag) = args.next() {
+        match flag.as_str() {
+            "--help" | "-h" => {
+                print!("{}", explain_help());
+                return Ok(EXIT_OK);
+            }
+            "--dir" => dir = Some(PathBuf::from(value(&mut args, "--dir")?)),
+            "--boundary" => boundary = Some(value(&mut args, "--boundary")?),
+            "--provider" => {
+                provider = Provider::parse(&value(&mut args, "--provider")?)
+                    .map_err(|error| CliError::usage(error.message()))?
+            }
+            "--model" => model = Some(value(&mut args, "--model")?),
+            "--endpoint" => endpoint = Some(value(&mut args, "--endpoint")?),
+            "--key-file" => key_file = Some(PathBuf::from(value(&mut args, "--key-file")?)),
+            "--send" => send = true,
+            "--preview" => send = false,
+            "--out" => out = Some(PathBuf::from(value(&mut args, "--out")?)),
+            other => {
+                return Err(CliError::usage(format!(
+                    "Unknown explain option: {other}\n{}",
+                    explain_help()
+                )));
+            }
+        }
+    }
+    let options = ExplainOptions {
+        dir: dir.ok_or_else(|| CliError::usage("explain requires --dir <review-dir>"))?,
+        boundary: boundary
+            .ok_or_else(|| CliError::usage("explain requires --boundary <hld-change-id>"))?,
+        provider,
+        model: model.ok_or_else(|| CliError::usage("explain requires --model <id>"))?,
+        endpoint,
+        key_file,
+        send,
+        out,
+    };
+    match flowdiff::csb_explain::run(&options) {
+        Ok(outcome) => {
+            eprintln!("csb: wrote AI preview to {}", outcome.preview.display());
+            if let Some((markdown, json)) = outcome.explanation {
+                eprintln!(
+                    "csb: wrote advisory explanation to {} and {}",
+                    markdown.display(),
+                    json.display()
+                );
+            }
+            Ok(EXIT_OK)
+        }
+        Err(error) => Err(CliError {
+            code: error.code(),
+            message: error.message().to_owned(),
+        }),
+    }
+}
+
 fn run() -> Result<u8, CliError> {
     let mut args = env::args().skip(1);
     let command = args.next().unwrap_or_else(|| "help".into());
@@ -712,6 +810,7 @@ fn run() -> Result<u8, CliError> {
         "review" => review(rest),
         "serve" => serve(rest),
         "verify" => verify(rest),
+        "explain" => explain(rest),
         "version" | "--version" | "-V" => {
             println!("csb {}", env!("CARGO_PKG_VERSION"));
             Ok(EXIT_OK)

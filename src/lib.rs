@@ -50,6 +50,10 @@ pub use ai::{
     EvidenceItem, FakeModelAdapter, ModelAdapter, ModelCapability, ModelRequest, ModelResult,
     build_evidence_bundle, redact_sensitive, validate_model_result,
 };
+#[cfg(feature = "ai")]
+pub use ai::{ollama::OllamaAdapter, openai::OpenAiAdapter};
+#[cfg(feature = "ai")]
+pub mod csb_explain;
 pub use analysis::Review;
 pub use core::{
     AnalysisResult, ArtifactStorage, Cancellation, Clock, ComparisonMode, Coverage,

@@ -18,6 +18,10 @@
   committed Cargo workspace, plus `--design-context` for a confirmed context.
   Provisional boundaries, assertions and gaps are labeled in the artifact and
   report; the default remains `--design off`.
+- Add `csb explain` for advisory, citation-checked AI explanations over a
+  verified review, using local Ollama or any OpenAI-compatible endpoint.
+  Preview is the default; `--send` is explicit; the deterministic report is
+  never modified. `docs/AI_USAGE.md` documents keys, privacy and limits.
 - Put the local CLI/container path on the landing page and document it in
   `docs/CLI_USAGE.md`.
 

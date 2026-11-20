@@ -15,6 +15,7 @@ panic = "abort"
 
 [features]
 default = []
+ai = ["dep:ureq"]
 github-app = ["server", "dep:ureq", "dep:base64", "dep:ring"]
 server = ["dep:axum", "dep:serde", "dep:tokio", "dep:toml"]
 
