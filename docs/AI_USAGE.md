@@ -65,6 +65,26 @@ logs, prompts or output, or stored by the tool.
 **Not supported:** GitHub Copilot and Codex are IDE/agent products without a
 third-party inference API. Chat subscriptions do not grant API access.
 
+## Model selection (measured locally)
+
+Tested on this repository's M2 merge diff with Ollama 0.40 on an Apple-silicon Mac:
+
+| Model | Narrow declaration boundary | Broad 16-span boundary | Recommendation |
+|---|---|---|---|
+| `qwen2.5-coder:1.5b` | 4–12 s, valid, generic | fails validation (invented citation) | fast; narrow boundaries only |
+| `qwen2.5-coder:3b` | 6–17 s, valid, more specific | fails validation (invented citation) | narrow boundaries only |
+| `qwen2.5-coder:7b` | 8–10 s, best wording | 14–16 s after the v0.4.1 guards | recommended default |
+| `qwen3:14b` | exceeded the 60 s deadline cold | not tested | raise the deadline before using |
+
+Small models mostly restate the declaration and ask generic questions. The
+largest quality limit is evidence granularity: HLD sources are individual
+declaration lines. Richer LLD/function-body evidence is the next improvement;
+a larger model alone does not fix it.
+
+From a container, `127.0.0.1` is the container itself. Use `--network host` on
+Linux or an HTTPS endpoint. Plain-HTTP `host.docker.internal` is intentionally
+rejected, and an Ollama listener must never be exposed beyond the local host.
+
 ## Outputs
 
 | File | Content |

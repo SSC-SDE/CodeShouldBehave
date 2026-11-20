@@ -1821,3 +1821,30 @@ is claimed; deployed release still predates these fixes.
 - Residual limits: no real Ollama/hosted-model call was made; tests use a local
   fake provider. No native Anthropic adapter; Copilot/Codex are unsupported as
   inference providers.
+
+## 2026-11-21 — real Ollama evaluation and v0.4.1 guards
+
+- Ran the real local Ollama `qwen2.5-coder` 1.5B, 3B and 7B on the M2 merge diff
+  (`de7a7ad..b436092`) with `csb explain`, against three boundaries: a modified
+  enum contract, an added `pub use`, and a broad 16-span unresolved element.
+- 1.5B and 3B answered narrow declaration boundaries in 3.6–16.8 s but produced
+  generic, restated claims; both failed the broad boundary with invented
+  citations. 7B produced the best wording and handles the broad boundary in
+  14–16 s after the guards.
+- The first broad run exposed real truncation: Ollama returned
+  `done_reason: "length"` after 512 tokens with unclosed JSON, surfaced as
+  `model_invalid_json`. A captured proxy exchange confirmed the exact request
+  and response.
+- Fixes in [PR #94](https://github.com/SSC-SDE/CodeShouldBehave/pull/94), merged
+  at `c92d9aae2656cb9dd33f729052359846a0ee9f2c`: 1024-token output budget,
+  explicit `provider_output_truncated`, five-item schema budget, sharper
+  reviewer prompt, and an uncertain-boundary guard that requires zero claims,
+  rejects asserted claims and replaces the headline deterministically.
+- Release: `v0.4.1` tagged at `c92d9aae`; publish run
+  [44817357388](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/44817357388)
+  passed. Index
+  `sha256:6ad15368f8a09904b90a3de00004aaca8ad36178ede5dd8b9117482a99540250`
+  for `linux/amd64` + `linux/arm64`; `:latest` matches; anonymous pull passed.
+- Model guidance: 7B is the default; 1.5B/3B are narrow-boundary only. The next
+  quality gain is richer LLD/function-body evidence, not a larger model.
+- Not verified: no hosted-model call; 14B exceeded the 60 s deadline cold.
