@@ -22,6 +22,11 @@
   verified review, using local Ollama or any OpenAI-compatible endpoint.
   Preview is the default; `--send` is explicit; the deterministic report is
   never modified. `docs/AI_USAGE.md` documents keys, privacy and limits.
+- Raise the explanation output budget to 1024 tokens and report truncated
+  provider output as `provider_output_truncated` instead of invalid JSON.
+- Tighten the explanation schema and prompt to five concise claims/questions.
+  Unresolved “uncertain” boundaries must return no claims and receive a neutral
+  deterministic headline; asserted claims fail with `model_invalid_certainty`.
 - Put the local CLI/container path on the landing page and document it in
   `docs/CLI_USAGE.md`.
 

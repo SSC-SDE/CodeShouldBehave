@@ -322,6 +322,33 @@ fn invalid_citation_fails_with_code_five() {
 }
 
 #[test]
+fn truncated_provider_output_fails_with_code_five() {
+    let fixture = Fixture::new();
+    let (out, boundary) = fixture.review();
+    let response = json!({
+        "done_reason": "length",
+        "message": {"content": valid_explanation()}
+    })
+    .to_string();
+    let (endpoint, _request) = serve_once(response);
+    let output = csb(&[
+        "explain",
+        "--dir",
+        out.to_str().unwrap(),
+        "--boundary",
+        &boundary,
+        "--model",
+        "fixture-model",
+        "--endpoint",
+        &endpoint,
+        "--send",
+    ]);
+    assert_eq!(output.status.code(), Some(5), "{}", stderr(&output));
+    assert!(stderr(&output).contains("provider_output_truncated"));
+    assert!(!out.join("ai.md").exists());
+}
+
+#[test]
 fn explain_requires_a_design_artifact() {
     let fixture = Fixture::new();
     let base = fixture.git(&["rev-parse", "HEAD~1"]);
