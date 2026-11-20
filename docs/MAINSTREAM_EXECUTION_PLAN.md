@@ -1,8 +1,12 @@
 # Mainstream Rust HLD/LLD review — execution plan
 
-Status: **planning only**. No implementation, merge, tag or deployment is
-authorized by this document. Each owner gate is marked explicitly.
-Baseline: public `main` `2d8347ca3ca85296fc8a098cfcbd752c77cb8f42`.
+Status: **M0–M2 implemented, merged and released**. M3 remains conditional and
+unauthorized. Each owner gate was exercised explicitly; see the completion
+record at the end.
+Planning baseline: `2d8347ca3ca85296fc8a098cfcbd752c77cb8f42`.
+Latest release record: `bd227af64d84339aa6ae231b1c6333abdc629731`.
+Completed releases: `v0.3.0` (provisional design), `v0.4.0` (BYOK AI),
+`v0.4.1` (explain guards), `v0.5.0` (LLD body/call evidence).
 Execution checkout: `/Users/shankhyachatterjee/Code/CodeShouldBehave-csb-cli`
 (clean, on `main` before starting). Do **not** use
 `/Users/shankhyachatterjee/Code/CodeShouldBehave-public`; it holds unrelated
@@ -641,3 +645,31 @@ Owner decisions (defaults preselected):
 4. AI providers in M2: **Ollama + OpenAI-compatible only**; no native Claude
    adapter, no Copilot/Codex.
 5. M3: **conditional**, not committed.
+
+---
+
+## 10. Completion record (2026-11-21)
+
+| Milestone | PR | Merge | Release | Index digest |
+|---|---|---|---|---|
+| M0 distribution | #89 | `6277e0e9` | — | — |
+| M1 design | #91 | `de7a7ad7` | `v0.3.0` | `sha256:169e6724…` |
+| M2 AI | #92 | `b4360925` | `v0.4.0` | `sha256:645cc888…` |
+| M2 guards | #94 | `c92d9aae` | `v0.4.1` | `sha256:6ad15368…` |
+| M2 LLD evidence | #96 | `ffb409dd` | `v0.5.0` | `sha256:6d76fa73…` |
+
+All releases are multi-arch (`linux/amd64`, `linux/arm64`), anonymously
+pullable, and smoke-tested in-image. `:latest` points at `v0.5.0`.
+
+M2 is complete for the **CLI** surface. The approved server/Focus 7.2–7.4 work
+remains a separate milestone. Real Ollama testing established:
+
+- `qwen2.5-coder:7b` is the default; it handles narrow and broad boundaries.
+- 1.5B and 3B are fast but produce generic claims and fail broad 16-span
+  boundaries with invented citations.
+- Explanation quality is now bounded by boundary selection/evidence scope, not
+  model size. Component-level or caller-graph context is the next quality lever.
+
+Remaining, explicitly not done: M3 `csb init` (conditional), server/Focus AI,
+App activation, hosted-model qualification, and live fresh-repository
+acceptance.
