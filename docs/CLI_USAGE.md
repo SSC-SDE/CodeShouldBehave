@@ -119,6 +119,10 @@ csb review --repo <path> --base <sha> --head <sha> --out-dir <new-dir>
 | `--cache-dir` | Analysis cache. Defaults to a per-repository temp directory. |
 | `--allow-dirty` | Skip the clean-worktree check. Analysis still reads commits only. |
 | `--summary` | Stdout format: `check` (default), `markdown`, `json`. |
+| `--design auto` | Derive provisional HLD/LLD from the committed Cargo workspace. |
+| `--design-context` | Use a confirmed accepted-context JSON; its commit must match `--head`. |
+| `--disable-hld` | Skip HLD and LLD generation. |
+| `--disable-lld` | Skip LLD generation (HLD still runs). |
 
 A dirty worktree is rejected by default because uncommitted changes are not
 part of the comparison. CI should pass `--allow-dirty` when the runner holds
@@ -145,6 +149,20 @@ Recomputes every SHA-256 in `manifest.json`, checks file sizes, and confirms
 that `index.json` matches `content_sha256`. Prints `OK <n> artifacts · index
 <sha>` or the first failure.
 
+### `csb explain`
+
+```
+csb explain --dir <review-dir> --boundary <hld-change-id> --model <id>
+            [--provider ollama|openai] [--endpoint <url>]
+            [--key-file <path>] [--send] [--out <prefix>]
+```
+
+Writes an advisory explanation for one HLD boundary. Without `--send` it only
+writes `ai-preview.json` and performs no network request. `--send` contacts the
+selected provider. Outputs `ai.md` and `ai.json` (or `<prefix>.md/.json`); they
+are not part of the manifest. See [AI_USAGE.md](AI_USAGE.md) for providers,
+keys, limits and privacy.
+
 ### `csb version`, `csb help`
 
 Print the version or command help.
@@ -158,6 +176,7 @@ Print the version or command help.
 | `2` | Usage error: bad arguments, missing repository, dirty worktree, symbolic ref, existing output. |
 | `3` | Git error: unknown commit, missing object, analysis failure. |
 | `4` | Internal error: invariant violation or artifact write failure. |
+| `5` | AI/provider failure: invalid output, citation, timeout or provider error. The deterministic review is unchanged. |
 
 ## CI integration
 

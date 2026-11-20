@@ -8,7 +8,7 @@ COPY fixtures/ fixtures/
 COPY migrations/ migrations/
 COPY examples/ examples/
 COPY docs/prototypes/vendor/mermaid.tiny-12.1.0.js docs/prototypes/vendor/
-RUN cargo build --release --locked --features server --bin csb \
+RUN cargo build --release --locked --features server,ai --bin csb \
     && strip target/release/csb
 
 FROM alpine:3.21
@@ -35,6 +35,7 @@ RUN set -eux; \
     test -f /tmp/out/design.md; \
     test -f /tmp/out/artifact.json; \
     csb verify --dir /tmp/out; \
+    csb explain --help >/dev/null; \
     rm -rf /tmp/smoke /tmp/out
 WORKDIR /repo
 ENTRYPOINT ["csb"]

@@ -67,10 +67,15 @@ site. It needs no GitHub App, token, telemetry or network access, and it never
 executes reviewed code.
 
 ```sh
-csb review --repo . --base "$(git rev-parse HEAD~1)" --head "$(git rev-parse HEAD)" --out-dir review/
+csb review --repo . --base "$(git rev-parse HEAD~1)" --head "$(git rev-parse HEAD)" --out-dir review/ --design auto
 csb serve --dir review/ --open
 csb verify --dir review/
 ```
+
+`--design auto` adds provisional HLD/LLD derived from the committed Cargo
+workspace. Optional advisory AI (`csb explain`) can then explain one boundary
+with local Ollama or an OpenAI-compatible endpoint; preview is the default and
+`--send` is explicit. See [`docs/AI_USAGE.md`](docs/AI_USAGE.md).
 
 Container: `docker run --rm ghcr.io/ssc-sde/csb:latest --help`.
 CI templates for GitHub Actions, GitLab and Bitbucket live in

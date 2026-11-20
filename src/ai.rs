@@ -1,6 +1,15 @@
 use crate::{Action, Grant, PrincipalId, ScopeRecord, SnapshotId, authorize, authorize_repository};
 use sha2::{Digest, Sha256};
 
+#[cfg(feature = "ai")]
+pub mod ollama;
+#[cfg(feature = "ai")]
+pub mod openai;
+#[cfg(feature = "ai")]
+pub(crate) mod schema;
+#[cfg(feature = "ai")]
+mod transport;
+
 pub const AI_CONTRACT_VERSION: &str = "ai-v1";
 const MAX_EVIDENCE_ITEMS: usize = 100;
 const MAX_EVIDENCE_BYTES: usize = 256 * 1024;
@@ -49,6 +58,7 @@ pub enum ModelCapability {
     Disabled,
     FakeOnly,
     Unavailable,
+    Ready,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
