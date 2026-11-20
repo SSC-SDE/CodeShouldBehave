@@ -5,6 +5,28 @@ copied into this repository. Branch: `phase-6`; PR base: `main`.
 The standalone landing-page publication below uses `codex/public-landing`;
 it does not advance, merge or activate the Phase 6 App implementation.
 
+## Current status — 2026-11-21
+
+Last release record: `bd227af64d84339aa6ae231b1c6333abdc629731` (docs #97).
+Public `main` carries the local CLI/container track through `v0.5.0`.
+
+| Release | Merge | Content | Index digest |
+|---|---|---|---|
+| `v0.3.0` | `de7a7ad7` | `csb review --design auto` with provisional HLD/LLD | `sha256:169e6724…` |
+| `v0.4.0` | `b4360925` | `csb explain` with Ollama + OpenAI-compatible BYOK | `sha256:645cc888…` |
+| `v0.4.1` | `c92d9aae` | 1024-token budget, truncation detection, uncertainty guards | `sha256:6ad15368…` |
+| `v0.5.0` | `ffb409dd` | LLD declaration-body and lexical-call evidence | `sha256:6d76fa73…` |
+
+- Every image is `linux/amd64` + `linux/arm64`; `:latest` points at `v0.5.0`;
+  anonymous pull and in-image review/design/verify/explain smoke were verified.
+- Gates at each release: Rust 1.87 formatting, strict Clippy in both profiles,
+  server/design/AI and core-only suites, 207 JavaScript tests, 136 Python tests,
+  Docker build, and browser render where the UI changed.
+- Real Ollama evaluation: `qwen2.5-coder:7b` is the default; 1.5B/3B work only
+  on narrow declaration boundaries. Broad boundaries need 7B or richer context.
+- Remaining: M3 `csb init` (conditional), server/Focus AI (7.2–7.4), App
+  activation, hosted-model qualification and live fresh-repository acceptance.
+
 ## 2026-11-14 — approved minimal Focus review implementation
 
 Owner approved HLD B (wide canvas) and the hybrid LLD flow-first design, then
