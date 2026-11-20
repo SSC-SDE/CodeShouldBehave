@@ -1759,8 +1759,9 @@ is claimed; deployed release still predates these fixes.
 
 ## 2026-11-21 — provisional HLD/LLD design mode
 
-- Branch `feature/design-auto` from the merged #89 commit `6277e0e9`; draft
-  [PR #91](https://github.com/SSC-SDE/CodeShouldBehave/pull/91).
+- Branch `feature/design-auto` from the merged #89 commit `6277e0e9`;
+  [PR #91](https://github.com/SSC-SDE/CodeShouldBehave/pull/91) merged at
+  `de7a7ad70b881608f307b779fe45d95702d8c5e4`.
 - `csb review --design auto` derives a provisional component model from the
   committed Cargo workspace and generates HLD/LLD without web onboarding.
   `--design-context` accepts a confirmed accepted-context file whose `commit`
@@ -1778,17 +1779,21 @@ is claimed; deployed release still predates these fixes.
   core-only test suites; 207 JavaScript tests; 136 Python tests (6 skipped);
   Docker build and in-image smoke; browser render at 1440px and 390px with no
   horizontal overflow. `csb verify` passed on a real workspace fixture.
-- Not verified: no merge, tag, image publish or deployment; `--design-context`
-  used a synthetic confirmed context, not a real onboarding export. When M1
-  started, `refs/tags/v0.2.0` was not visible on the remote. The provisional
-  model is explicitly not confirmed architecture.
+- Release: `v0.3.0` tagged at `de7a7ad7`; publish run
+  [44805003093](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/44805003093)
+  passed. Multi-arch index `sha256:169e672484aec437f98bda5e30115f54b3d186c6e6cad01c678384653532d6f1`
+  for `linux/amd64` + `linux/arm64`; anonymous pull passed; the published image
+  ran `review --design auto` and `verify` (`OK 9 artifacts`).
+- Residual limits: `--design-context` used a synthetic confirmed context, not a
+  real onboarding export. The provisional model is explicitly not confirmed
+  architecture.
 
 ## 2026-11-21 — advisory AI explanations (BYOK)
 
-- Branch `feature/csb-explain` stacked on `feature/design-auto` because PR #91
-  was still open and no `v0.3.0` tag was visible; draft
-  [PR #92](https://github.com/SSC-SDE/CodeShouldBehave/pull/92). Retarget to
-  `main` after #91 merges.
+- Branch `feature/csb-explain` stacked on `feature/design-auto`; after #91
+  merged it was retargeted to `main` with only the two M2 commits.
+  [PR #92](https://github.com/SSC-SDE/CodeShouldBehave/pull/92) merged at
+  `b43609257364c5a52ed844c8764665774050547a`.
 - Added `csb explain` over a verified review with local Ollama and
   OpenAI-compatible adapters. Preview is the default and performs no network
   request; `--send` is explicit.
@@ -1807,6 +1812,12 @@ is claimed; deployed release still predates these fixes.
   (6 skipped); Docker build and in-image smoke; fake-provider integration tests
   for Ollama/OpenAI request shape, preview no-egress, invalid citations and
   private key files.
-- Not verified: no real Ollama/hosted-model call; no merge, tag, image publish
-  or deployment. No native Anthropic adapter; Copilot/Codex are unsupported as
+- Release: `v0.4.0` tagged at `b4360925`; publish run
+  [44809658954](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/44809658954)
+  passed. Multi-arch index `sha256:645cc8884f5e246cc82835e7d62b95097bd34997b2579ae19fa4884fc28b218a`
+  for `linux/amd64` + `linux/arm64`; `:latest` resolves to the same index;
+  anonymous pull passed; the published image produced an AI preview and kept
+  `verify` at `OK 9 artifacts`.
+- Residual limits: no real Ollama/hosted-model call was made; tests use a local
+  fake provider. No native Anthropic adapter; Copilot/Codex are unsupported as
   inference providers.
