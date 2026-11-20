@@ -18,6 +18,30 @@ pub const MANIFEST_SCHEMA: &str = "csb-local-manifest-v1";
 pub struct DesignArtifacts {
     pub markdown: String,
     pub json: Value,
+    pub report: DesignReport,
+}
+
+/// Plain, bounded design presentation data. No design types cross into the
+/// always-compiled site and report modules.
+#[derive(Clone, Debug, Default)]
+pub struct DesignReport {
+    pub authority: String,
+    pub hld_status: String,
+    pub lld_status: String,
+    pub hld_rows: Vec<DesignRow>,
+    pub hld_questions: Vec<String>,
+    pub hld_gaps: Vec<String>,
+    pub hld_mermaid: String,
+    pub lld_rows: Vec<DesignRow>,
+    pub lld_gaps: Vec<String>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct DesignRow {
+    pub kind: String,
+    pub before: String,
+    pub after: String,
+    pub detail: String,
 }
 
 #[derive(Clone, Debug)]
@@ -69,10 +93,13 @@ pub fn emit(
 
     let review = &result.review;
     let source_paths = source_paths(review);
+    let index_html = match design {
+        Some(design) => crate::render_html_with_design(review, &design.report),
+        None => crate::render_html(review),
+    };
     let mut files: Vec<(PathBuf, Vec<u8>)> = vec![
         (
             PathBuf::from("index.html"),
-            crate::render_html(review).into_bytes(),
         ),
         (
             PathBuf::from("review.md"),

@@ -35,6 +35,16 @@ struct Repo {
 }
 
 impl Repo {
+    #[cfg(feature = "server")]
+    fn bare() -> Self {
+        let scratch = Scratch::new();
+        let repo = Self { scratch };
+        repo.git(&["init", "-q"]);
+        repo.git(&["config", "user.name", "csb test"]);
+        repo.git(&["config", "user.email", "test@example.invalid"]);
+        repo
+    }
+
     fn new() -> Self {
         let scratch = Scratch::new();
         let repo = Self { scratch };
@@ -89,6 +99,44 @@ impl Repo {
             "fn add(a: i32, b: i32) -> i32 {\n    a + b\n}\n\nfn multiply(a: i32, b: i32) -> i32 {\n    a * b\n}\n",
         );
         self.commit("add multiply")
+    }
+
+    #[cfg(feature = "server")]
+    fn cargo_workspace(&self) -> String {
+        self.write(
+            "Cargo.toml",
+            "[workspace]\nmembers = [\"crates/core\", \"crates/app\"]\nresolver = \"2\"\n",
+        );
+        self.write(
+            "crates/core/Cargo.toml",
+            "[package]\nname = \"core\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+        );
+        self.write(
+            "crates/app/Cargo.toml",
+            "[package]\nname = \"app\"\nversion = \"0.1.0\"\nedition = \"2021\"\n[dependencies]\ncore = { path = \"../core\" }\n",
+        );
+        self.write(
+            "crates/core/src/lib.rs",
+            "pub fn add(a: i32, b: i32) -> i32 {\n    a + b\n}\n",
+        );
+        self.write(
+            "crates/app/src/lib.rs",
+            "use core::add;\npub fn total() -> i32 {\n    add(1, 2)\n}\n",
+        );
+        self.commit("workspace baseline")
+    }
+
+    #[cfg(feature = "server")]
+    fn change_workspace(&self) -> String {
+        self.write(
+            "crates/core/src/lib.rs",
+            "pub fn add(a: i32, b: i32) -> i32 {\n    a.checked_add(b).unwrap_or(0)\n}\n\npub fn subtract(a: i32, b: i32) -> i32 {\n    a - b\n}\n",
+        );
+        self.write(
+            "crates/app/src/lib.rs",
+            "use core::{add, subtract};\npub fn total() -> i32 {\n    add(1, 2) - subtract(3, 1)\n}\n",
+        );
+        self.commit("change workspace")
     }
 }
 
@@ -439,3 +487,8 @@ fn serve_rejects_directories_without_review_output() {
     assert_eq!(output.status.code(), Some(2));
     assert!(stderr(&output).contains("run `csb review` first"));
 }
+
+#[cfg(feature = "server")]
+#[cfg(feature = "server")]
+#[cfg(feature = "server")]
+#[cfg(feature = "server")]

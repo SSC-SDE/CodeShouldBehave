@@ -40,6 +40,9 @@ HEAD=$(git rev-parse HEAD)
 
 csb review --repo . --base "$BASE" --head "$HEAD" --out-dir review/
 
+# Optional: add provisional HLD/LLD derived from the Cargo workspace
+csb review --repo . --base "$BASE" --head "$HEAD" --out-dir review-design/ --design auto
+
 # Serve it locally (file:// is blocked by browser fetch rules)
 csb serve --dir review/ --open
 
@@ -71,12 +74,30 @@ review/
 ├── review.json      Structured review evidence
 ├── review.md        Full Markdown report
 ├── summary.md       Pull-request summary
+├── design.md        Optional HLD/LLD report (`--design`)
+├── artifact.json    Optional structured HLD/LLD artifact (`--design`)
 └── sources/         Per-file patch and flow evidence
 ```
 
 `index.html` inlines its CSS, JavaScript and data. It renders from `file://` in
 most browsers, but `csb serve` is the supported path because some browser
 profiles block local file reads.
+
+## Design (provisional)
+
+`--design auto` reads `Cargo.toml` from the reviewed head commit, derives one
+component per workspace member (or one component for a single package), and
+generates HLD/LLD from committed Rust declarations.
+
+- Component boundaries are **provisional**. They are workspace-derived, not
+  human-confirmed. The artifact records `"authority": "provisional"`, the
+  report labels the sections, and the HLD contains an explicit gap.
+- A missing, invalid or non-UTF-8 `Cargo.toml` is a usage error.
+- Unsupported workspace globs are disclosed as gaps, not silently expanded.
+- `--design-context <file>` uses a confirmed accepted-context JSON. Its
+  `commit` must equal the reviewed `--head`.
+- `--disable-hld` also disables LLD; `--disable-lld` skips LLD only.
+- `--design` is off by default and requires a `--features server` build.
 
 ## Commands
 
@@ -180,10 +201,10 @@ excluded from the site so a warm cache cannot change the output.
   Truncation and deferral are reported in coverage.
 - Cross-file arrows are lexical call-name candidates, not resolved execution
   paths. The report says so in place.
-- HLD and LLD cards require a confirmed onboarding context and the server
-  feature. The local CLI site shows them as unavailable rather than inventing
-  design evidence. Use `flowdiff review --onboarding-context <file>` for that
-  workflow.
+- HLD and LLD are available through `--design auto` (provisional) or
+  `--design-context` (confirmed) and require the server feature. Without a
+  design flag the report explicitly shows them as unavailable rather than
+  inventing design evidence.
 - The review is advisory. It is not a merge approval and does not prove runtime
   behavior.
 

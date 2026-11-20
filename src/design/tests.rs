@@ -106,6 +106,7 @@ fn context(commit: &SnapshotId) -> ConfirmedDesignContext {
         providers: vec![],
         integrations: vec![],
         gaps: vec![],
+        authority: ContextAuthority::Confirmed,
     }
 }
 fn generate(

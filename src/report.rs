@@ -507,7 +507,104 @@ fn flowcharts_html(review: &Review) -> String {
     out
 }
 
+fn design_rows_html(rows: &[crate::csb_site::DesignRow]) -> String {
+    if rows.is_empty() {
+        return "<p class='design-empty'>No observed changes within the selected scope.</p>"
+            .to_string();
+    }
+    let mut out = String::from(
+        "<div class='design-table-wrap'><table class='design-table'><thead><tr><th>Change</th><th>Before</th><th>After</th><th>Detail</th></tr></thead><tbody>",
+    );
+    for row in rows {
+        let _ = write!(
+            out,
+            "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>",
+            esc(&row.kind),
+            esc(&row.before),
+            esc(&row.after),
+            esc(&row.detail)
+        );
+    }
+    out.push_str("</tbody></table></div>");
+    out
+}
+
+fn design_list_html(items: &[String], label: &str) -> String {
+    if items.is_empty() {
+        return String::new();
+    }
+    let mut out = format!("<h3>{}</h3><ul class='design-list'>", esc(label));
+    for item in items {
+        let _ = write!(out, "<li>{}</li>", esc(item));
+    }
+    out.push_str("</ul>");
+    out
+}
+
+fn design_levels_html(design: &crate::csb_site::DesignReport) -> String {
+    let provisional = design.authority == "provisional";
+    let authority = if provisional {
+        "Provisional"
+    } else {
+        "Confirmed"
+    };
+    let hld_summary = if design.hld_rows.is_empty() {
+        "no observed changes".to_string()
+    } else {
+        format!("{} changes", design.hld_rows.len())
+    };
+    let lld_summary = if design.lld_rows.is_empty() {
+        "no observed changes".to_string()
+    } else {
+        format!("{} changes", design.lld_rows.len())
+    };
+    let mut out = format!(
+        "<nav class='design-level-nav' aria-label='Design levels'><a class='active' href='#structural-map'><strong>Structural map</strong><span>Available · repository topology and lexical call candidates</span></a><a href='#hld-status'><strong>HLD</strong><span>{} · {}</span></a><a href='#lld-status'><strong>LLD</strong><span>{} · {}</span></a></nav><div class='design-level-status'>",
+        authority, hld_summary, authority, lld_summary
+    );
+    let _ = write!(
+        out,
+        "<article id='hld-status'><span class='change-badge design-authority'>{}</span><h2>High-level design · {}</h2><p>{} The deterministic analyzer derived this comparison from committed Rust declarations and workspace boundaries. Runtime behavior is not verified.</p>",
+        esc(authority),
+        esc(&design.hld_status),
+        if provisional {
+            "These component boundaries were derived from the Cargo workspace and are provisional; confirm them before treating them as architecture."
+        } else {
+            "These component boundaries come from a confirmed onboarding context."
+        }
+    );
+    out.push_str(&design_rows_html(&design.hld_rows));
+    out.push_str(&design_list_html(&design.hld_questions, "Review questions"));
+    out.push_str(&design_list_html(&design.hld_gaps, "Coverage gaps"));
+    if !design.hld_mermaid.is_empty() {
+        let _ = write!(
+            out,
+            "<details class='design-mermaid'><summary>HLD Mermaid source</summary><pre>{}</pre></details>",
+            esc(&design.hld_mermaid)
+        );
+    }
+    out.push_str("</article>");
+    let _ = write!(
+        out,
+        "<article id='lld-status'><span class='change-badge design-authority'>{}</span><h2>Low-level design · {}</h2><p>Declaration and control-flow changes are bounded to the selected scope. Absence is only meaningful where coverage is complete.</p>",
+        esc(authority),
+        esc(&design.lld_status)
+    );
+    out.push_str(&design_rows_html(&design.lld_rows));
+    out.push_str(&design_list_html(&design.lld_gaps, "LLD gaps"));
+    out.push_str("</article></div>");
+    out
+}
+
 pub fn html(review: &Review) -> String {
+    html_impl(review, None)
+}
+
+pub fn html_with_design(review: &Review, design: &crate::csb_site::DesignReport) -> String {
+    html_impl(review, Some(design))
+}
+
+fn html_impl(review: &Review, design: Option<&crate::csb_site::DesignReport>) -> String {
     let mut out = String::from(
         "<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><meta http-equiv='Content-Security-Policy' content=\"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'none'; connect-src 'none'; font-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'\"><title>Flowdiff — Behavioral review</title><style>",
     );
@@ -585,6 +682,14 @@ pub fn html(review: &Review) -> String {
     }
     out.push_str("<div class='analysis-note'><b>How to read this</b> Arrows connect landmarks in source order, not runtime paths. Branches, loops, exits and error propagation are highlighted from syntax. Validate behavior in the source diff; these sketches do not prove execution paths.</div></section><section id='view-architecture' role='tabpanel' aria-labelledby='tab-architecture' hidden>");
     out.push_str(&architecture_html(review));
+    if let Some(design) = design {
+        if let (Some(start), Some(end)) = (
+            out.find("<nav class='design-level-nav'"),
+            out.find("<div class='architecture-revisions'>"),
+        ) {
+            out.replace_range(start..end, &design_levels_html(design));
+        }
+    }
     out.push_str("<div class='view-intro'><p>Architectural signals <span>Possible connections across changed files</span></p></div><div class='architecture-summary'><span class='architecture-icon'>◇</span><div><h2>A change can travel.</h2><p>These links match call names to definitions. They are candidates to investigate, not resolved dependencies. Additional scoped repositories, libraries and service contracts appear in the Context tab. Transitive effects are not automatically expanded.</p></div></div><div class='impact-list'>");
     if review.impacts.is_empty() {
         out.push_str("<div class='empty'>No cross-file call candidates found.<small>This does not rule out architectural effects.</small></div>");

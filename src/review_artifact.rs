@@ -26,6 +26,7 @@ pub struct ReviewArtifact {
 }
 #[derive(Serialize)]
 pub struct ArtifactHld {
+    pub authority: String,
     pub baseline: crate::design::DesignVersion,
     pub proposal: crate::design::DesignVersion,
     pub delta: crate::design::DesignDelta,
@@ -251,6 +252,7 @@ impl ReviewArtifact {
         let (sources, source_gaps) =
             design_sources(repository, &baseline, &proposal, cancellation)?;
         self.hld = Some(ArtifactHld {
+            authority: context.authority.as_str().into(),
             baseline: without_rendered(baseline),
             proposal: without_rendered(proposal),
             delta,

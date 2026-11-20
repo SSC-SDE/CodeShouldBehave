@@ -1,5 +1,5 @@
 use super::*;
-use crate::design::{ConfirmedDesignContext, DesignLevel, generate_hld};
+use crate::design::{ConfirmedDesignContext, ContextAuthority, DesignLevel, generate_hld};
 use crate::{
     Cancellation, ComponentDecision, ComponentProposal, EvidenceConfidence, PathScope, ScopeRecord,
     SecurityDomain,
@@ -126,6 +126,7 @@ impl Fixture {
             providers: vec![],
             integrations: vec![],
             gaps: vec![],
+            authority: ContextAuthority::Confirmed,
         };
         let hld = generate_hld(
             &self.root,

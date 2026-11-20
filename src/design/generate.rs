@@ -733,14 +733,40 @@ pub fn generate_hld(
             deferred_facts: vec![],
         },
     };
+    let provisional = context.authority == ContextAuthority::Provisional;
+    if provisional {
+        builder.gap("Component boundaries are workspace-derived and provisional; runtime ownership and service boundaries are unconfirmed.");
+    }
     for component in &context.components {
         let id = component_id(scope, &component.id);
         let mut roots = component.roots.clone();
         roots.sort();
         roots.dedup();
-        builder.elements.insert(id.clone(),DesignElement{id,kind:DesignElementKind::Component,name:component.name.clone(),component_id:Some(component.id.clone()),roots,
-            responsibility:Some(component.role.clone()),user_assertions:vec![format!("Confirmed onboarding role: {}",component.role)],facts:vec![],evidence_ids:vec![],
-            unknowns:vec!["Confirmed role and boundary express user interpretation; business responsibilities, runtime ownership and deployed service state are not established".into()]});
+        let assertion = if provisional {
+            format!("Provisional workspace-derived role: {}", component.role)
+        } else {
+            format!("Confirmed onboarding role: {}", component.role)
+        };
+        let unknown = if provisional {
+            "Provisional role and boundary are workspace-derived; business responsibilities, runtime ownership and deployed service state are not established"
+        } else {
+            "Confirmed role and boundary express user interpretation; business responsibilities, runtime ownership and deployed service state are not established"
+        };
+        builder.elements.insert(
+            id.clone(),
+            DesignElement {
+                id,
+                kind: DesignElementKind::Component,
+                name: component.name.clone(),
+                component_id: Some(component.id.clone()),
+                roots,
+                responsibility: Some(component.role.clone()),
+                user_assertions: vec![assertion],
+                facts: vec![],
+                evidence_ids: vec![],
+                unknowns: vec![unknown.into()],
+            },
+        );
     }
     let tree = cancelable_tree(repository, snapshot, cancellation);
     let entries = match tree {
@@ -1803,6 +1829,7 @@ mod tests {
             providers: vec![],
             integrations: vec![],
             gaps: vec![],
+            authority: ContextAuthority::Confirmed,
         };
         let mut builder = Builder {
             snapshot: &snapshot,
@@ -1927,6 +1954,7 @@ mod tests {
             providers: vec![],
             integrations: vec![],
             gaps: vec![],
+            authority: ContextAuthority::Confirmed,
         };
         let before = generate_hld(
             &root,
@@ -2110,6 +2138,7 @@ mod tests {
             providers: vec![],
             integrations: vec![],
             gaps: vec![],
+            authority: ContextAuthority::Confirmed,
         };
         let before = generate_hld(
             &root.0,
