@@ -1782,3 +1782,31 @@ is claimed; deployed release still predates these fixes.
   used a synthetic confirmed context, not a real onboarding export. When M1
   started, `refs/tags/v0.2.0` was not visible on the remote. The provisional
   model is explicitly not confirmed architecture.
+
+## 2026-11-21 — advisory AI explanations (BYOK)
+
+- Branch `feature/csb-explain` stacked on `feature/design-auto` because PR #91
+  was still open and no `v0.3.0` tag was visible; draft
+  [PR #92](https://github.com/SSC-SDE/CodeShouldBehave/pull/92). Retarget to
+  `main` after #91 merges.
+- Added `csb explain` over a verified review with local Ollama and
+  OpenAI-compatible adapters. Preview is the default and performs no network
+  request; `--send` is explicit.
+- Evidence is limited to 16 redacted spans / 16 KiB. Requests carry exact
+  review, manifest, boundary, provider/model and evidence hashes. Responses are
+  schema-, length-, markup- and citation-validated; failures exit 5 without
+  modifying the review.
+- Keys come from `CSB_AI_API_KEY` or a regular 0600 file; no key is accepted as
+  a CLI value or written to logs/output. Plain HTTP is loopback-only; remote
+  endpoints require HTTPS. No retries, redirects or proxy.
+- `ai.md`/`ai.json` are not listed in the manifest; `csb verify` still passes.
+  The container builds with `server,ai` (39.2 MB) and smoke-tests `explain
+  --help`.
+- Gates: Rust 1.87 formatting; strict Clippy for `server,ai` and core-only;
+  353 server+AI tests; core-only suite; 207 JavaScript tests; 136 Python tests
+  (6 skipped); Docker build and in-image smoke; fake-provider integration tests
+  for Ollama/OpenAI request shape, preview no-egress, invalid citations and
+  private key files.
+- Not verified: no real Ollama/hosted-model call; no merge, tag, image publish
+  or deployment. No native Anthropic adapter; Copilot/Codex are unsupported as
+  inference providers.
