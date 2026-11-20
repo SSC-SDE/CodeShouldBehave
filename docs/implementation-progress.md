@@ -1733,3 +1733,26 @@ is claimed; deployed release still predates these fixes.
   fresh-repository acceptance require owner-provided infrastructure.
 - The root component boundary remains the v7 demo's only uncertain item; it is
   rendered explicitly rather than hidden.
+
+## 2026-11-21 — per-repository Pages adoption for the local CLI
+
+- Branch `feature/csb-pages-adoption` from `main` `2d8347ca3c`; draft
+  [PR #89](https://github.com/SSC-SDE/CodeShouldBehave/pull/89).
+- The GitHub Actions template now runs `csb verify` and preserves an existing
+  Pages link when it updates the sticky summary comment. A new optional
+  companion workflow deploys the verified report to the adopter's own Pages.
+- It is triggered by `workflow_run` so the deployment ref is the default
+  branch. The live repository reports `custom_branch_policies=true` with policy
+  `main` for the `github-pages` environment, so a pull-request deployment would
+  be rejected. Fork runs are skipped and the artifact is re-verified before
+  deployment.
+- Reports are not committed. Pages keeps only the latest deployment; the
+  artifact and content-addressed manifest remain the immutable record.
+- Verified with the published `ghcr.io/ssc-sde/csb:latest`: review and verify
+  passed on a standalone checkout (`OK 6 artifacts`, exit 0), the report has no
+  external references, both workflows parse, both scripts pass `node --check`
+  and whitespace checks pass. The Pages deployment itself was not executed
+  because it would replace the live canary site.
+- Not addressed: CLI reports still omit HLD/LLD because `csb review` passes no
+  design artifacts; `--features server` alone does not change that.
+- No merge, release, tag or container republish is claimed.
