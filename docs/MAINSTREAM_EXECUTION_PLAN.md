@@ -7,6 +7,7 @@ Planning baseline: `2d8347ca3ca85296fc8a098cfcbd752c77cb8f42`.
 Latest release record: `bd227af64d84339aa6ae231b1c6333abdc629731`.
 Completed releases: `v0.3.0` (provisional design), `v0.4.0` (BYOK AI),
 `v0.4.1` (explain guards), `v0.5.0` (LLD body/call evidence).
+Next: M4 component/caller context is planned in §11, not authorized.
 Execution checkout: `/Users/shankhyachatterjee/Code/CodeShouldBehave-csb-cli`
 (clean, on `main` before starting). Do **not** use
 `/Users/shankhyachatterjee/Code/CodeShouldBehave-public`; it holds unrelated
@@ -645,6 +646,8 @@ Owner decisions (defaults preselected):
 4. AI providers in M2: **Ollama + OpenAI-compatible only**; no native Claude
    adapter, no Copilot/Codex.
 5. M3: **conditional**, not committed.
+6. M4 (component/caller context): **planned**, not authorized; default scope is
+   11.1 + 11.2 together.
 
 ---
 
@@ -673,3 +676,71 @@ remains a separate milestone. Real Ollama testing established:
 Remaining, explicitly not done: M3 `csb init` (conditional), server/Focus AI,
 App activation, hosted-model qualification, and live fresh-repository
 acceptance.
+
+---
+
+## 11. Next quality milestone — component and caller context (planned)
+
+Status: **planned, not authorized, not started.** M2 is complete. Real-model
+testing showed that deeper explanation quality needs better evidence scope, not
+a larger model. This section records the next scoped direction so a future
+execution agent does not guess.
+
+### 11.1 Component-level boundary selection
+
+Current `csb explain` requires one HLD change. Most such changes are single
+declarations, so the model restates a signature. Component selection gives the
+model a coherent slice of the design.
+
+- Accept `--component <component-id>` (or `--boundary component:<id>`).
+  Resolve the component from `artifact.hld.baseline.elements` where
+  `kind == "component"`.
+- Build evidence from the component's changed contracts, relations, possible
+  impacts and the LLD entries whose `parent.component_id` matches.
+- Include at most 8 declarations and 8 relations, then apply the existing
+  16-span / 16 KiB cap and redaction.
+- Derived component facts are summaries, not new source; label them
+  `source_kind: "component"`.
+- Acceptance: a component selection yields at least two declarations or
+  relations; a 7B explanation cites more than one evidence item and references
+  at least one relation; the deterministic report is unchanged.
+
+### 11.2 Caller-graph context
+
+LLD already retains lexical call observations and
+`lld.delta.possible_callers`. Expose the relevant ones without claiming runtime
+resolution.
+
+- For each selected declaration, collect at most 8 callers from
+  `possible_callers` and caller entries in the same side.
+- Include the caller signature and the call-site line when retained; otherwise
+  include the logical key only.
+- Label callers `source_kind: "call_candidate"` and state explicitly that they
+  are lexical candidates, not resolved runtime calls.
+- Deduplicate by caller entry ID; keep the 16-span / 16 KiB cap.
+- Acceptance: an explanation names at least one caller and cites its evidence;
+  it makes no runtime-order or reachability claim; absent callers produce an
+  explicit unknown, not invented edges.
+
+### 11.3 Boundary discovery UX
+
+- Add `csb explain --list` to print boundary ID, kind, path, declaration name,
+  evidence bytes and whether it is `uncertain`.
+- Keep explicit selection mandatory; do not silently explain a whole PR.
+- Sort deterministically and cap the listing.
+
+### 11.4 Gates and stop conditions
+
+- Unit and integration fixtures with two callers and a component containing
+  multiple declarations.
+- Real Ollama 7B comparison against the current single-declaration output;
+  record latency, citation use and whether questions become change-specific.
+- `csb verify` and the deterministic manifest stay byte-identical.
+- No new provider, no larger default model, no whole-repository graph.
+- If caller evidence is absent or ambiguous, say so; never infer a call graph.
+- Stop if the evidence bundle exceeds the existing caps or the explanation
+  cannot cite the component/caller evidence.
+
+Owner decision required before starting: choose component-only, caller-only, or
+both, and set the evidence budget. Default recommendation: implement 11.1 and
+11.2 together, then re-evaluate with 7B.
