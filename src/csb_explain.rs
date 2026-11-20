@@ -224,7 +224,11 @@ pub fn run(options: &ExplainOptions) -> Result<ExplainOutcome, ExplainError> {
     }
     let value: Value = serde_json::from_str(&result.explanation)
         .map_err(|_| ExplainError::Provider("model_invalid_json".into()))?;
-    let value = validate_response(&value, evidence.len())?;
+    let uncertain = change.get("kind").and_then(Value::as_str) == Some("uncertain");
+    let mut value = validate_response(&value, evidence.len(), !uncertain)?;
+    if uncertain {
+        value["headline"] = json!("Unresolved design difference — verification required");
+    }
     let explanation = json!({
         "schema": "csb-ai-explanation-v1",
         "bundle_id": bundle_id,
@@ -327,9 +331,19 @@ fn collect_evidence(
 fn prompt(change: &Value, evidence: &[Evidence]) -> String {
     let mut prompt = String::from(
         "Explain the selected high-level-design change for a Rust pull request.\n\
+         Write for a senior Rust reviewer. State the design consequence of the change, not the syntax that changed.\n\
          Use only the evidence below. Do not invent runtime behavior, ownership or intent.\n\
-         Cite evidence by its bracketed index. Return JSON with keys headline, changes, questions, unknowns.\n\n",
+         Cite evidence by its bracketed index. Return JSON with keys headline, changes, questions, unknowns.\n\
+         At most 5 claims, 5 questions and 5 unknowns. Do not restate the evidence.\n\
+         Questions must be specific to this change and answerable from code; omit generic compatibility, risk or timeline questions.\n\
+         If the evidence is only a declaration line, say that behavior and callers are not established instead of guessing.\n\n",
     );
+    if change.get("kind").and_then(Value::as_str) == Some("uncertain") {
+        prompt.push_str(
+            "This boundary is marked uncertain/unresolved. Do not present evidence items as added, removed or modified. \
+             Return an empty changes array. Explain only that the difference is unresolved, why the deterministic coverage is incomplete, and what a reviewer must verify.\n\n",
+        );
+    }
     prompt.push_str(&format!(
         "Boundary: {}\nBefore: {}\nAfter: {}\nReason: {}\n\nEvidence:\n",
         change.get("kind").and_then(Value::as_str).unwrap_or(""),
@@ -352,7 +366,11 @@ fn prompt(change: &Value, evidence: &[Evidence]) -> String {
     prompt
 }
 
-fn validate_response(value: &Value, evidence_len: usize) -> Result<Value, ExplainError> {
+fn validate_response(
+    value: &Value,
+    evidence_len: usize,
+    allow_changes: bool,
+) -> Result<Value, ExplainError> {
     let object = value
         .as_object()
         .ok_or_else(|| ExplainError::Provider("model_invalid_schema".into()))?;
@@ -374,6 +392,13 @@ fn validate_response(value: &Value, evidence_len: usize) -> Result<Value, Explai
         Ok(value.to_owned())
     };
     let headline = text(&object["headline"], 200)?;
+    if !allow_changes
+        && object["changes"]
+            .as_array()
+            .is_none_or(|changes| !changes.is_empty())
+    {
+        return Err(ExplainError::Provider("model_invalid_certainty".into()));
+    }
     let mut changes = Vec::new();
     for change in object["changes"]
         .as_array()
@@ -566,8 +591,12 @@ mod tests {
             "unknowns": []
         });
         assert!(matches!(
-            validate_response(&foreign, 1),
+            validate_response(&foreign, 1, true),
             Err(ExplainError::Provider(message)) if message == "model_invalid_citation"
+        ));
+        assert!(matches!(
+            validate_response(&foreign, 1, false),
+            Err(ExplainError::Provider(message)) if message == "model_invalid_certainty"
         ));
         let script = json!({
             "headline": "<script>alert(1)</script>",
@@ -576,7 +605,7 @@ mod tests {
             "unknowns": []
         });
         assert!(matches!(
-            validate_response(&script, 1),
+            validate_response(&script, 1, true),
             Err(ExplainError::Provider(message)) if message == "model_invalid_text"
         ));
     }

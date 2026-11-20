@@ -79,7 +79,11 @@ still verifies independently.
 ## Limits and failure behavior
 
 - At most 16 evidence spans and 16 KiB of redacted source per request.
-- 60-second deadline, 64 KiB response cap, no retries, no redirects, no proxy.
+- 60-second deadline, 1024 generated tokens, 64 KiB response cap. Truncated
+  output fails as `provider_output_truncated`; it is never parsed as a result.
+- Boundaries marked `uncertain` must return no claims; they get a neutral
+  headline and only questions/unknowns. Asserted claims fail validation.
+- No retries, no redirects, no proxy.
 - Only cited evidence indexes are accepted; foreign or stale citations fail.
 - Invalid JSON, schema, markup or an oversized response fails with exit code 5.
 - A provider failure leaves the review untouched; rerun `csb review` only if the

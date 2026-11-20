@@ -9,13 +9,13 @@ pub(crate) fn response_schema() -> Value {
             "headline": {"type": "string", "maxLength": 200},
             "changes": {
                 "type": "array",
-                "maxItems": 10,
+                "maxItems": 5,
                 "items": {
                     "type": "object",
                     "additionalProperties": false,
                     "required": ["claim", "side", "evidence_ids"],
                     "properties": {
-                        "claim": {"type": "string", "maxLength": 500},
+                        "claim": {"type": "string", "maxLength": 400},
                         "side": {"type": "string", "enum": ["baseline", "proposal", "both"]},
                         "evidence_ids": {
                             "type": "array",
@@ -27,13 +27,13 @@ pub(crate) fn response_schema() -> Value {
             },
             "questions": {
                 "type": "array",
-                "maxItems": 10,
-                "items": {"type": "string", "maxLength": 300}
+                "maxItems": 5,
+                "items": {"type": "string", "maxLength": 240}
             },
             "unknowns": {
                 "type": "array",
-                "maxItems": 10,
-                "items": {"type": "string", "maxLength": 300}
+                "maxItems": 5,
+                "items": {"type": "string", "maxLength": 240}
             }
         }
     })
