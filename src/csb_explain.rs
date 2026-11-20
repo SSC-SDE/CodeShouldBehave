@@ -87,6 +87,8 @@ pub struct ExplainOutcome {
 struct Evidence {
     index: usize,
     side: &'static str,
+    source_kind: &'static str,
+    lld_entry: Option<String>,
     path: String,
     commit: String,
     blob: String,
@@ -132,7 +134,7 @@ pub fn run(options: &ExplainOptions) -> Result<ExplainOutcome, ExplainError> {
         .get("proposal")
         .and_then(Value::as_str)
         .ok_or_else(|| ExplainError::Usage("index.json has no proposal".into()))?;
-    let evidence = collect_evidence(hld, change, baseline, proposal)?;
+    let evidence = collect_evidence(hld, artifact.get("lld"), change, baseline, proposal)?;
     if evidence.is_empty() {
         return Err(ExplainError::Usage(
             "selected boundary has no source evidence; choose another HLD change".into(),
@@ -154,6 +156,8 @@ pub fn run(options: &ExplainOptions) -> Result<ExplainOutcome, ExplainError> {
         "evidence": evidence.iter().map(|item| json!({
             "index": item.index,
             "side": item.side,
+            "source_kind": item.source_kind,
+            "lld_entry": item.lld_entry,
             "path": item.path,
             "commit": item.commit,
             "blob": item.blob,
@@ -255,6 +259,7 @@ pub fn run(options: &ExplainOptions) -> Result<ExplainOutcome, ExplainError> {
 
 fn collect_evidence(
     hld: &Value,
+    lld: Option<&Value>,
     change: &Value,
     baseline: &str,
     proposal: &str,
@@ -303,6 +308,8 @@ fn collect_evidence(
             } else {
                 "both"
             },
+            source_kind: "hld",
+            lld_entry: None,
             path: source
                 .get("path")
                 .and_then(Value::as_str)
@@ -325,7 +332,159 @@ fn collect_evidence(
             break;
         }
     }
+    append_lld_bodies(&mut evidence, &mut total, lld, change, baseline, proposal);
     Ok(evidence)
+}
+
+fn append_lld_bodies(
+    evidence: &mut Vec<Evidence>,
+    total: &mut usize,
+    lld: Option<&Value>,
+    change: &Value,
+    baseline: &str,
+    proposal: &str,
+) {
+    let Some(lld) = lld else { return };
+    let spans = evidence.clone();
+    let mut seen_entries = std::collections::BTreeSet::new();
+    for span in spans {
+        for (side, commit) in [("baseline", baseline), ("proposal", proposal)] {
+            if span.side != side && span.side != "both" {
+                continue;
+            }
+            let Some(side_value) = lld.get(side) else {
+                continue;
+            };
+            let Some(entries) = side_value
+                .get("catalog")
+                .and_then(|catalog| catalog.get("entries"))
+                .and_then(Value::as_array)
+            else {
+                continue;
+            };
+            let Some(entry) = matching_entry(entries, &span, change) else {
+                continue;
+            };
+            let Some(entry_id) = entry.get("id").and_then(Value::as_str) else {
+                continue;
+            };
+            if !seen_entries.insert(entry_id.to_owned()) {
+                continue;
+            }
+            if let Some(inputs) = side_value.get("inputs").and_then(Value::as_array) {
+                if let Some((source, blob)) = inputs
+                    .iter()
+                    .find_map(|input| {
+                        (input.get("path").and_then(Value::as_str) == Some(span.path.as_str()))
+                            .then(|| {
+                                (
+                                    input.get("source").and_then(Value::as_str),
+                                    input.get("blob").and_then(Value::as_str),
+                                )
+                            })
+                    })
+                    .and_then(|(source, blob)| Some((source?, blob?)))
+                {
+                    let start =
+                        entry.get("start_byte").and_then(Value::as_u64).unwrap_or(0) as usize;
+                    let end = entry.get("end_byte").and_then(Value::as_u64).unwrap_or(0) as usize;
+                    if let Some(text) = source.get(start..end) {
+                        let text = redact_sensitive(text);
+                        if !text.is_empty()
+                            && text.trim() != span.text.trim()
+                            && *total + text.len() <= MAX_EVIDENCE_BYTES
+                        {
+                            *total += text.len();
+                            evidence.push(Evidence {
+                                index: evidence.len(),
+                                side: span.side,
+                                source_kind: "lld_body",
+                                lld_entry: Some(entry_id.to_owned()),
+                                path: span.path.clone(),
+                                commit: commit.to_owned(),
+                                blob: blob.to_owned(),
+                                start_line: entry
+                                    .get("start_line")
+                                    .and_then(Value::as_u64)
+                                    .unwrap_or(span.start_line),
+                                end_line: entry
+                                    .get("end_line")
+                                    .and_then(Value::as_u64)
+                                    .unwrap_or(span.end_line),
+                                text,
+                            });
+                        }
+                    }
+                }
+            }
+            if let Some(calls) = entry.get("call_observations").and_then(Value::as_array) {
+                let mut observed: Vec<String> = calls
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .take(20)
+                    .map(|call| call.chars().take(120).collect())
+                    .collect();
+                observed.dedup();
+                if !observed.is_empty() {
+                    let name = entry.get("name").and_then(Value::as_str).unwrap_or("");
+                    let text = format!(
+                        "Deterministic lexical call observations for {name}:\n- {}",
+                        observed.join("\n- ")
+                    );
+                    if *total + text.len() <= MAX_EVIDENCE_BYTES {
+                        *total += text.len();
+                        evidence.push(Evidence {
+                            index: evidence.len(),
+                            side: span.side,
+                            source_kind: "lld_calls",
+                            lld_entry: Some(entry_id.to_owned()),
+                            path: span.path.clone(),
+                            commit: commit.to_owned(),
+                            blob: String::new(),
+                            start_line: entry
+                                .get("start_line")
+                                .and_then(Value::as_u64)
+                                .unwrap_or(span.start_line),
+                            end_line: entry
+                                .get("end_line")
+                                .and_then(Value::as_u64)
+                                .unwrap_or(span.end_line),
+                            text,
+                        });
+                    }
+                }
+            }
+            if evidence.len() >= MAX_EVIDENCE {
+                return;
+            }
+        }
+    }
+}
+
+fn matching_entry<'a>(entries: &'a [Value], span: &Evidence, change: &Value) -> Option<&'a Value> {
+    let names: Vec<&str> = ["before_name", "after_name"]
+        .iter()
+        .filter_map(|key| change.get(*key).and_then(Value::as_str))
+        .collect();
+    entries
+        .iter()
+        .filter(|entry| entry.get("kind").and_then(Value::as_str) != Some("file"))
+        .filter(|entry| entry.get("path").and_then(Value::as_str) == Some(span.path.as_str()))
+        .filter(|entry| {
+            let start = entry.get("start_line").and_then(Value::as_u64).unwrap_or(0);
+            let end = entry.get("end_line").and_then(Value::as_u64).unwrap_or(0);
+            (start <= span.start_line && end >= span.end_line)
+                || names
+                    .iter()
+                    .any(|name| entry.get("name").and_then(Value::as_str) == Some(*name))
+        })
+        .min_by_key(|entry| {
+            entry
+                .get("end_line")
+                .and_then(Value::as_u64)
+                .unwrap_or(0)
+                .saturating_sub(entry.get("start_line").and_then(Value::as_u64).unwrap_or(0))
+        })
 }
 
 fn prompt(change: &Value, evidence: &[Evidence]) -> String {
@@ -359,8 +518,14 @@ fn prompt(change: &Value, evidence: &[Evidence]) -> String {
     ));
     for item in evidence {
         prompt.push_str(&format!(
-            "\n[{}] side={} path={} lines={}-{}\n{}\n",
-            item.index, item.side, item.path, item.start_line, item.end_line, item.text
+            "\n[{}] side={} kind={} path={} lines={}-{}\n{}\n",
+            item.index,
+            item.side,
+            item.source_kind,
+            item.path,
+            item.start_line,
+            item.end_line,
+            item.text
         ));
     }
     prompt
@@ -576,10 +741,58 @@ mod tests {
     #[test]
     fn evidence_text_is_redacted_before_the_prompt() {
         let change = json!({"evidence_ids": ["e1"]});
-        let evidence = collect_evidence(&hld(), &change, &"a".repeat(40), &"c".repeat(40)).unwrap();
+        let evidence =
+            collect_evidence(&hld(), None, &change, &"a".repeat(40), &"c".repeat(40)).unwrap();
         assert_eq!(evidence.len(), 1);
         assert!(!evidence[0].text.contains("api_key"));
         assert!(evidence[0].text.contains("[REDACTED"));
+    }
+
+    #[test]
+    fn lld_function_body_is_appended_to_the_signature_evidence() {
+        let commit = "c".repeat(40);
+        let source_text = "pub fn add(a: i32, b: i32) -> i32 {\n    a + b\n}\n";
+        let hld = json!({
+            "sources": [{
+                "evidence_id": "e1",
+                "commit": commit,
+                "path": "src/lib.rs",
+                "blob_id": "b".repeat(40),
+                "start_line": 1,
+                "end_line": 1,
+                "text": "pub fn add(a: i32, b: i32) -> i32\n"
+            }]
+        });
+        let change = json!({"evidence_ids": ["e1"], "after_name": "add"});
+        let lld = json!({
+            "baseline": {"catalog": {"entries": []}, "inputs": []},
+            "proposal": {
+                "catalog": {
+                    "snapshot": commit,
+                    "entries": [{
+                        "id": "lld-entry-1",
+                        "kind": "function",
+                        "name": "add",
+                        "path": "src/lib.rs",
+                        "start_line": 1,
+                        "end_line": 3,
+                        "start_byte": 0,
+                        "end_byte": source_text.len()
+                    }]
+                },
+                "inputs": [{
+                    "path": "src/lib.rs",
+                    "source": source_text,
+                    "blob": "d".repeat(40)
+                }]
+            }
+        });
+        let evidence =
+            collect_evidence(&hld, Some(&lld), &change, &"a".repeat(40), &commit).unwrap();
+        assert_eq!(evidence.len(), 2);
+        assert_eq!(evidence[0].source_kind, "hld");
+        assert_eq!(evidence[1].source_kind, "lld_body");
+        assert!(evidence[1].text.contains("a + b"));
     }
 
     #[test]

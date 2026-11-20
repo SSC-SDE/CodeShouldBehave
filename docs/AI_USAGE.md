@@ -98,6 +98,10 @@ still verifies independently.
 
 ## Limits and failure behavior
 
+- Evidence combines HLD source spans with LLD evidence: the most specific
+  declaration body from the retained syntax inputs, plus deterministic lexical
+  call observations for that declaration. Each item records `source_kind`
+  (`hld`, `lld_body`, `lld_calls`); identical HLD/LLD text is never duplicated.
 - At most 16 evidence spans and 16 KiB of redacted source per request.
 - 60-second deadline, 1024 generated tokens, 64 KiB response cap. Truncated
   output fails as `provider_output_truncated`; it is never parsed as a result.
