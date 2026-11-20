@@ -22,6 +22,10 @@
   verified review, using local Ollama or any OpenAI-compatible endpoint.
   Preview is the default; `--send` is explicit; the deterministic report is
   never modified. `docs/AI_USAGE.md` documents keys, privacy and limits.
+- Enrich `csb explain` with LLD evidence: the most specific declaration body
+  from retained syntax inputs and deterministic lexical call observations.
+  Evidence keeps its `source_kind` (`hld`, `lld_body`, `lld_calls`) and the same
+  16-span/16 KiB cap; HLD text is never duplicated.
 - Raise the explanation output budget to 1024 tokens and report truncated
   provider output as `provider_output_truncated` instead of invalid JSON.
 - Tighten the explanation schema and prompt to five concise claims/questions.

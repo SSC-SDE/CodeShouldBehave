@@ -40,7 +40,7 @@ impl Fixture {
         fixture.commit("baseline");
         fixture.write(
             "crates/core/src/lib.rs",
-            "pub fn add(a: i32, b: i32) -> i32 {\n    a.checked_add(b).unwrap_or(0)\n}\n\npub fn subtract(a: i32, b: i32) -> i32 {\n    a - b\n}\n",
+            "pub fn add(a: i32, b: i32) -> i32 {\n    a.checked_add(b).unwrap_or(0)\n}\n\npub fn subtract(a: i32, b: i32) -> i32 {\n    helper(a, b)\n}\n\nfn helper(a: i32, b: i32) -> i32 {\n    a - b\n}\n",
         );
         fixture.commit("head");
         fixture
@@ -205,7 +205,14 @@ fn preview_writes_identity_without_contacting_a_provider() {
         serde_json::from_slice(&fs::read(out.join("ai-preview.json")).unwrap()).unwrap();
     assert_eq!(preview["schema"], "csb-ai-preview-v1");
     assert_eq!(preview["boundary"], boundary);
-    assert!(!preview["evidence"].as_array().unwrap().is_empty());
+    let evidence = preview["evidence"].as_array().unwrap();
+    assert!(!evidence.is_empty());
+    assert!(
+        evidence
+            .iter()
+            .any(|item| item["source_kind"] == "lld_calls"),
+        "missing LLD call evidence: {preview}"
+    );
     assert!(!out.join("ai.md").exists());
     assert!(!out.join("ai.json").exists());
 }
