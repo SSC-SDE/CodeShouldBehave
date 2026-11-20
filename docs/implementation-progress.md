@@ -1848,3 +1848,30 @@ is claimed; deployed release still predates these fixes.
 - Model guidance: 7B is the default; 1.5B/3B are narrow-boundary only. The next
   quality gain is richer LLD/function-body evidence, not a larger model.
 - Not verified: no hosted-model call; 14B exceeded the 60 s deadline cold.
+
+## 2026-11-21 — LLD body and call evidence, v0.5.0
+
+- [PR #96](https://github.com/SSC-SDE/CodeShouldBehave/pull/96) merged at
+  `ffb409dd381c793bc7d53f9ca80d46eaf3b75d26`. `csb explain` now matches each
+  HLD span to its most specific non-file LLD declaration and appends that
+  declaration's body from retained syntax inputs. It also adds deterministic
+  lexical call observations for the matched declaration.
+- Evidence records `source_kind` (`hld`, `lld_body`, `lld_calls`) and
+  `lld_entry`; identical HLD/LLD text is deduplicated. The 16-span/16 KiB cap
+  and redaction are unchanged.
+- Measured on the M2 `run` boundary: 6,860 evidence bytes (6,000 HLD body +
+  860 call observations). Real Ollama 7B produced valid JSON in 19 s and its
+  questions referenced actual functions from the body (`prompt`, `bundle_id`,
+  `validate_response`) instead of only generic categories.
+- On this diff most HLD spans already include the full body, so body
+  deduplication correctly prevents duplicate evidence; call observations are
+  the useful addition for those boundaries.
+- Release: `v0.5.0` tagged at `ffb409dd`; publish run
+  [44824466172](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/44824466172)
+  passed. Index
+  `sha256:6d76fa7367e18126e88f97aceb9998c28b5d18191682a3aa0785ed83aae47b98`
+  for `linux/amd64` + `linux/arm64`; `:latest` matches; anonymous pull passed.
+  The published image produced an `lld_calls` preview and `verify` returned
+  `OK 23 artifacts`.
+- Not verified: no hosted-model call; body enrichment still cannot add context
+  where HLD already carries the complete body.
