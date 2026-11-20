@@ -1,5 +1,5 @@
-use super::*;
 use super::diff::{element_fingerprint, relation_fingerprint};
+use super::*;
 use crate::{
     Cancellation,
     git::BatchBlob,
@@ -1260,9 +1260,11 @@ pub fn generate_hld(
             .iter()
             .filter(|relation| remove.contains(&relation.from) || remove.contains(&relation.to))
         {
-            version
-                .coverage
-                .record_deferred("relation", &relation.id, &relation_fingerprint(relation));
+            version.coverage.record_deferred(
+                "relation",
+                &relation.id,
+                &relation_fingerprint(relation),
+            );
         }
         version
             .relations

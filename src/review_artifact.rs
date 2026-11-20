@@ -337,9 +337,7 @@ impl ReviewArtifact {
 /// Rendered markdown and mermaid are derivable from the retained facts and the
 /// public report regenerates them. Omitting them removes duplicate payload
 /// without changing the review.
-fn without_rendered(
-    mut version: crate::design::DesignVersion,
-) -> crate::design::DesignVersion {
+fn without_rendered(mut version: crate::design::DesignVersion) -> crate::design::DesignVersion {
     version.markdown.clear();
     version.mermaid.clear();
     version

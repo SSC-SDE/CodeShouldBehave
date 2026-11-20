@@ -218,12 +218,18 @@ pub fn invoke(
         .map_err(|_| "LLD HLD parent unavailable")?;
     let mut proposal_hld: DesignVersion = serde_json::from_value(value["hld"]["proposal"].clone())
         .map_err(|_| "LLD HLD parent unavailable")?;
-    let stored_baseline = without_rendered(
-        storage.load_design_version(repository, &baseline_hld.id, principal, grants)?,
-    );
-    let stored_proposal = without_rendered(
-        storage.load_design_version(repository, &proposal_hld.id, principal, grants)?,
-    );
+    let stored_baseline = without_rendered(storage.load_design_version(
+        repository,
+        &baseline_hld.id,
+        principal,
+        grants,
+    )?);
+    let stored_proposal = without_rendered(storage.load_design_version(
+        repository,
+        &proposal_hld.id,
+        principal,
+        grants,
+    )?);
     if stored_baseline != without_rendered(baseline_hld.clone())
         || stored_proposal != without_rendered(proposal_hld.clone())
     {

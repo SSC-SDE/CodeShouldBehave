@@ -1034,7 +1034,9 @@ fn deferred_inventory_index_proves_trimmed_facts_unchanged_or_modified() {
         .expect("fixture exposes a public contract");
     let mut baseline = generated.clone();
     baseline.coverage.complete = false;
-    baseline.elements.retain(|element| element.id != contract.id);
+    baseline
+        .elements
+        .retain(|element| element.id != contract.id);
     let removed_relations = generated
         .relations
         .iter()
@@ -1042,9 +1044,11 @@ fn deferred_inventory_index_proves_trimmed_facts_unchanged_or_modified() {
         .cloned()
         .collect::<Vec<_>>();
     for relation in &removed_relations {
-        baseline
-            .coverage
-            .record_deferred("relation", &relation.id, &relation_fingerprint(relation));
+        baseline.coverage.record_deferred(
+            "relation",
+            &relation.id,
+            &relation_fingerprint(relation),
+        );
     }
     baseline
         .relations
@@ -1076,8 +1080,7 @@ fn deferred_inventory_index_proves_trimmed_facts_unchanged_or_modified() {
     let modified = compare_hld(&baseline, &proposal).unwrap();
     assert!(
         !modified.changes.iter().any(|change| {
-            change.kind == "uncertain"
-                && change.element_id.as_deref() == Some(contract.id.as_str())
+            change.kind == "uncertain" && change.element_id.as_deref() == Some(contract.id.as_str())
         }),
         "{:?}",
         modified.changes

@@ -98,9 +98,7 @@ pub fn emit(
         None => crate::render_html(review),
     };
     let mut files: Vec<(PathBuf, Vec<u8>)> = vec![
-        (
-            PathBuf::from("index.html"),
-        ),
+        (PathBuf::from("index.html"), index_html.into_bytes()),
         (
             PathBuf::from("review.md"),
             crate::render_markdown(review).into_bytes(),
