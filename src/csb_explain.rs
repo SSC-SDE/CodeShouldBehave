@@ -508,10 +508,10 @@ fn collect_component_evidence(
         for element in elements {
             let owned = element.get("component_id").and_then(Value::as_str) == Some(component);
             let is_component = element.get("id").and_then(Value::as_str) == Some(component);
-            if (owned || is_component)
-                && let Some(id) = element.get("id").and_then(Value::as_str)
-            {
-                member_ids.insert(id.to_owned());
+            if owned || is_component {
+                if let Some(id) = element.get("id").and_then(Value::as_str) {
+                    member_ids.insert(id.to_owned());
+                }
             }
         }
     }
