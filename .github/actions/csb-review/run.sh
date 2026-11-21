@@ -49,6 +49,9 @@ set +e
 docker run --rm \
   -v "$repo_root:/repo:ro" \
   -v "$out_dir:/out" \
+  -e GIT_CONFIG_COUNT=1 \
+  -e GIT_CONFIG_KEY_0=safe.directory \
+  -e GIT_CONFIG_VALUE_0=/repo \
   "$image" review \
     --repo /repo \
     --base "$base" \
