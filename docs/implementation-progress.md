@@ -35,6 +35,17 @@ Public `main` carries the local CLI/container track through `v0.6.0`.
   activation, hosted-model qualification and live hosted fresh-repository
   acceptance.
 
+## 2026-11-21 — public-repository case studies
+
+- Ran the published `v0.6.0` digest on three public Rust commits: `fd`
+  2381562, `thiserror` f82a0cf and `ripgrep` e2b508d.
+- All reports pass `csb verify`; they are hosted as immutable release assets in
+  `SSC-SDE/csb-case-studies` (tag `case-studies-2026-11-21`).
+- Findings: `fd` shows 152 HLD/163 LLD changes; `thiserror` shows 0 HLD/71 LLD;
+  `ripgrep` shows 0 HLD/25 LLD. All three disclose incomplete bounded coverage.
+- No upstream endorsement is claimed; licenses remain with the upstream
+  projects.
+
 ## 2026-11-21 — csb-demo template repository
 
 - Created public template repository `SSC-SDE/csb-demo` with a single
