@@ -1,8 +1,9 @@
 # Mainstream Rust HLD/LLD review — implementation plan
 
 Status: **M0–M2 complete. M3 conditional. M4 merged in PR #101.**
-Current release: `v0.5.0` (LLD body/call evidence).
-Release baseline: `bd227af64d84339aa6ae231b1c6333abdc629731`.
+Current release: `v0.6.0` (component/caller context; digest
+`sha256:53e53a1f6374c58dacf90e1c52eca4130d1c82531f217edb56f31a43e507c075`).
+Release baseline: `6d84138d152ea6846ed54c830c18f3e2933c7c1a`.
 Plan maintenance since then is documentation-only; current `main` also includes
 the consolidated status and this plan update.
 
@@ -90,7 +91,7 @@ Owner decision required before starting. If skipped, record why in the tracker.
 
 ---
 
-## 3. M4 — component and caller context (merged)
+## 3. M4 — component and caller context (released in `v0.6.0`)
 
 Status: **merged in PR #101 at `94bc0273fe02b70dd4c3e63dba389ab6645b66ac`.** Both component and caller
 context were implemented (the default recommendation). M3 remains conditional
