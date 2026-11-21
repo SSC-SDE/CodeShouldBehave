@@ -19,6 +19,11 @@ body_file="$runner_temp/csb-comment.md"
 payload_file="$runner_temp/csb-comment.json"
 {
   printf '%s\n' "$marker"
+  if [ -n "${INPUT_REPORT_URL:-}" ]; then
+    printf '📎 [Open the interactive report](%s) — latest Pages deployment.\n\n' "$INPUT_REPORT_URL"
+  elif [ -n "${INPUT_ARTIFACT_URL:-}" ]; then
+    printf '📎 [Open the workflow run](%s) to download the interactive report artifact.\n\n' "$INPUT_ARTIFACT_URL"
+  fi
   head -c 60000 "$summary"
 } > "$body_file"
 jq -n --rawfile body "$body_file" '{body: $body}' > "$payload_file"

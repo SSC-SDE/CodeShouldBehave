@@ -35,6 +35,18 @@ Public `main` carries the local CLI/container track through `v0.6.0`.
   activation, hosted-model qualification and live hosted fresh-repository
   acceptance.
 
+## 2026-11-21 — one-click Pages report link
+
+- The action now deploys the interactive report to the repository's Pages site
+  when Pages is enabled and `pages: true` is set.
+- The PR comment starts with a direct “Open the interactive report” link; if
+  Pages is unavailable or deployment fails, it links the workflow artifact
+  instead.
+- `pages`, `pages: write` and `id-token: write` are documented; the legacy
+  companion workflow is deprecated.
+- `GITHUB_TOKEN` cannot create a Pages site (`Resource not accessible by
+  integration`), so the one-time Pages enablement remains a repository setting.
+
 ## 2026-11-21 — v1 action convenience tag
 
 - Tag `v1` points at `702f8f3a78333be1acc37eb06b103c95fc5e8d25`, the same

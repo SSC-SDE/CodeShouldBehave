@@ -1,5 +1,5 @@
 name: CodeShouldBehave Review
-description: Run a pinned CodeShouldBehave review, verify it, comment on the pull request and upload the report artifact.
+description: Run a pinned CodeShouldBehave review, publish the interactive report, comment on the pull request and upload the report artifact.
 author: SSC-SDE
 branding:
   icon: git-pull-request
@@ -32,6 +32,10 @@ inputs:
     description: Upload the interactive review as a workflow artifact.
     required: false
     default: "true"
+  pages:
+    description: Publish the interactive report to GitHub Pages when Pages is enabled.
+    required: false
+    default: "true"
   fail-on-incomplete:
     description: Fail the job when review coverage is incomplete. Default is a warning.
     required: false
@@ -50,6 +54,9 @@ outputs:
   coverage:
     description: complete, incomplete or failed.
     value: ${{ steps.review.outputs.coverage }}
+  report-url:
+    description: Live Pages report URL when deployment succeeds.
+    value: ${{ steps.pages-deploy.outputs.page_url || '' }}
 
 runs:
   using: composite
@@ -74,6 +81,31 @@ runs:
         if-no-files-found: warn
         retention-days: 30
 
+    - name: Configure Pages
+      id: pages-configure
+      if: ${{ inputs.pages == 'true' }}
+      uses: actions/configure-pages@v5
+      continue-on-error: true
+
+    - name: Upload Pages artifact
+      id: pages-upload
+      if: ${{ inputs.pages == 'true' && steps.pages-configure.outcome == 'success' }}
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: ${{ steps.review.outputs.out-dir }}
+      continue-on-error: true
+
+    - name: Wait for Pages artifact
+      if: ${{ inputs.pages == 'true' && steps.pages-upload.outcome == 'success' }}
+      shell: bash
+      run: sleep 10
+
+    - name: Deploy Pages
+      id: pages-deploy
+      if: ${{ inputs.pages == 'true' && steps.pages-upload.outcome == 'success' }}
+      uses: actions/deploy-pages@v4
+      continue-on-error: true
+
     - name: Post pull-request summary
       if: ${{ always() && inputs.comment == 'true' && github.event_name == 'pull_request' }}
       shell: bash
@@ -81,6 +113,8 @@ runs:
       env:
         GH_TOKEN: ${{ github.token }}
         INPUT_SUMMARY: ${{ steps.review.outputs.summary-path }}
+        INPUT_REPORT_URL: ${{ steps.pages-deploy.outputs.page_url }}
+        INPUT_ARTIFACT_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
       run: bash "${{ github.action_path }}/.github/actions/csb-review/comment.sh"
 
     - name: Enforce review result
