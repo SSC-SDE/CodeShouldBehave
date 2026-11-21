@@ -6,13 +6,18 @@
 use crate::ai::{ModelAdapter, ModelRequest, redact_sensitive};
 use crate::{OllamaAdapter, OpenAiAdapter, csb_site};
 use serde_json::{Value, json};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
-pub const RULE_VERSION: &str = "csb-explain-v1";
+pub const RULE_VERSION: &str = "csb-explain-v2";
 pub const MAX_EVIDENCE: usize = 16;
 pub const MAX_EVIDENCE_BYTES: usize = 16 * 1024;
 const MAX_KEY_BYTES: u64 = 4096;
+const MAX_COMPONENT_DECLARATIONS: usize = 8;
+const MAX_COMPONENT_RELATIONS: usize = 8;
+const MAX_COMPONENT_BASE: usize = 12;
+const MAX_CALLERS: usize = 8;
+const MAX_LISTED_BOUNDARIES: usize = 100;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Provider {
@@ -56,6 +61,7 @@ pub struct ExplainOptions {
     pub key_file: Option<PathBuf>,
     pub send: bool,
     pub out: Option<PathBuf>,
+    pub list: bool,
 }
 
 #[derive(Debug)]
@@ -79,7 +85,7 @@ impl ExplainError {
 }
 
 pub struct ExplainOutcome {
-    pub preview: PathBuf,
+    pub preview: Option<PathBuf>,
     pub explanation: Option<(PathBuf, PathBuf)>,
 }
 
@@ -110,18 +116,6 @@ pub fn run(options: &ExplainOptions) -> Result<ExplainOutcome, ExplainError> {
             "artifact.json has no design; run csb review --design auto first".into(),
         )
     })?;
-    let change = hld
-        .get("delta")
-        .and_then(|delta| delta.get("changes"))
-        .and_then(Value::as_array)
-        .and_then(|changes| {
-            changes.iter().find(|change| {
-                change.get("id").and_then(Value::as_str) == Some(options.boundary.as_str())
-            })
-        })
-        .ok_or_else(|| {
-            ExplainError::Usage(format!("unknown HLD boundary: {}", options.boundary))
-        })?;
     let review_id = index
         .get("analysis_review_id")
         .and_then(Value::as_str)
@@ -134,7 +128,35 @@ pub fn run(options: &ExplainOptions) -> Result<ExplainOutcome, ExplainError> {
         .get("proposal")
         .and_then(Value::as_str)
         .ok_or_else(|| ExplainError::Usage("index.json has no proposal".into()))?;
-    let evidence = collect_evidence(hld, artifact.get("lld"), change, baseline, proposal)?;
+    if options.list {
+        list_boundaries(hld, artifact.get("lld"), baseline, proposal)?;
+        return Ok(ExplainOutcome {
+            preview: None,
+            explanation: None,
+        });
+    }
+    let boundary = resolve_boundary(hld, &options.boundary)?;
+    let change = &boundary.change;
+    let lld = artifact.get("lld");
+    let (mut evidence, declaration_names) = match boundary.component.as_deref() {
+        Some(component) => {
+            collect_component_evidence(hld, lld, change, component, baseline, proposal)?
+        }
+        None => {
+            let evidence = collect_evidence(hld, lld, change, baseline, proposal)?;
+            let names = selected_names(change);
+            (evidence, names)
+        }
+    };
+    let mut total = evidence.iter().map(|item| item.text.len()).sum::<usize>();
+    append_callers(
+        &mut evidence,
+        &mut total,
+        lld,
+        &declaration_names,
+        baseline,
+        proposal,
+    );
     if evidence.is_empty() {
         return Err(ExplainError::Usage(
             "selected boundary has no source evidence; choose another HLD change".into(),
@@ -196,7 +218,7 @@ pub fn run(options: &ExplainOptions) -> Result<ExplainOutcome, ExplainError> {
     write_json(&preview_path, &preview).map_err(ExplainError::Usage)?;
     if !options.send {
         return Ok(ExplainOutcome {
-            preview: preview_path,
+            preview: Some(preview_path),
             explanation: None,
         });
     }
@@ -252,7 +274,7 @@ pub fn run(options: &ExplainOptions) -> Result<ExplainOutcome, ExplainError> {
         ExplainError::Usage(format!("Cannot write {}: {error}", markdown_path.display()))
     })?;
     Ok(ExplainOutcome {
-        preview: preview_path,
+        preview: Some(preview_path),
         explanation: Some((markdown_path, json_path)),
     })
 }
@@ -336,6 +358,652 @@ fn collect_evidence(
     Ok(evidence)
 }
 
+struct Boundary {
+    change: Value,
+    component: Option<String>,
+}
+
+fn resolve_boundary(hld: &Value, boundary: &str) -> Result<Boundary, ExplainError> {
+    if let Some(component) = boundary.strip_prefix("component:") {
+        let element = ["baseline", "proposal"]
+            .iter()
+            .filter_map(|side| hld.get(*side))
+            .filter_map(|version| version.get("elements").and_then(Value::as_array))
+            .flatten()
+            .find(|element| {
+                element.get("kind").and_then(Value::as_str) == Some("component")
+                    && element.get("id").and_then(Value::as_str) == Some(component)
+            })
+            .ok_or_else(|| {
+                ExplainError::Usage(format!("unknown component boundary: {component}"))
+            })?;
+        let name = element
+            .get("name")
+            .and_then(Value::as_str)
+            .unwrap_or(component);
+        return Ok(Boundary {
+            change: json!({
+                "id": boundary,
+                "kind": "component",
+                "element_id": component,
+                "before_name": Value::Null,
+                "after_name": name,
+                "reason": "Explicit component boundary; aggregates static contracts, relations, possible impacts and retained declarations only"
+            }),
+            component: Some(component.to_owned()),
+        });
+    }
+    let change = hld
+        .get("delta")
+        .and_then(|delta| delta.get("changes"))
+        .and_then(Value::as_array)
+        .and_then(|changes| {
+            changes
+                .iter()
+                .find(|change| change.get("id").and_then(Value::as_str) == Some(boundary))
+        })
+        .cloned()
+        .ok_or_else(|| ExplainError::Usage(format!("unknown HLD boundary: {boundary}")))?;
+    Ok(Boundary {
+        change,
+        component: None,
+    })
+}
+
+fn selected_names(change: &Value) -> BTreeSet<String> {
+    ["before_name", "after_name"]
+        .iter()
+        .filter_map(|key| change.get(*key).and_then(Value::as_str))
+        .map(str::to_owned)
+        .collect()
+}
+
+fn is_declaration_kind(kind: &str) -> bool {
+    !matches!(kind, "file" | "parameter" | "configuration" | "schema")
+}
+
+#[allow(clippy::too_many_arguments)]
+fn push_hld_span(
+    evidence: &mut Vec<Evidence>,
+    total: &mut usize,
+    seen: &mut BTreeSet<String>,
+    by_id: &BTreeMap<&str, &Value>,
+    id: &str,
+    baseline: &str,
+    proposal: &str,
+    source_kind: &'static str,
+) {
+    if evidence.len() >= MAX_COMPONENT_BASE || !seen.insert(id.to_owned()) {
+        return;
+    }
+    let Some(source) = by_id.get(id) else { return };
+    let text = source.get("text").and_then(Value::as_str).unwrap_or("");
+    let text = redact_sensitive(text);
+    if text.is_empty() || *total + text.len() > MAX_EVIDENCE_BYTES {
+        return;
+    }
+    *total += text.len();
+    let commit = source.get("commit").and_then(Value::as_str).unwrap_or("");
+    evidence.push(Evidence {
+        index: evidence.len(),
+        side: if commit == baseline {
+            "baseline"
+        } else if commit == proposal {
+            "proposal"
+        } else {
+            "both"
+        },
+        source_kind,
+        lld_entry: None,
+        path: source
+            .get("path")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_owned(),
+        commit: commit.to_owned(),
+        blob: source
+            .get("blob_id")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_owned(),
+        start_line: source
+            .get("start_line")
+            .and_then(Value::as_u64)
+            .unwrap_or(0),
+        end_line: source.get("end_line").and_then(Value::as_u64).unwrap_or(0),
+        text,
+    });
+}
+
+fn collect_component_evidence(
+    hld: &Value,
+    lld: Option<&Value>,
+    change: &Value,
+    component: &str,
+    baseline: &str,
+    proposal: &str,
+) -> Result<(Vec<Evidence>, BTreeSet<String>), ExplainError> {
+    let sources = hld
+        .get("sources")
+        .and_then(Value::as_array)
+        .ok_or_else(|| ExplainError::Usage("artifact.json has no HLD sources".into()))?;
+    let by_id: BTreeMap<&str, &Value> = sources
+        .iter()
+        .filter_map(|source| {
+            source
+                .get("evidence_id")
+                .and_then(Value::as_str)
+                .map(|id| (id, source))
+        })
+        .collect();
+    let mut member_ids = BTreeSet::new();
+    for side in ["baseline", "proposal"] {
+        let Some(elements) = hld
+            .get(side)
+            .and_then(|version| version.get("elements"))
+            .and_then(Value::as_array)
+        else {
+            continue;
+        };
+        for element in elements {
+            let owned = element.get("component_id").and_then(Value::as_str) == Some(component);
+            let is_component = element.get("id").and_then(Value::as_str) == Some(component);
+            if (owned || is_component)
+                && let Some(id) = element.get("id").and_then(Value::as_str)
+            {
+                member_ids.insert(id.to_owned());
+            }
+        }
+    }
+    let mut relations: Vec<&Value> = Vec::new();
+    let mut relation_ids = BTreeSet::new();
+    for side in ["baseline", "proposal"] {
+        let Some(items) = hld
+            .get(side)
+            .and_then(|version| version.get("relations"))
+            .and_then(Value::as_array)
+        else {
+            continue;
+        };
+        for relation in items {
+            let from = relation.get("from").and_then(Value::as_str).unwrap_or("");
+            let to = relation.get("to").and_then(Value::as_str).unwrap_or("");
+            let Some(id) = relation.get("id").and_then(Value::as_str) else {
+                continue;
+            };
+            if (member_ids.contains(from) || member_ids.contains(to))
+                && relation_ids.insert(id.to_owned())
+                && relations.len() < MAX_COMPONENT_RELATIONS
+            {
+                relations.push(relation);
+            }
+        }
+    }
+    let mut evidence = Vec::new();
+    let mut total = 0usize;
+    let mut seen = BTreeSet::new();
+    if let Some(changes) = hld
+        .get("delta")
+        .and_then(|delta| delta.get("changes"))
+        .and_then(Value::as_array)
+    {
+        for item in changes {
+            let element = item.get("element_id").and_then(Value::as_str);
+            let relation = item.get("relation_id").and_then(Value::as_str);
+            let belongs = element.is_some_and(|id| member_ids.contains(id))
+                || relation.is_some_and(|id| relation_ids.contains(id));
+            if !belongs {
+                continue;
+            }
+            if let Some(ids) = item.get("evidence_ids").and_then(Value::as_array) {
+                for id in ids.iter().filter_map(Value::as_str) {
+                    push_hld_span(
+                        &mut evidence,
+                        &mut total,
+                        &mut seen,
+                        &by_id,
+                        id,
+                        baseline,
+                        proposal,
+                        "component",
+                    );
+                }
+            }
+            if evidence.len() >= MAX_COMPONENT_BASE {
+                break;
+            }
+        }
+    }
+    for relation in &relations {
+        if let Some(ids) = relation.get("evidence_ids").and_then(Value::as_array) {
+            for id in ids.iter().filter_map(Value::as_str) {
+                push_hld_span(
+                    &mut evidence,
+                    &mut total,
+                    &mut seen,
+                    &by_id,
+                    id,
+                    baseline,
+                    proposal,
+                    "component",
+                );
+            }
+        }
+        if evidence.len() >= MAX_COMPONENT_BASE {
+            break;
+        }
+    }
+    if let Some(impacts) = hld
+        .get("delta")
+        .and_then(|delta| delta.get("possible_impacts"))
+        .and_then(Value::as_array)
+    {
+        for impact in impacts {
+            if impact.get("component_id").and_then(Value::as_str) != Some(component) {
+                continue;
+            }
+            let Some(ids) = impact.get("via_relation_ids").and_then(Value::as_array) else {
+                continue;
+            };
+            for relation_id in ids.iter().filter_map(Value::as_str) {
+                for side in ["baseline", "proposal"] {
+                    let Some(relation) = hld
+                        .get(side)
+                        .and_then(|version| version.get("relations"))
+                        .and_then(Value::as_array)
+                        .and_then(|items| {
+                            items.iter().find(|item| {
+                                item.get("id").and_then(Value::as_str) == Some(relation_id)
+                            })
+                        })
+                    else {
+                        continue;
+                    };
+                    if let Some(evidence_ids) =
+                        relation.get("evidence_ids").and_then(Value::as_array)
+                    {
+                        for id in evidence_ids.iter().filter_map(Value::as_str) {
+                            push_hld_span(
+                                &mut evidence,
+                                &mut total,
+                                &mut seen,
+                                &by_id,
+                                id,
+                                baseline,
+                                proposal,
+                                "component",
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+    let mut declarations = Vec::new();
+    let mut declaration_names = BTreeSet::new();
+    let mut declaration_ids = BTreeSet::new();
+    for side in ["baseline", "proposal"] {
+        let Some(entries) = lld
+            .and_then(|lld| lld.get(side))
+            .and_then(|value| value.get("catalog"))
+            .and_then(|catalog| catalog.get("entries"))
+            .and_then(Value::as_array)
+        else {
+            continue;
+        };
+        for entry in entries {
+            if entry
+                .get("parent")
+                .and_then(|parent| parent.get("component_id"))
+                .and_then(Value::as_str)
+                != Some(component)
+            {
+                continue;
+            }
+            let kind = entry.get("kind").and_then(Value::as_str).unwrap_or("");
+            if !is_declaration_kind(kind) {
+                continue;
+            }
+            let Some(id) = entry.get("id").and_then(Value::as_str) else {
+                continue;
+            };
+            if !declaration_ids.insert(id.to_owned())
+                || declarations.len() >= MAX_COMPONENT_DECLARATIONS
+            {
+                continue;
+            }
+            if let Some(name) = entry.get("name").and_then(Value::as_str) {
+                declaration_names.insert(name.to_owned());
+            }
+            declarations.push((side, entry));
+        }
+    }
+    let mut seen_entries = BTreeSet::new();
+    for (side, entry) in declarations {
+        let commit = if side == "baseline" {
+            baseline
+        } else {
+            proposal
+        };
+        append_entry_evidence(
+            &mut evidence,
+            &mut total,
+            lld,
+            side,
+            commit,
+            entry,
+            &mut seen_entries,
+            "",
+        );
+        if evidence.len() >= MAX_EVIDENCE {
+            break;
+        }
+    }
+    if evidence.is_empty() {
+        return Err(ExplainError::Usage(format!(
+            "component {} has no retained evidence; choose another boundary",
+            change
+                .get("id")
+                .and_then(Value::as_str)
+                .unwrap_or(component)
+        )));
+    }
+    Ok((evidence, declaration_names))
+}
+
+fn list_boundaries(
+    hld: &Value,
+    lld: Option<&Value>,
+    baseline: &str,
+    proposal: &str,
+) -> Result<String, ExplainError> {
+    let changes = hld
+        .get("delta")
+        .and_then(|delta| delta.get("changes"))
+        .and_then(Value::as_array)
+        .ok_or_else(|| ExplainError::Usage("artifact.json has no HLD delta changes".into()))?;
+    let mut sorted = changes.iter().collect::<Vec<_>>();
+    sorted.sort_by_key(|change| {
+        change
+            .get("id")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_owned()
+    });
+    let mut out = String::from("id\tkind\tpath\tdeclaration\tevidence_bytes\tuncertain\n");
+    for change in sorted.into_iter().take(MAX_LISTED_BOUNDARIES) {
+        let id = change.get("id").and_then(Value::as_str).unwrap_or("");
+        let kind = change.get("kind").and_then(Value::as_str).unwrap_or("");
+        let declaration = ["after_name", "before_name"]
+            .iter()
+            .find_map(|key| change.get(*key).and_then(Value::as_str))
+            .unwrap_or("");
+        let evidence = collect_evidence(hld, lld, change, baseline, proposal).unwrap_or_default();
+        let bytes = evidence.iter().map(|item| item.text.len()).sum::<usize>();
+        let path = evidence
+            .first()
+            .map(|item| item.path.as_str())
+            .unwrap_or("");
+        out.push_str(&format!(
+            "{id}\t{kind}\t{path}\t{declaration}\t{bytes}\t{}\n",
+            kind == "uncertain"
+        ));
+    }
+    print!("{out}");
+    Ok(out)
+}
+
+fn append_callers(
+    evidence: &mut Vec<Evidence>,
+    total: &mut usize,
+    lld: Option<&Value>,
+    declarations: &BTreeSet<String>,
+    baseline: &str,
+    proposal: &str,
+) {
+    let Some(lld) = lld else { return };
+    let Some(callers) = lld
+        .get("delta")
+        .and_then(|delta| delta.get("possible_callers"))
+        .and_then(Value::as_array)
+    else {
+        return;
+    };
+    let mut seen = BTreeSet::new();
+    let mut added = 0usize;
+    for caller in callers {
+        if added >= MAX_CALLERS || evidence.len() >= MAX_EVIDENCE {
+            break;
+        }
+        let logical_key = caller
+            .get("logical_key")
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        let proposal_id = caller.get("proposal_entry_id").and_then(Value::as_str);
+        let baseline_id = caller.get("baseline_entry_id").and_then(Value::as_str);
+        let (side, commit, entry_id) = if let Some(id) = proposal_id {
+            ("proposal", proposal, id)
+        } else if let Some(id) = baseline_id {
+            ("baseline", baseline, id)
+        } else {
+            continue;
+        };
+        if !seen.insert(entry_id.to_owned()) {
+            continue;
+        }
+        let entry = lld
+            .get(side)
+            .and_then(|value| value.get("catalog"))
+            .and_then(|catalog| catalog.get("entries"))
+            .and_then(Value::as_array)
+            .and_then(|entries| {
+                entries
+                    .iter()
+                    .find(|entry| entry.get("id").and_then(Value::as_str) == Some(entry_id))
+            });
+        let matched = match entry {
+            Some(entry) if !declarations.is_empty() => entry
+                .get("call_observations")
+                .and_then(Value::as_array)
+                .and_then(|calls| {
+                    calls.iter().filter_map(Value::as_str).find_map(|call| {
+                        let terminal = call
+                            .rsplit("::")
+                            .next()
+                            .unwrap_or(call)
+                            .rsplit('.')
+                            .next()
+                            .unwrap_or(call);
+                        declarations.get(terminal).cloned()
+                    })
+                }),
+            Some(_) => None,
+            None => None,
+        };
+        if !declarations.is_empty() && matched.is_none() {
+            continue;
+        }
+        let name = matched
+            .as_deref()
+            .or_else(|| entry.and_then(|entry| entry.get("name").and_then(Value::as_str)))
+            .or_else(|| logical_key.rsplit('|').next())
+            .unwrap_or("");
+        let (path, blob, start_line, end_line, text) = match entry {
+            Some(entry) => {
+                let path = entry.get("path").and_then(Value::as_str).unwrap_or("");
+                let blob = entry.get("blob").and_then(Value::as_str).unwrap_or("");
+                let start_line = entry.get("start_line").and_then(Value::as_u64).unwrap_or(0);
+                let end_line = entry.get("end_line").and_then(Value::as_u64).unwrap_or(0);
+                let signature = entry.get("signature").and_then(Value::as_str).unwrap_or("");
+                let mut text = format!(
+                    "Lexical caller candidate for declaration `{name}` (possible_callers; not a resolved runtime call):\n\
+                     {signature}\n\
+                     path={path} lines={start_line}-{end_line}\n\
+                     call-site line: not retained in the bounded catalog\n\
+                     logical_key={logical_key}"
+                );
+                if let Some(calls) = entry.get("call_observations").and_then(Value::as_array) {
+                    let observed = calls
+                        .iter()
+                        .filter_map(Value::as_str)
+                        .take(8)
+                        .collect::<Vec<_>>();
+                    if !observed.is_empty() {
+                        text.push_str(&format!(
+                            "\nobserved lexical calls: {}",
+                            observed.join(", ")
+                        ));
+                    }
+                }
+                (path.to_owned(), blob.to_owned(), start_line, end_line, text)
+            }
+            None => (
+                String::new(),
+                String::new(),
+                0,
+                0,
+                format!(
+                    "Lexical caller candidate (possible_callers; not a resolved runtime call):\n\
+                     caller entry is not retained on the {side} side\n\
+                     logical_key={logical_key}\n\
+                     call-site line: unknown"
+                ),
+            ),
+        };
+        let text = redact_sensitive(&text);
+        if text.is_empty() || *total + text.len() > MAX_EVIDENCE_BYTES {
+            continue;
+        }
+        *total += text.len();
+        evidence.push(Evidence {
+            index: evidence.len(),
+            side: if side == "baseline" {
+                "baseline"
+            } else {
+                "proposal"
+            },
+            source_kind: "call_candidate",
+            lld_entry: Some(entry_id.to_owned()),
+            path,
+            commit: commit.to_owned(),
+            blob,
+            start_line,
+            end_line,
+            text,
+        });
+        added += 1;
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn append_entry_evidence(
+    evidence: &mut Vec<Evidence>,
+    total: &mut usize,
+    lld: Option<&Value>,
+    side: &str,
+    commit: &str,
+    entry: &Value,
+    seen_entries: &mut BTreeSet<String>,
+    duplicate_body: &str,
+) {
+    if evidence.len() >= MAX_EVIDENCE {
+        return;
+    }
+    let Some(lld) = lld else { return };
+    let Some(side_value) = lld.get(side) else {
+        return;
+    };
+    let Some(entry_id) = entry.get("id").and_then(Value::as_str) else {
+        return;
+    };
+    if !seen_entries.insert(entry_id.to_owned()) {
+        return;
+    }
+    let path = entry.get("path").and_then(Value::as_str).unwrap_or("");
+    let start_line = entry.get("start_line").and_then(Value::as_u64).unwrap_or(0);
+    let end_line = entry.get("end_line").and_then(Value::as_u64).unwrap_or(0);
+    if let Some(inputs) = side_value.get("inputs").and_then(Value::as_array) {
+        if let Some((source, blob)) = inputs
+            .iter()
+            .find_map(|input| {
+                (input.get("path").and_then(Value::as_str) == Some(path)).then(|| {
+                    (
+                        input.get("source").and_then(Value::as_str),
+                        input.get("blob").and_then(Value::as_str),
+                    )
+                })
+            })
+            .and_then(|(source, blob)| Some((source?, blob?)))
+        {
+            let start = entry.get("start_byte").and_then(Value::as_u64).unwrap_or(0) as usize;
+            let end = entry.get("end_byte").and_then(Value::as_u64).unwrap_or(0) as usize;
+            if let Some(text) = source.get(start..end) {
+                let text = redact_sensitive(text);
+                if !text.is_empty()
+                    && text.trim() != duplicate_body.trim()
+                    && *total + text.len() <= MAX_EVIDENCE_BYTES
+                {
+                    *total += text.len();
+                    evidence.push(Evidence {
+                        index: evidence.len(),
+                        side: if side == "baseline" {
+                            "baseline"
+                        } else {
+                            "proposal"
+                        },
+                        source_kind: "lld_body",
+                        lld_entry: Some(entry_id.to_owned()),
+                        path: path.to_owned(),
+                        commit: commit.to_owned(),
+                        blob: blob.to_owned(),
+                        start_line,
+                        end_line,
+                        text,
+                    });
+                }
+            }
+        }
+    }
+    if evidence.len() >= MAX_EVIDENCE {
+        return;
+    }
+    if let Some(calls) = entry.get("call_observations").and_then(Value::as_array) {
+        let mut observed: Vec<String> = calls
+            .iter()
+            .filter_map(Value::as_str)
+            .take(20)
+            .map(|call| call.chars().take(120).collect())
+            .collect();
+        observed.dedup();
+        if !observed.is_empty() {
+            let name = entry.get("name").and_then(Value::as_str).unwrap_or("");
+            let text = format!(
+                "Deterministic lexical call observations for {name}:\n- {}",
+                observed.join("\n- ")
+            );
+            if *total + text.len() <= MAX_EVIDENCE_BYTES {
+                *total += text.len();
+                evidence.push(Evidence {
+                    index: evidence.len(),
+                    side: if side == "baseline" {
+                        "baseline"
+                    } else {
+                        "proposal"
+                    },
+                    source_kind: "lld_calls",
+                    lld_entry: Some(entry_id.to_owned()),
+                    path: path.to_owned(),
+                    commit: commit.to_owned(),
+                    blob: String::new(),
+                    start_line,
+                    end_line,
+                    text,
+                });
+            }
+        }
+    }
+}
+
 fn append_lld_bodies(
     evidence: &mut Vec<Evidence>,
     total: &mut usize,
@@ -365,95 +1033,16 @@ fn append_lld_bodies(
             let Some(entry) = matching_entry(entries, &span, change) else {
                 continue;
             };
-            let Some(entry_id) = entry.get("id").and_then(Value::as_str) else {
-                continue;
-            };
-            if !seen_entries.insert(entry_id.to_owned()) {
-                continue;
-            }
-            if let Some(inputs) = side_value.get("inputs").and_then(Value::as_array) {
-                if let Some((source, blob)) = inputs
-                    .iter()
-                    .find_map(|input| {
-                        (input.get("path").and_then(Value::as_str) == Some(span.path.as_str()))
-                            .then(|| {
-                                (
-                                    input.get("source").and_then(Value::as_str),
-                                    input.get("blob").and_then(Value::as_str),
-                                )
-                            })
-                    })
-                    .and_then(|(source, blob)| Some((source?, blob?)))
-                {
-                    let start =
-                        entry.get("start_byte").and_then(Value::as_u64).unwrap_or(0) as usize;
-                    let end = entry.get("end_byte").and_then(Value::as_u64).unwrap_or(0) as usize;
-                    if let Some(text) = source.get(start..end) {
-                        let text = redact_sensitive(text);
-                        if !text.is_empty()
-                            && text.trim() != span.text.trim()
-                            && *total + text.len() <= MAX_EVIDENCE_BYTES
-                        {
-                            *total += text.len();
-                            evidence.push(Evidence {
-                                index: evidence.len(),
-                                side: span.side,
-                                source_kind: "lld_body",
-                                lld_entry: Some(entry_id.to_owned()),
-                                path: span.path.clone(),
-                                commit: commit.to_owned(),
-                                blob: blob.to_owned(),
-                                start_line: entry
-                                    .get("start_line")
-                                    .and_then(Value::as_u64)
-                                    .unwrap_or(span.start_line),
-                                end_line: entry
-                                    .get("end_line")
-                                    .and_then(Value::as_u64)
-                                    .unwrap_or(span.end_line),
-                                text,
-                            });
-                        }
-                    }
-                }
-            }
-            if let Some(calls) = entry.get("call_observations").and_then(Value::as_array) {
-                let mut observed: Vec<String> = calls
-                    .iter()
-                    .filter_map(Value::as_str)
-                    .take(20)
-                    .map(|call| call.chars().take(120).collect())
-                    .collect();
-                observed.dedup();
-                if !observed.is_empty() {
-                    let name = entry.get("name").and_then(Value::as_str).unwrap_or("");
-                    let text = format!(
-                        "Deterministic lexical call observations for {name}:\n- {}",
-                        observed.join("\n- ")
-                    );
-                    if *total + text.len() <= MAX_EVIDENCE_BYTES {
-                        *total += text.len();
-                        evidence.push(Evidence {
-                            index: evidence.len(),
-                            side: span.side,
-                            source_kind: "lld_calls",
-                            lld_entry: Some(entry_id.to_owned()),
-                            path: span.path.clone(),
-                            commit: commit.to_owned(),
-                            blob: String::new(),
-                            start_line: entry
-                                .get("start_line")
-                                .and_then(Value::as_u64)
-                                .unwrap_or(span.start_line),
-                            end_line: entry
-                                .get("end_line")
-                                .and_then(Value::as_u64)
-                                .unwrap_or(span.end_line),
-                            text,
-                        });
-                    }
-                }
-            }
+            append_entry_evidence(
+                evidence,
+                total,
+                Some(lld),
+                side,
+                commit,
+                entry,
+                &mut seen_entries,
+                &span.text,
+            );
             if evidence.len() >= MAX_EVIDENCE {
                 return;
             }
@@ -501,6 +1090,22 @@ fn prompt(change: &Value, evidence: &[Evidence]) -> String {
         prompt.push_str(
             "This boundary is marked uncertain/unresolved. Do not present evidence items as added, removed or modified. \
              Return an empty changes array. Explain only that the difference is unresolved, why the deterministic coverage is incomplete, and what a reviewer must verify.\n\n",
+        );
+    }
+    if change.get("kind").and_then(Value::as_str) == Some("component") {
+        prompt.push_str(
+            "This is an explicitly selected component boundary. The evidence aggregates static contracts, relations and retained declarations; it is not a complete component inventory. \
+             Cite at least two independent items and reference at least one relation when present. Do not claim runtime order, reachability, ownership or intent.\n\n",
+        );
+    }
+    if evidence
+        .iter()
+        .any(|item| item.source_kind == "call_candidate")
+    {
+        prompt.push_str(
+            "Evidence of kind call_candidate is a lexical name-only caller candidate, not a resolved runtime call or a proven edge. \
+             Name at least one caller and cite its index, but do not claim runtime order or reachability and do not infer caller behavior. \
+             If no call_candidate evidence is present, state explicitly that callers are unknown.\n\n",
         );
     }
     prompt.push_str(&format!(
@@ -793,6 +1398,45 @@ mod tests {
         assert_eq!(evidence[0].source_kind, "hld");
         assert_eq!(evidence[1].source_kind, "lld_body");
         assert!(evidence[1].text.contains("a + b"));
+    }
+
+    #[test]
+    fn caller_candidates_are_lexical_only_and_include_signatures() {
+        let lld = json!({
+            "proposal": {
+                "catalog": {"entries": [{
+                    "id": "caller-1",
+                    "name": "handle",
+                    "path": "src/api.rs",
+                    "blob": "b".repeat(40),
+                    "start_line": 10,
+                    "end_line": 12,
+                    "signature": "pub fn handle(a: i32) -> i32",
+                    "call_observations": ["core::add"]
+                }]},
+                "inputs": []
+            },
+            "delta": {"possible_callers": [{
+                "proposal_entry_id": "caller-1",
+                "logical_key": "api||function|handle"
+            }]}
+        });
+        let mut evidence = Vec::new();
+        let mut total = 0;
+        append_callers(
+            &mut evidence,
+            &mut total,
+            Some(&lld),
+            &BTreeSet::from(["add".to_owned()]),
+            &"a".repeat(40),
+            &"c".repeat(40),
+        );
+        assert_eq!(evidence.len(), 1);
+        assert_eq!(evidence[0].source_kind, "call_candidate");
+        assert!(evidence[0].text.contains("handle"));
+        assert!(evidence[0].text.contains("pub fn handle(a: i32) -> i32"));
+        assert!(evidence[0].text.contains("not a resolved runtime call"));
+        assert!(evidence[0].text.contains("call-site line: not retained"));
     }
 
     #[test]

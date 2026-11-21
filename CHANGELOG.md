@@ -26,6 +26,12 @@
   from retained syntax inputs and deterministic lexical call observations.
   Evidence keeps its `source_kind` (`hld`, `lld_body`, `lld_calls`) and the same
   16-span/16 KiB cap; HLD text is never duplicated.
+- Add component and caller context to `csb explain`: `--component <id>` (or
+  `--boundary component:<id>`) aggregates changed contracts, relations,
+  possible impacts and retained declarations, while lexical caller candidates
+  use `source_kind: "call_candidate"` and never imply a resolved call graph.
+  Add `--list` for deterministic boundary discovery without a provider.
+  Explanation rule version is now `csb-explain-v2`.
 - Raise the explanation output budget to 1024 tokens and report truncated
   provider output as `provider_output_truncated` instead of invalid JSON.
 - Tighten the explanation schema and prompt to five concise claims/questions.

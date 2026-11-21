@@ -152,16 +152,32 @@ that `index.json` matches `content_sha256`. Prints `OK <n> artifacts · index
 ### `csb explain`
 
 ```
-csb explain --dir <review-dir> --boundary <hld-change-id> --model <id>
+csb explain --dir <review-dir> --boundary <hld-change-id|component:<id>> --model <id>
+            [--component <component-id>] [--list]
             [--provider ollama|openai] [--endpoint <url>]
             [--key-file <path>] [--send] [--out <prefix>]
 ```
 
-Writes an advisory explanation for one HLD boundary. Without `--send` it only
-writes `ai-preview.json` and performs no network request. `--send` contacts the
-selected provider. Outputs `ai.md` and `ai.json` (or `<prefix>.md/.json`); they
-are not part of the manifest. See [AI_USAGE.md](AI_USAGE.md) for providers,
-keys, limits and privacy.
+Writes an advisory explanation for one explicitly selected boundary. Select an
+HLD change with `--boundary <change-id>`, or a component with
+`--component <component-id>` (equivalent to `--boundary component:<id>`). A
+component selection aggregates its changed contracts, relations, possible
+impacts and retained declarations, then appends up to eight lexical caller
+candidates from unchanged declarations. Caller candidates carry
+`source_kind: "call_candidate"`; they are name-only lexical matches, not
+resolved runtime calls, and the command never infers a call graph.
+
+`--list` prints `id`, `kind`, `path`, declaration name, evidence bytes and the
+uncertain flag for the HLD boundaries, sorted deterministically and capped at
+100 rows. It contacts no provider and writes no files. Explicit selection is
+always required; the whole pull request is never explained implicitly.
+
+Without `--send` it only writes `ai-preview.json` and performs no network
+request. `--send` contacts the selected provider. Outputs `ai.md` and `ai.json`
+(or `<prefix>.md/.json`); they are not part of the manifest. The 16-span /
+16 KiB evidence cap and redaction apply to both change and component
+selections. See [AI_USAGE.md](AI_USAGE.md) for providers, keys, limits and
+privacy.
 
 ### `csb version`, `csb help`
 

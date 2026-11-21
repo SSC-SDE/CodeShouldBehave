@@ -24,8 +24,37 @@ Public `main` carries the local CLI/container track through `v0.5.0`.
   Docker build, and browser render where the UI changed.
 - Real Ollama evaluation: `qwen2.5-coder:7b` is the default; 1.5B/3B work only
   on narrow declaration boundaries. Broad boundaries need 7B or richer context.
+- M4 component/caller context is implemented on
+  `feat/m4-component-caller-context`; PR and owner merge are pending.
 - Remaining: M3 `csb init` (conditional), server/Focus AI (7.2–7.4), App
   activation, hosted-model qualification and live fresh-repository acceptance.
+
+## 2026-11-21 — M4 component and caller context
+
+Implemented both M4 tracks on `feat/m4-component-caller-context` from
+`origin/main` `f634683`:
+
+- `csb explain --component <id>` or `--boundary component:<id>` aggregates a
+  component's changed contracts, relations, possible impacts and retained
+  declarations under the existing 16-span / 16 KiB cap. Derived HLD facts use
+  `source_kind: "component"`.
+- Up to eight lexical caller candidates from `lld.delta.possible_callers` use
+  `source_kind: "call_candidate"`, include the retained signature and entry
+  lines, state that the call-site line is not retained, and never claim a
+  resolved call or reachability.
+- `csb explain --list` prints id, kind, path, declaration, evidence bytes and
+  uncertainty for up to 100 boundaries, sorted deterministically, without a
+  provider or file writes.
+- Rule version is `csb-explain-v2`. The deterministic artifact and manifest are
+  untouched; tests assert byte-identical `manifest.json` and no preview
+  `ai.md`.
+- Gates: `cargo fmt --check`, `cargo check --features ai,server --bin csb`,
+  `cargo test --features ai,server --test csb_explain` (10 passed) and
+  `cargo test --features ai,server --lib csb_explain::tests` (4 passed).
+- `qwen2.5-coder:7b` comparison: single-declaration 15.1 s / one citation /
+  generic questions; component 20.5 s / three citations (`4, 5, 8`) /
+  change-specific questions naming `handle`, `other` and dependent `api`.
+  One local loopback run, advisory only; not a multi-seed evaluation.
 
 ## 2026-11-14 — approved minimal Focus review implementation
 

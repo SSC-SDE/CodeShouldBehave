@@ -55,7 +55,8 @@ Usage:\n\
              [--allow-dirty] [--summary check|markdown|json]\n\
   csb serve --dir <review-dir> [--host <addr>] [--port <port>] [--open]\n\
   csb verify --dir <review-dir>\n\
-  csb explain --dir <review-dir> --boundary <hld-change-id> --model <id>\n\
+  csb explain --dir <review-dir> --boundary <hld-change-id|component:<id>> --model <id>\n\
+              [--component <component-id>] [--list]\n\
               [--provider ollama|openai] [--endpoint <url>]\n\
               [--key-file <path>] [--send] [--out <prefix>]\n\
   csb version\n\
@@ -711,12 +712,15 @@ fn verify(arguments: Vec<String>) -> Result<u8, CliError> {
 
 fn explain_help() -> &'static str {
     "csb explain — advisory AI over a verified review\n\n\
-Usage: csb explain --dir <review-dir> --boundary <hld-change-id> --model <id>\n\
+Usage: csb explain --dir <review-dir> --boundary <hld-change-id|component:<id>> --model <id>\n\
+                   [--component <component-id>] [--list]\n\
                    [--provider ollama|openai] [--endpoint <url>]\n\
                    [--key-file <path>] [--send] [--out <prefix>]\n\n\
 Defaults: provider ollama, endpoint http://127.0.0.1:11434, preview only.\n\
 --send is required to contact the provider. --out writes <prefix>.md/.json;\n\
 the default is <review-dir>/ai.md and ai.json. Preview is ai-preview.json.\n\
+--component selects a component boundary; --list prints boundary ids and sizes\n\
+without contacting a provider or writing files.\n\
 OpenAI-compatible keys come from CSB_AI_API_KEY or a 0600 --key-file.\n"
 }
 
@@ -739,6 +743,8 @@ fn explain(arguments: Vec<String>) -> Result<u8, CliError> {
     use flowdiff::csb_explain::{ExplainOptions, Provider};
     let mut dir = None;
     let mut boundary = None;
+    let mut component = None;
+    let mut list = false;
     let mut provider = Provider::Ollama;
     let mut model = None;
     let mut endpoint = None;
@@ -754,6 +760,8 @@ fn explain(arguments: Vec<String>) -> Result<u8, CliError> {
             }
             "--dir" => dir = Some(PathBuf::from(value(&mut args, "--dir")?)),
             "--boundary" => boundary = Some(value(&mut args, "--boundary")?),
+            "--component" => component = Some(value(&mut args, "--component")?),
+            "--list" => list = true,
             "--provider" => {
                 provider = Provider::parse(&value(&mut args, "--provider")?)
                     .map_err(|error| CliError::usage(error.message()))?
@@ -772,20 +780,42 @@ fn explain(arguments: Vec<String>) -> Result<u8, CliError> {
             }
         }
     }
+    let boundary = match (component, boundary) {
+        (Some(_), Some(_)) => {
+            return Err(CliError::usage(
+                "explain accepts either --component or --boundary, not both",
+            ));
+        }
+        (Some(component), None) => Some(format!("component:{component}")),
+        (None, boundary) => boundary,
+    };
+    let boundary = if list {
+        boundary.unwrap_or_default()
+    } else {
+        boundary.ok_or_else(|| {
+            CliError::usage("explain requires --boundary <hld-change-id> or --component <id>")
+        })?
+    };
     let options = ExplainOptions {
         dir: dir.ok_or_else(|| CliError::usage("explain requires --dir <review-dir>"))?,
-        boundary: boundary
-            .ok_or_else(|| CliError::usage("explain requires --boundary <hld-change-id>"))?,
+        boundary,
         provider,
-        model: model.ok_or_else(|| CliError::usage("explain requires --model <id>"))?,
+        model: if list {
+            model.unwrap_or_default()
+        } else {
+            model.ok_or_else(|| CliError::usage("explain requires --model <id>"))?
+        },
         endpoint,
         key_file,
         send,
         out,
+        list,
     };
     match flowdiff::csb_explain::run(&options) {
         Ok(outcome) => {
-            eprintln!("csb: wrote AI preview to {}", outcome.preview.display());
+            if let Some(preview) = outcome.preview {
+                eprintln!("csb: wrote AI preview to {}", preview.display());
+            }
             if let Some((markdown, json)) = outcome.explanation {
                 eprintln!(
                     "csb: wrote advisory explanation to {} and {}",
