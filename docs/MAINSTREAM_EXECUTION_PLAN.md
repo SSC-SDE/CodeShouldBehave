@@ -1,7 +1,7 @@
 # Mainstream Rust HLD/LLD review — implementation plan
 
-Status: **M0–M2 complete. M3 conditional. M4 implemented on branch; PR and
-owner merge pending.**
+Status: **M0–M2 complete. M3 conditional. M4 implemented on branch; draft PR #101 is open and
+owner merge is pending.**
 Current release: `v0.5.0` (LLD body/call evidence).
 Release baseline: `bd227af64d84339aa6ae231b1c6333abdc629731`.
 Plan maintenance since then is documentation-only; current `main` also includes
@@ -93,7 +93,7 @@ Owner decision required before starting. If skipped, record why in the tracker.
 
 ## 3. M4 — component and caller context (implemented on branch)
 
-Status: **implemented; PR and owner merge pending.** Both component and caller
+Status: **implemented; draft PR #101 is open and owner merge is pending.** Both component and caller
 context were implemented (the default recommendation). M3 remains conditional
 and unchanged.
 Reason: real-model testing showed that deeper explanation quality needs better
@@ -151,7 +151,7 @@ Default recommendation: implement 3.1 and 3.2 together, then re-evaluate with 7B
 ### Implementation record — 2026-11-21
 
 Branch: `feat/m4-component-caller-context` from `origin/main` `f634683`
-(PR and merge SHA pending).
+(draft PR #101; merge SHA pending).
 
 - 3.1 and 3.2 implemented together: `--component` / `--boundary
   component:<id>` and lexical `call_candidate` evidence.
