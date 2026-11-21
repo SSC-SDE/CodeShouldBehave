@@ -7,8 +7,9 @@ it does not advance, merge or activate the Phase 6 App implementation.
 
 ## Current status — 2026-11-21
 
-Last release record: `bd227af64d84339aa6ae231b1c6333abdc629731` (docs #97).
-Public `main` carries the local CLI/container track through `v0.5.0`.
+Last release: `v0.6.0` at `6d84138d152ea6846ed54c830c18f3e2933c7c1a`;
+image digest `sha256:53e53a1f6374c58dacf90e1c52eca4130d1c82531f217edb56f31a43e507c075`.
+Public `main` carries the local CLI/container track through `v0.6.0`.
 
 | Release | Merge | Content | Index digest |
 |---|---|---|---|
@@ -16,9 +17,11 @@ Public `main` carries the local CLI/container track through `v0.5.0`.
 | `v0.4.0` | `b4360925` | `csb explain` with Ollama + OpenAI-compatible BYOK | `sha256:645cc888…` |
 | `v0.4.1` | `c92d9aae` | 1024-token budget, truncation detection, uncertainty guards | `sha256:6ad15368…` |
 | `v0.5.0` | `ffb409dd` | LLD declaration-body and lexical-call evidence | `sha256:6d76fa73…` |
+| `v0.6.0` | `6d84138d` | Component/caller context for `explain`; Rust 1.87 MSRV fix | `sha256:53e53a1f…` |
 
-- Every image is `linux/amd64` + `linux/arm64`; `:latest` points at `v0.5.0`;
-  anonymous pull and in-image review/design/verify/explain smoke were verified.
+- Every image is `linux/amd64` + `linux/arm64`; `:latest` points at `v0.6.0`;
+  anonymous pull, `csb version` and `csb explain --help` were verified against
+  `v0.6.0`.
 - Gates at each release: Rust 1.87 formatting, strict Clippy in both profiles,
   server/design/AI and core-only suites, 207 JavaScript tests, 136 Python tests,
   Docker build, and browser render where the UI changed.
@@ -28,6 +31,20 @@ Public `main` carries the local CLI/container track through `v0.5.0`.
   `94bc0273fe02b70dd4c3e63dba389ab6645b66ac`.
 - Remaining: M3 `csb init` (conditional), server/Focus AI (7.2–7.4), App
   activation, hosted-model qualification and live fresh-repository acceptance.
+
+## 2026-11-21 — v0.6.0 release
+
+- Tag `v0.6.0` points at `6d84138d152ea6846ed54c830c18f3e2933c7c1a`.
+- Publish run [44884679891](https://github.com/SSC-SDE/CodeShouldBehave/actions/runs/44884679891)
+  passed in 32m58s; index digest
+  `sha256:53e53a1f6374c58dacf90e1c52eca4130d1c82531f217edb56f31a43e507c075`.
+- Platforms: `linux/amd64` and `linux/arm64`; `:latest` resolves to the same
+  index digest.
+- The first `v0.6.0` publish failed on Rust 1.87 because of an unstable
+  let-chain in `src/csb_explain.rs`. PR #103 removed it; `cargo +1.87 check` and
+  the 14 explain tests passed before the tag moved.
+- The tag was recreated on the fixed merge commit; the failed run is retained as
+  history.
 
 ## 2026-11-21 — M4 component and caller context
 
