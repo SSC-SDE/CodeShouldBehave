@@ -24,17 +24,16 @@ Public `main` carries the local CLI/container track through `v0.5.0`.
   Docker build, and browser render where the UI changed.
 - Real Ollama evaluation: `qwen2.5-coder:7b` is the default; 1.5B/3B work only
   on narrow declaration boundaries. Broad boundaries need 7B or richer context.
-- M4 component/caller context is implemented on
-  `feat/m4-component-caller-context`; draft PR #101 is open and owner merge is
-  pending.
+- M4 component/caller context merged in PR #101 at
+  `94bc0273fe02b70dd4c3e63dba389ab6645b66ac`.
 - Remaining: M3 `csb init` (conditional), server/Focus AI (7.2–7.4), App
   activation, hosted-model qualification and live fresh-repository acceptance.
 
 ## 2026-11-21 — M4 component and caller context
 
 Implemented both M4 tracks on `feat/m4-component-caller-context` from
-`origin/main` `f634683`; draft PR #101 is open. Tested code head:
-`f8944b9e51`.
+`origin/main` `f634683`. PR #101 merged at
+`94bc0273fe02b70dd4c3e63dba389ab6645b66ac`; tested code head `f8944b9e51`.
 
 - `csb explain --component <id>` or `--boundary component:<id>` aggregates a
   component's changed contracts, relations, possible impacts and retained
