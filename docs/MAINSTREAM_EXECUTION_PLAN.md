@@ -1,6 +1,7 @@
 # Mainstream Rust HLD/LLD review — implementation plan
 
-Status: **M0–M2 complete. M3 conditional. M4 merged in PR #101.**
+Status: **M0–M2 complete. M3 skipped (no trigger observed). M4 merged in PR
+#101 and released in `v0.6.0`.**
 Current release: `v0.6.0` (component/caller context; digest
 `sha256:53e53a1f6374c58dacf90e1c52eca4130d1c82531f217edb56f31a43e507c075`).
 Release baseline: `6d84138d152ea6846ed54c830c18f3e2933c7c1a`.
@@ -66,9 +67,13 @@ execution, a vector store, or live AI in the static report as part of M3/M4.
 
 ---
 
-## 2. M3 — guided `csb init` (conditional)
+## 2. M3 — guided `csb init` (skipped)
 
-Status: **not started; only if evidence requires it.**
+Status: **skipped on 2026-11-21 after `v0.6.0` fresh-repository acceptance; no
+trigger was observed.** Evidence: `docs/evidence/v0.6.0-fresh-repo/acceptance.md`.
+The component boundaries matched the workspace members, the roots matched
+`Cargo.toml`, and no manual correction was needed. The unowned workspace-root
+manifest remains disclosed as a coverage gap rather than an invented boundary.
 Trigger: M1 provisional boundaries are materially wrong for real Rust
 workspaces (components collapse, roots contradict `Cargo.toml`, or repeated
 manual correction is observed). Otherwise skip M3.
@@ -209,9 +214,11 @@ A milestone is done only when all are true:
 
 ## 6. Remaining owner decisions
 
-1. **M3:** start only if the provisional-boundary trigger is observed, otherwise
-   record it as skipped.
-2. **M4 scope:** component-only, caller-only, or both (default: both).
+1. **M3:** resolved — skipped on 2026-11-21; the v0.6.0 fresh-repository
+   acceptance observed no trigger. Evidence:
+   `docs/evidence/v0.6.0-fresh-repo/acceptance.md`.
+2. **M4 scope:** resolved — both component and caller context shipped in
+   `v0.6.0`.
 3. **AI key storage:** env var or 0600 file; OS keychain deferred.
 4. **AI providers:** Ollama and OpenAI-compatible only.
 5. **`--design` default:** remains `off` until usage evidence supports `auto`.
