@@ -9,6 +9,16 @@ Copy the file for your provider into the repository you want reviewed.
 | GitLab CI | `gitlab-ci.yml` | merge into `.gitlab-ci.yml` |
 | Bitbucket Pipelines | `bitbucket-pipelines.yml` | merge into `bitbucket-pipelines.yml` |
 
+The GitHub template uses the first-party composite action
+`SSC-SDE/CodeShouldBehave@v0.7.0`. It runs the pinned image, verifies the report,
+posts one pull-request comment and uploads the artifact. Pin the action to a
+reviewed release tag; do not use `@main`.
+
+All non-action templates pin the `v0.6.0` image by immutable digest:
+`ghcr.io/ssc-sde/csb@sha256:53e53a1f6374c58dacf90e1c52eca4130d1c82531f217edb56f31a43e507c075`.
+Do not use `:latest` in an adoption template. Bump the digest only after a
+provider-confirmed release, and review the diff before merging.
+
 All templates run `csb review` against exact commit IDs supplied by the CI
 provider. They upload the interactive review as an artifact and, on GitHub,
 post or update a single pull-request summary comment.

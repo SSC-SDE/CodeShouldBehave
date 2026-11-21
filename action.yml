@@ -1,0 +1,113 @@
+name: CodeShouldBehave Review
+description: Run a pinned CodeShouldBehave review, verify it, comment on the pull request and upload the report artifact.
+author: SSC-SDE
+branding:
+  icon: git-pull-request
+  color: purple
+
+inputs:
+  base:
+    description: Exact base commit SHA. Defaults to the pull request base.
+    required: false
+  head:
+    description: Exact head commit SHA. Defaults to the pull request head.
+    required: false
+  design:
+    description: Design mode passed to csb review.
+    required: false
+    default: auto
+  image:
+    description: Pinned csb image reference. Override only with a verified digest.
+    required: false
+    default: ghcr.io/ssc-sde/csb@sha256:53e53a1f6374c58dacf90e1c52eca4130d1c82531f217edb56f31a43e507c075
+  out-dir:
+    description: Empty output directory. Defaults to a temporary directory.
+    required: false
+    default: ""
+  comment:
+    description: Post or update one pull-request summary comment.
+    required: false
+    default: "true"
+  artifact:
+    description: Upload the interactive review as a workflow artifact.
+    required: false
+    default: "true"
+  fail-on-incomplete:
+    description: Fail the job when review coverage is incomplete. Default is a warning.
+    required: false
+    default: "false"
+
+outputs:
+  out-dir:
+    description: Directory containing the verified review.
+    value: ${{ steps.review.outputs.out-dir }}
+  review-exit:
+    description: csb review exit code.
+    value: ${{ steps.review.outputs.review-exit }}
+  verify-exit:
+    description: csb verify exit code.
+    value: ${{ steps.review.outputs.verify-exit }}
+  coverage:
+    description: complete, incomplete or failed.
+    value: ${{ steps.review.outputs.coverage }}
+
+runs:
+  using: composite
+  steps:
+    - name: Run and verify CodeShouldBehave
+      id: review
+      shell: bash
+      env:
+        INPUT_BASE: ${{ inputs.base }}
+        INPUT_HEAD: ${{ inputs.head }}
+        INPUT_DESIGN: ${{ inputs.design }}
+        INPUT_IMAGE: ${{ inputs.image }}
+        INPUT_OUT_DIR: ${{ inputs.out-dir }}
+      run: bash "${{ github.action_path }}/.github/actions/csb-review/run.sh"
+
+    - name: Upload interactive review
+      if: ${{ always() && inputs.artifact == 'true' }}
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: csb-review-${{ github.event.pull_request.number || github.run_id }}
+        path: ${{ steps.review.outputs.out-dir }}
+        if-no-files-found: warn
+        retention-days: 30
+
+    - name: Post pull-request summary
+      if: ${{ always() && inputs.comment == 'true' && github.event_name == 'pull_request' }}
+      shell: bash
+      continue-on-error: true
+      env:
+        GH_TOKEN: ${{ github.token }}
+        INPUT_SUMMARY: ${{ steps.review.outputs.summary-path }}
+      run: bash "${{ github.action_path }}/.github/actions/csb-review/comment.sh"
+
+    - name: Enforce review result
+      if: always()
+      shell: bash
+      env:
+        REVIEW_EXIT: ${{ steps.review.outputs.review-exit }}
+        VERIFY_EXIT: ${{ steps.review.outputs.verify-exit }}
+        FAIL_ON_INCOMPLETE: ${{ inputs.fail-on-incomplete }}
+      run: |
+        if [ "${VERIFY_EXIT:-missing}" != "0" ]; then
+          echo "::error::csb verify failed or did not run"
+          exit 1
+        fi
+        case "${REVIEW_EXIT:-missing}" in
+          0)
+            echo "csb review completed with complete coverage"
+            ;;
+          1)
+            if [ "$FAIL_ON_INCOMPLETE" = "true" ]; then
+              echo "::error::csb review coverage is incomplete"
+              exit 1
+            fi
+            echo "::warning::csb review coverage is incomplete; see the summary and artifact"
+            ;;
+          *)
+            echo "::error::csb review failed with exit code ${REVIEW_EXIT:-missing}"
+            exit "${REVIEW_EXIT:-1}"
+            ;;
+        esac

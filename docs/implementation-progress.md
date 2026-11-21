@@ -35,6 +35,21 @@ Public `main` carries the local CLI/container track through `v0.6.0`.
   activation, hosted-model qualification and live hosted fresh-repository
   acceptance.
 
+## 2026-11-21 — public adoption action and pinned templates
+
+- Added the `SSC-SDE/CodeShouldBehave@v0.7.0` composite action: pinned image,
+  review, `verify`, PR summary comment, 30-day artifact, coverage outputs and
+  explicit `fail-on-incomplete` handling.
+- Replaced the GitHub template with the action; pinned the GitLab, Bitbucket and
+  Pages templates to the `v0.6.0` image digest. `scripts/check-csb-pins.sh`
+  rejects a moving `:latest` tag or digest drift.
+- Local proof: the action scripts reviewed a real two-commit fixture, verified
+  8 artifacts as incomplete coverage, and exercised comment create/update with a
+  fake `gh` API. A manual `csb action self-test` workflow runs the real action on
+  a hosted runner.
+- Deferred under the $0 infrastructure ceiling: native macOS/Windows binaries,
+  the hosted GitHub App and any paid runner or service. No new hosted cost.
+
 ## 2026-11-21 — AI extension 7.1 candidate contract
 
 Drafted the `ai-extension-v1` contract at

@@ -21,9 +21,12 @@ It is deliberately narrow:
 Container:
 
 ```sh
-docker pull ghcr.io/ssc-sde/csb:latest
-docker run --rm ghcr.io/ssc-sde/csb:latest --help
+docker pull ghcr.io/ssc-sde/csb:v0.6.0
+docker run --rm ghcr.io/ssc-sde/csb:v0.6.0 --help
 ```
+
+For CI, pin the immutable digest instead of a moving tag; see
+[`templates/csb-ci/README.md`](./templates/csb-ci/README.md).
 
 From source:
 
@@ -56,12 +59,12 @@ Container equivalent:
 docker run --rm \
   -v "$PWD:/repo" \
   -v "$PWD/review:/out" \
-  ghcr.io/ssc-sde/csb:latest review \
+  ghcr.io/ssc-sde/csb:v0.6.0 review \
     --repo /repo --base "$BASE" --head "$HEAD" --out-dir /out
 
 docker run --rm -p 8080:8080 \
   -v "$PWD/review:/review" \
-  ghcr.io/ssc-sde/csb:latest serve --dir /review --host 0.0.0.0
+  ghcr.io/ssc-sde/csb:v0.6.0 serve --dir /review --host 0.0.0.0
 ```
 
 ## Output

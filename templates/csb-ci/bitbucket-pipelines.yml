@@ -1,5 +1,5 @@
 # Merge into bitbucket-pipelines.yml.
-image: ghcr.io/ssc-sde/csb:latest
+image: ghcr.io/ssc-sde/csb@sha256:53e53a1f6374c58dacf90e1c52eca4130d1c82531f217edb56f31a43e507c075
 
 pipelines:
   pull-requests:

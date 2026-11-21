@@ -77,10 +77,25 @@ workspace. Optional advisory AI (`csb explain`) can then explain one boundary
 with local Ollama or an OpenAI-compatible endpoint; preview is the default and
 `--send` is explicit. See [`docs/AI_USAGE.md`](docs/AI_USAGE.md).
 
-Container: `docker run --rm ghcr.io/ssc-sde/csb:latest --help`.
+Container: `docker run --rm ghcr.io/ssc-sde/csb:v0.6.0 --help`.
 CI templates for GitHub Actions, GitLab and Bitbucket live in
 [`templates/csb-ci/`](templates/csb-ci/). Full reference:
 [`docs/CLI_USAGE.md`](docs/CLI_USAGE.md).
+
+Fastest GitHub integration (pin the action to a reviewed release):
+
+```yaml
+- uses: actions/checkout@v4
+  with:
+    fetch-depth: 0
+- uses: SSC-SDE/CodeShouldBehave@v0.7.0
+  with:
+    design: auto
+```
+
+The action runs the pinned `v0.6.0` image digest, verifies every report hash,
+posts one PR summary comment and uploads the interactive report. Set
+`fail-on-incomplete: true` to block the job when coverage is incomplete.
 
 ## Reviewer journey
 
