@@ -1,6 +1,7 @@
 # Plug-and-play AI extension: detailed implementation plan
 
-Updated: 2026-11-14. Status: **planned; implementation and acceptance pending**.
+Updated: 2026-11-21. Status: **7.1 candidate contract drafted; owner approval
+pending; 7.2 not started.**
 
 This is the current detailed AI-extension plan for the maintained application.
 Read with [implementation progress](implementation-progress.md) and the existing
@@ -171,7 +172,9 @@ before coding; preserve the active nested-HLD work and unrelated backend edits.
 Record actual tested SHAs, commands, outcomes and reviewer acceptance per package.
 Planning approval does not start implementation, pass a gate or authorize merging.
 
-1. **Contract freeze (7.1):** approve local-only scope, owners, disclosure policy,
+1. **Contract freeze (7.1):** candidate contract drafted at
+   [`contracts/ai-extension-v1/`](contracts/ai-extension-v1/README.md); owner
+   approval pending. Approve local-only scope, owners, disclosure policy,
    exact limits, model/hardware and versioned request/result schemas. Map the
    broader 7.1–7.8 obligations; hosted adapters/commercial beta remain pending.
 2. **Isolation (7.2):** add disabled-by-default configuration, capability states,

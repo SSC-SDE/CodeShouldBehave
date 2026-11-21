@@ -119,3 +119,11 @@ still verifies independently.
 
 The self-contained report and GitHub Pages publication are static. They never
 call a model. AI explanations are a local CLI action only.
+
+## Server/Focus extension
+
+The server-side Explain this boundary flow is **not implemented** as of
+`v0.6.0`. Its candidate contract, limits, disclosure policy, identity and JSON
+Schemas are defined for owner review at
+[`contracts/ai-extension-v1/`](contracts/ai-extension-v1/README.md). Owner
+approval and work packages 7.2–7.4 are required before any server dispatch.

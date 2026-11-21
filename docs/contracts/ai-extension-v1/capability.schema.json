@@ -1,0 +1,208 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codeshouldbehave.dev/contracts/ai-extension-v1/capability.schema.json",
+  "title": "AI extension capability v1",
+  "description": "Authenticated capability response. Disabled and unconfigured states are computed without contacting the model service and never expose credentials.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "api_version",
+    "contract_version",
+    "capability",
+    "dispatch_available",
+    "features",
+    "limits",
+    "policy_revision"
+  ],
+  "properties": {
+    "schema": {
+      "const": "csb-ai-capability-v1"
+    },
+    "api_version": {
+      "const": "v1"
+    },
+    "contract_version": {
+      "const": "ai-extension-v1"
+    },
+    "capability": {
+      "enum": [
+        "disabled",
+        "unconfigured",
+        "unavailable",
+        "ready"
+      ]
+    },
+    "dispatch_available": {
+      "type": "boolean"
+    },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "model",
+        "model_digest",
+        "destination"
+      ],
+      "properties": {
+        "name": {
+          "const": "ollama"
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "model_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "destination": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        }
+      }
+    },
+    "features": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "explain_hld_boundary",
+        "hld_only",
+        "streaming",
+        "lld_explanations",
+        "whole_pr_narratives"
+      ],
+      "properties": {
+        "explain_hld_boundary": {
+          "type": "boolean"
+        },
+        "hld_only": {
+          "const": true
+        },
+        "streaming": {
+          "const": false
+        },
+        "lld_explanations": {
+          "const": false
+        },
+        "whole_pr_narratives": {
+          "const": false
+        }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "concurrency_global",
+        "concurrency_per_tenant",
+        "deadline_seconds",
+        "max_evidence_items",
+        "max_evidence_bytes",
+        "max_input_tokens",
+        "max_generated_tokens",
+        "max_response_bytes",
+        "admissions_per_hour",
+        "cache_entries",
+        "cache_bytes",
+        "cache_ttl_seconds"
+      ],
+      "properties": {
+        "concurrency_global": {
+          "const": 1
+        },
+        "concurrency_per_tenant": {
+          "const": 1
+        },
+        "deadline_seconds": {
+          "const": 60
+        },
+        "max_evidence_items": {
+          "const": 16
+        },
+        "max_evidence_bytes": {
+          "const": 16384
+        },
+        "max_input_tokens": {
+          "const": 4096
+        },
+        "max_generated_tokens": {
+          "const": 512
+        },
+        "max_response_bytes": {
+          "const": 65536
+        },
+        "admissions_per_hour": {
+          "const": 10
+        },
+        "cache_entries": {
+          "const": 128
+        },
+        "cache_bytes": {
+          "const": 16777216
+        },
+        "cache_ttl_seconds": {
+          "const": 3600
+        }
+      }
+    },
+    "policy_revision": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "capability": {
+            "const": "ready"
+          }
+        },
+        "required": [
+          "capability"
+        ]
+      },
+      "then": {
+        "properties": {
+          "dispatch_available": {
+            "const": true
+          }
+        },
+        "required": [
+          "provider"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "capability": {
+            "enum": [
+              "disabled",
+              "unconfigured",
+              "unavailable"
+            ]
+          }
+        },
+        "required": [
+          "capability"
+        ]
+      },
+      "then": {
+        "properties": {
+          "dispatch_available": {
+            "const": false
+          }
+        }
+      }
+    }
+  ]
+}

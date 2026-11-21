@@ -1,0 +1,266 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codeshouldbehave.dev/contracts/ai-extension-v1/result.schema.json",
+  "title": "AI extension explanation result v1",
+  "description": "Server-validated public result. Identity, labels and generation settings are assigned by the server, never by the model.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "request_id",
+    "review_id",
+    "design",
+    "evidence",
+    "provider",
+    "versions",
+    "generated_at",
+    "headline",
+    "changes",
+    "questions",
+    "unknowns"
+  ],
+  "properties": {
+    "schema": {
+      "const": "csb-ai-extension-result-v1"
+    },
+    "request_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "review_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "design": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "baseline",
+        "proposal",
+        "boundary"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "baseline": {
+          "$ref": "#/$defs/commit"
+        },
+        "proposal": {
+          "$ref": "#/$defs/commit"
+        },
+        "boundary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "id"
+          ],
+          "properties": {
+            "kind": {
+              "enum": [
+                "change",
+                "component"
+              ]
+            },
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            }
+          }
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bundle_id",
+        "scope_version",
+        "grant_version",
+        "item_count",
+        "bytes",
+        "sha256"
+      ],
+      "properties": {
+        "bundle_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "scope_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "grant_version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "item_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 16
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 16384
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "model",
+        "model_digest",
+        "destination",
+        "destination_policy_revision"
+      ],
+      "properties": {
+        "name": {
+          "const": "ollama"
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "model_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "destination": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "destination_policy_revision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        }
+      }
+    },
+    "versions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contract",
+        "provider_schema",
+        "prompt",
+        "rules",
+        "generation"
+      ],
+      "properties": {
+        "contract": {
+          "const": "ai-extension-v1"
+        },
+        "provider_schema": {
+          "const": "csb-ai-provider-result-v1"
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "rules": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "generation": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      }
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "headline": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "changes": {
+      "type": "array",
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "claim",
+          "label",
+          "side",
+          "evidence_ids"
+        ],
+        "properties": {
+          "claim": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "label": {
+            "const": "inferred"
+          },
+          "side": {
+            "enum": [
+              "baseline",
+              "proposal",
+              "both"
+            ]
+          },
+          "evidence_ids": {
+            "type": "array",
+            "maxItems": 16,
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 15
+            },
+            "minItems": 1
+          }
+        }
+      }
+    },
+    "questions": {
+      "type": "array",
+      "maxItems": 5,
+      "items": {
+        "type": "string",
+        "maxLength": 240
+      }
+    },
+    "unknowns": {
+      "type": "array",
+      "maxItems": 5,
+      "items": {
+        "type": "string",
+        "maxLength": 240
+      }
+    }
+  },
+  "$defs": {
+    "commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}(?:[0-9a-f]{24})?$"
+    }
+  }
+}

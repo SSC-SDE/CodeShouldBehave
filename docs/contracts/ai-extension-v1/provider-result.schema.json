@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codeshouldbehave.dev/contracts/ai-extension-v1/provider-result.schema.json",
+  "title": "AI provider result v1 (untrusted model output)",
+  "description": "Exact JSON shape returned by the local model. It contains no identity, destination, label or confidence fields; the server rejects any additional property.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "headline",
+    "changes",
+    "questions",
+    "unknowns"
+  ],
+  "properties": {
+    "headline": {
+      "type": "string",
+      "maxLength": 200
+    },
+    "changes": {
+      "type": "array",
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "claim",
+          "side",
+          "evidence_ids"
+        ],
+        "properties": {
+          "claim": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "side": {
+            "enum": [
+              "baseline",
+              "proposal",
+              "both"
+            ]
+          },
+          "evidence_ids": {
+            "type": "array",
+            "maxItems": 16,
+            "items": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "minItems": 1
+          }
+        }
+      }
+    },
+    "questions": {
+      "type": "array",
+      "maxItems": 5,
+      "items": {
+        "type": "string",
+        "maxLength": 240
+      }
+    },
+    "unknowns": {
+      "type": "array",
+      "maxItems": 5,
+      "items": {
+        "type": "string",
+        "maxLength": 240
+      }
+    }
+  }
+}

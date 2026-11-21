@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codeshouldbehave.dev/contracts/ai-extension-v1/error.schema.json",
+  "title": "AI extension error v1",
+  "description": "Typed AI-only failure. Upstream response bodies, prompts, keys and inaccessible review existence are never included.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "code", "message", "retryable"],
+  "properties": {
+    "schema": {"const": "csb-ai-error-v1"},
+    "code": {
+      "enum": [
+        "ai_disabled",
+        "ai_unconfigured",
+        "ai_unavailable",
+        "ai_not_found",
+        "ai_stale_evidence",
+        "ai_busy",
+        "ai_budget_exhausted",
+        "ai_timeout",
+        "ai_context_overflow",
+        "ai_invalid_output"
+      ]
+    },
+    "message": {"type": "string", "minLength": 1, "maxLength": 240},
+    "retryable": {"type": "boolean"},
+    "request_id": {"type": "string", "minLength": 1, "maxLength": 128}
+  }
+}
