@@ -56,7 +56,7 @@ jobs:
         run: |
           docker run --rm \
             -v "$RUNNER_TEMP/csb-review:/review:ro" \
-            ghcr.io/ssc-sde/csb:latest verify --dir /review
+            ghcr.io/ssc-sde/csb@sha256:53e53a1f6374c58dacf90e1c52eca4130d1c82531f217edb56f31a43e507c075 verify --dir /review
 
       - uses: actions/configure-pages@v5
 

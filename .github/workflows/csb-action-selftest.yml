@@ -1,0 +1,54 @@
+# Manual proof that the first-party action runs, verifies and uploads on a
+# hosted runner. It also runs on pull requests that touch the action so a broken
+# action cannot merge. It never posts a comment.
+name: csb action self-test
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - action.yml
+      - .github/actions/**
+      - .github/workflows/csb-action-selftest.yml
+      - scripts/check-csb-pins.sh
+      - templates/csb-ci/**
+
+permissions:
+  contents: read
+
+jobs:
+  action:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Check pinned template digests
+        shell: bash
+        run: ./scripts/check-csb-pins.sh
+
+      - name: Select the exact commit pair
+        id: pair
+        shell: bash
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ -n "${PR_BASE:-}" ] && [ -n "${PR_HEAD:-}" ]; then
+            echo "base=$PR_BASE" >> "$GITHUB_OUTPUT"
+            echo "head=$PR_HEAD" >> "$GITHUB_OUTPUT"
+          else
+            echo "base=$(git rev-parse HEAD~1)" >> "$GITHUB_OUTPUT"
+            echo "head=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run the local action
+        uses: ./
+        with:
+          base: ${{ steps.pair.outputs.base }}
+          head: ${{ steps.pair.outputs.head }}
+          design: auto
+          comment: false
+          artifact: true
+          fail-on-incomplete: false

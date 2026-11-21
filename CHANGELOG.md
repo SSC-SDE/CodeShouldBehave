@@ -37,6 +37,11 @@
 - Tighten the explanation schema and prompt to five concise claims/questions.
   Unresolved “uncertain” boundaries must return no claims and receive a neutral
   deterministic headline; asserted claims fail with `model_invalid_certainty`.
+- Add a first-party composite GitHub Action that runs the pinned image,
+  verifies the report, posts one PR summary comment, uploads the artifact and
+  reports complete/incomplete coverage separately.
+- Pin every adoption CI template to the immutable `v0.6.0` image digest; the
+  GitHub template now uses the action instead of a mutable `:latest` tag.
 - Put the local CLI/container path on the landing page and document it in
   `docs/CLI_USAGE.md`.
 
