@@ -35,6 +35,23 @@ Public `main` carries the local CLI/container track through `v0.6.0`.
   activation, hosted-model qualification and live hosted fresh-repository
   acceptance.
 
+## 2026-11-21 — AI extension 7.2 isolation foundation
+
+- Added `src/ai_extension.rs`: disabled-by-default `AiExtensionPolicy`, pure
+  capability states (`disabled`, `unconfigured`, `unavailable`, `ready`),
+  local-only endpoint validation, explicit consent binding and a separate
+  single-flight/hourly admission gate.
+- `ServiceHost` defaults to disabled. `with_ai_extension` is the only enable
+  path. Capability is now computed before the storage mutex and never contacts
+  Ollama.
+- Default and configured capability HTTP tests pass; non-loopback, metadata,
+  credentialed, path-bearing and HTTPS destinations are rejected.
+- Admission is independent of review storage and scheduling. Consent binds
+  tenant, principal, review, evidence, destination and policy revision.
+- Remaining 7.2 work: payload-preview/evidence identity, an end-to-end
+  zero-egress assertion and the core-independence proof. No dispatch endpoint
+  or UI exists yet.
+
 ## 2026-11-21 — AI extension 7.1 candidate contract
 
 Drafted the `ai-extension-v1` contract at

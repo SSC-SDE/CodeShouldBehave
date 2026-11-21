@@ -16,7 +16,7 @@ use crate::{
     ComparisonAccessProvider, ContextPin, ExactComparisonRequest, ExactSourceReader,
     ExportCommands, GraphDirection, PathScope, RepositoryId, ReviewAccessProvider, RevisionSide,
     ScopeChangeRequest, ScopeRecord, ScopeVersion, SecurityDomain, ServiceApi,
-    ServiceAuthenticator, ServiceCommands, SnapshotId, Storage,
+    ServiceAuthenticator, ServiceCommands, SnapshotId, Storage, ai_extension::AiExtensionPolicy,
 };
 
 const MAX_HTTP_BODY: usize = 64 * 1024;
@@ -125,6 +125,7 @@ pub struct ServiceHost<A, P, R> {
     authenticator: A,
     access_provider: P,
     source_reader: R,
+    ai_extension: Arc<AiExtensionPolicy>,
 }
 
 impl<A, P, R> ServiceHost<A, P, R> {
@@ -134,7 +135,15 @@ impl<A, P, R> ServiceHost<A, P, R> {
             authenticator,
             access_provider,
             source_reader,
+            ai_extension: Arc::new(AiExtensionPolicy::disabled()),
         }
+    }
+
+    /// Enables the AI extension only for this host. The default remains
+    /// disabled; capability computation never contacts a provider.
+    pub fn with_ai_extension(mut self, policy: AiExtensionPolicy) -> Self {
+        self.ai_extension = Arc::new(policy);
+        self
     }
 }
 
@@ -257,6 +266,12 @@ where
     R: ExactSourceReader + Send + Sync + 'static,
 {
     fn execute(&self, bearer: &str, operation: HttpOperation) -> Result<Value, HttpFailure> {
+        if matches!(&operation, HttpOperation::AiCapability) {
+            self.authenticator
+                .authenticate(bearer)
+                .map_err(map_core_error)?;
+            return Ok(self.ai_extension.capability_json());
+        }
         let mut storage = self.storage.lock().map_err(|_| HttpFailure::Unavailable)?;
         match operation {
             HttpOperation::WorkspacePreferences { request } => {
@@ -279,14 +294,6 @@ where
                         HttpFailure::Unavailable
                     }
                 })
-            }
-            HttpOperation::AiCapability => {
-                self.authenticator
-                    .authenticate(bearer)
-                    .map_err(map_core_error)?;
-                Ok(
-                    json!({"api_version":"v1","contract_version":crate::AI_CONTRACT_VERSION,"capability":"disabled","dispatch_available":false,"credential_input_available":false}),
-                )
             }
             HttpOperation::CreateReview { request } => {
                 let request: ReviewPayload =
@@ -1882,6 +1889,79 @@ mod tests {
             std::process::id(),
             std::thread::current().name().unwrap_or("test")
         ))
+    }
+
+    #[tokio::test]
+    async fn configured_ai_capability_reports_ready_without_dispatch() {
+        let root = host_temp().join("ai-capability");
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(&root).unwrap();
+        let storage = Storage::open(&root.join("state.sqlite"), &root.join("artifacts")).unwrap();
+        let sessions = SessionRegistry::default();
+        let principal = PrincipalId::new("ai-reviewer").unwrap();
+        sessions
+            .register(
+                "cccccccccccccccccccccccccccccccc",
+                principal.clone(),
+                u64::MAX,
+            )
+            .unwrap();
+        let repository = RepositoryId::new(
+            SecurityDomain::new("local").unwrap(),
+            "github",
+            "owner",
+            "repo",
+        )
+        .unwrap();
+        let scope = ScopeRecord {
+            version: ScopeVersion::new("ai-scope").unwrap(),
+            primary_repository: repository,
+            primary_paths: PathScope::all(),
+            contexts: vec![],
+            contracts: BTreeSet::new(),
+            export_allowed: false,
+            model_destinations: BTreeSet::new(),
+        };
+        let policy = AiExtensionPolicy::configure(
+            true,
+            Some("qwen2.5-coder:7b".into()),
+            Some("http://127.0.0.1:11434".into()),
+        )
+        .unwrap();
+        let host = Arc::new(
+            ServiceHost::new(
+                storage,
+                sessions,
+                HostAccess {
+                    principal,
+                    scope,
+                    grants: Arc::new(RwLock::new(vec![])),
+                },
+                NoSource,
+            )
+            .with_ai_extension(policy),
+        );
+        let response = router(host)
+            .oneshot(
+                Request::get("/v1/ai/capability")
+                    .header(
+                        header::AUTHORIZATION,
+                        "Bearer cccccccccccccccccccccccccccccccc",
+                    )
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        let value: Value =
+            serde_json::from_slice(&response.into_body().collect().await.unwrap().to_bytes())
+                .unwrap();
+        assert_eq!(value["capability"], "ready");
+        assert_eq!(value["dispatch_available"], true);
+        assert_eq!(value["provider"]["model"], "qwen2.5-coder:7b");
+        assert_eq!(value["provider"]["destination"], "http://127.0.0.1:11434");
+        assert!(value.get("credential_input_available").is_none());
     }
 
     #[tokio::test]
