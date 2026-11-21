@@ -37,6 +37,7 @@ The action:
 
 [View a real report](https://ssc-sde.github.io/CodeShouldBehave/) ·
 [Marketplace listing](https://github.com/marketplace/actions/codeshouldbehave-review) ·
+[Template demo](https://github.com/SSC-SDE/csb-demo) ·
 [CLI and container](docs/CLI_USAGE.md) ·
 [CI templates](templates/csb-ci/)
 
