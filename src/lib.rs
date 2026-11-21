@@ -1,4 +1,6 @@
 mod ai;
+#[cfg(feature = "server")]
+pub mod ai_extension;
 mod analysis;
 mod architecture;
 mod context;

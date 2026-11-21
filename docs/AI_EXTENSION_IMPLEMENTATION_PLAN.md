@@ -176,9 +176,10 @@ Planning approval does not start implementation, pass a gate or authorize mergin
    2026-11-21. Local-only scope, owners, disclosure policy,
    exact limits, model/hardware and versioned request/result schemas. Map the
    broader 7.1–7.8 obligations; hosted adapters/commercial beta remain pending.
-2. **Isolation (7.2):** add disabled-by-default configuration, capability states,
-   explicit consent/payload preview, endpoint restrictions and separate admission.
-   Prove zero model egress and unchanged core behavior before live model calls.
+2. **Isolation (7.2):** foundation implemented: disabled-by-default policy,
+   capability states, local-only endpoint validation, explicit consent store and
+   separate admission. Remaining: payload-preview/evidence identity and the
+   end-to-end zero-egress and core-independence proof before live model calls.
 3. **Evidence and identity (7.2–7.3):** build bounded selected-boundary bundles,
    canonical identities, stale/revoked-request rejection and adversarial fixtures.
    Run exported-symbol reference checks before changing the existing AI contract.
