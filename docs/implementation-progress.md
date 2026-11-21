@@ -35,6 +35,15 @@ Public `main` carries the local CLI/container track through `v0.6.0`.
   activation, hosted-model qualification and live hosted fresh-repository
   acceptance.
 
+## 2026-11-21 — v0.7.0 action tag
+
+- Tag `v0.7.0` points at `702f8f3a78333be1acc37eb06b103c95fc5e8d25`.
+- It ships the composite action and pinned templates; it does not rebuild or
+  retag the container. The action still pins the `v0.6.0` image digest
+  `sha256:53e53a1f6374c58dacf90e1c52eca4130d1c82531f217edb56f31a43e507c075`.
+- Hosted self-test run `44891331395` passed with incomplete coverage reported
+  as a warning and 8 verified artifacts.
+
 ## 2026-11-21 — public adoption action and pinned templates
 
 - Added the `SSC-SDE/CodeShouldBehave@v0.7.0` composite action: pinned image,
