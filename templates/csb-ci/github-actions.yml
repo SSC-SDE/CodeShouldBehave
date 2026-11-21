@@ -4,7 +4,8 @@
 # or updates one pull-request summary comment and uploads the 30-day artifact.
 # No token, App installation or local server is required.
 #
-# Pin the action to a reviewed release tag. Do not use @main.
+# v1 tracks compatible action releases. For an immutable production pin, use
+# the commit SHA documented in templates/csb-ci/README.md. Do not use @main.
 name: CodeShouldBehave Review
 
 on:
@@ -28,7 +29,7 @@ jobs:
           fetch-depth: 0
 
       - name: CodeShouldBehave
-        uses: SSC-SDE/CodeShouldBehave@v0.7.0
+        uses: SSC-SDE/CodeShouldBehave@v1
         with:
           design: auto
           # Set true to block the job when coverage is incomplete.

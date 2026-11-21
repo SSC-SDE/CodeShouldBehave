@@ -35,6 +35,13 @@ Public `main` carries the local CLI/container track through `v0.6.0`.
   activation, hosted-model qualification and live hosted fresh-repository
   acceptance.
 
+## 2026-11-21 — v1 action convenience tag
+
+- Tag `v1` points at `702f8f3a78333be1acc37eb06b103c95fc5e8d25`, the same
+  action commit as `v0.7.0`; it will move only for compatible action releases.
+- README and CI templates use `@v1`; production guidance pins the full commit
+  SHA. `@v0.7.0` remains available for an exact action release.
+
 ## 2026-11-21 — public-repository case studies
 
 - Ran the published `v0.6.0` digest on three public Rust commits: `fd`
