@@ -33,7 +33,8 @@ Public `main` carries the local CLI/container track through `v0.5.0`.
 ## 2026-11-21 — M4 component and caller context
 
 Implemented both M4 tracks on `feat/m4-component-caller-context` from
-`origin/main` `f634683`; draft PR #101 is open.
+`origin/main` `f634683`; draft PR #101 is open. Tested code head:
+`f8944b9e51`.
 
 - `csb explain --component <id>` or `--boundary component:<id>` aggregates a
   component's changed contracts, relations, possible impacts and retained

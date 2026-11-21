@@ -151,7 +151,7 @@ Default recommendation: implement 3.1 and 3.2 together, then re-evaluate with 7B
 ### Implementation record — 2026-11-21
 
 Branch: `feat/m4-component-caller-context` from `origin/main` `f634683`
-(draft PR #101; merge SHA pending).
+(draft PR #101; tested code head `f8944b9e51`; merge SHA pending).
 
 - 3.1 and 3.2 implemented together: `--component` / `--boundary
   component:<id>` and lexical `call_candidate` evidence.
