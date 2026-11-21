@@ -5,13 +5,20 @@ Copy the file for your provider into the repository you want reviewed.
 | Provider | Template | Destination |
 |---|---|---|
 | GitHub Actions | `github-actions.yml` | `.github/workflows/csb-review.yml` |
-| GitHub Actions Pages (optional) | `github-actions-pages.yml` | `.github/workflows/csb-pages.yml` |
+| GitHub Actions Pages (legacy) | `github-actions-pages.yml` | Deprecated: the review action publishes Pages directly |
 | GitLab CI | `gitlab-ci.yml` | merge into `.gitlab-ci.yml` |
 | Bitbucket Pipelines | `bitbucket-pipelines.yml` | merge into `bitbucket-pipelines.yml` |
 
 The GitHub template uses the first-party composite action
 `SSC-SDE/CodeShouldBehave@v1`. It runs the pinned image, verifies the report,
-posts one pull-request comment and uploads the artifact.
+publishes the interactive report to the repository's Pages site, posts one
+pull-request comment and uploads the immutable artifact.
+
+Enable Pages once before the first run: **Settings → Pages → Build and
+deployment → Source: GitHub Actions**. The action deploys the report and links
+it at the top of the PR comment. If Pages is unavailable, the comment links the
+workflow artifact. Pages keeps only the latest deployment; the artifact is the
+immutable copy.
 
 `v1` is a convenience tag that tracks compatible action releases. For an
 immutable production pin, use the current v1 commit SHA:

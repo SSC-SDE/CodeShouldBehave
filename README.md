@@ -13,6 +13,8 @@ report with exact baseline/proposal source, without executing reviewed code.
 permissions:
   contents: read
   pull-requests: write
+  pages: write
+  id-token: write
 
 jobs:
   review:
@@ -24,7 +26,13 @@ jobs:
       - uses: SSC-SDE/CodeShouldBehave@v1
         with:
           design: auto
+          pages: true
 ```
+
+Enable Pages once for the one-click report: **Settings → Pages → Build and
+deployment → Source: GitHub Actions**. The action then publishes the interactive
+report and links it at the top of the PR comment. If Pages is unavailable, the
+comment links the workflow artifact instead.
 
 `v1` is a convenience tag that tracks compatible action releases. For an
 immutable production pin, use the current v1 commit instead:
@@ -38,6 +46,7 @@ The exact action release is also available as `@v0.7.0`.
 The action:
 
 - runs a pinned, verified image digest;
+- publishes the interactive HLD/LLD/source report to Pages when enabled;
 - rechecks every report hash with `csb verify`;
 - posts or updates one pull-request summary comment;
 - uploads the interactive report as a 30-day artifact;

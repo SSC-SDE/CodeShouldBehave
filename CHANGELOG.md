@@ -48,6 +48,8 @@
   `ripgrep`, with verified report archives and exact commits.
 - Add the `v1` convenience action tag and document immutable SHA pinning for
   production workflows.
+- Publish the interactive report to GitHub Pages from the action and link it at
+  the top of the PR comment, with an artifact fallback when Pages is unavailable.
 - Put the local CLI/container path on the landing page and document it in
   `docs/CLI_USAGE.md`.
 
