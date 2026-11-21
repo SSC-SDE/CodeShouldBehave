@@ -1,6 +1,7 @@
 # Mainstream Rust HLD/LLD review — implementation plan
 
-Status: **M0–M2 complete. M3 conditional. M4 planned.**
+Status: **M0–M2 complete. M3 conditional. M4 implemented on branch; draft PR #101 is open and
+owner merge is pending.**
 Current release: `v0.5.0` (LLD body/call evidence).
 Release baseline: `bd227af64d84339aa6ae231b1c6333abdc629731`.
 Plan maintenance since then is documentation-only; current `main` also includes
@@ -90,9 +91,11 @@ Owner decision required before starting. If skipped, record why in the tracker.
 
 ---
 
-## 3. M4 — component and caller context (planned)
+## 3. M4 — component and caller context (implemented on branch)
 
-Status: **planned, not authorized, not started.**
+Status: **implemented; draft PR #101 is open and owner merge is pending.** Both component and caller
+context were implemented (the default recommendation). M3 remains conditional
+and unchanged.
 Reason: real-model testing showed that deeper explanation quality needs better
 evidence scope, not a larger model. Single-declaration boundaries produce
 restatement and generic questions.
@@ -144,6 +147,30 @@ restatement and generic questions.
 
 Owner decision required before starting: component-only, caller-only, or both.
 Default recommendation: implement 3.1 and 3.2 together, then re-evaluate with 7B.
+
+### Implementation record — 2026-11-21
+
+Branch: `feat/m4-component-caller-context` from `origin/main` `f634683`
+(draft PR #101; tested code head `f8944b9e51`; merge SHA pending).
+
+- 3.1 and 3.2 implemented together: `--component` / `--boundary
+  component:<id>` and lexical `call_candidate` evidence.
+- 3.3 implemented: `csb explain --list`, no provider contact, no file writes,
+  sorted and capped at 100 rows.
+- Rule version moved to `csb-explain-v2`; the deterministic review artifact and
+  manifest are not written by explain and are unchanged.
+- Fixture covers a component with multiple declarations and two lexical callers.
+- Gates passed: `cargo fmt --check`; `cargo check --features ai,server --bin
+  csb`; `cargo test --features ai,server --test csb_explain` (10 passed);
+  `cargo test --features ai,server --lib csb_explain::tests` (4 passed).
+  Tests assert `manifest.json` bytes are unchanged and no `ai.md` is written in
+  preview mode.
+- Real `qwen2.5-coder:7b`: single-declaration boundary 15.1 s and one citation
+  with generic questions; component boundary 20.5 s, three citations
+  (`4, 5, 8`), and change-specific questions naming `handle`, `other` and the
+  dependent `api` component. No runtime-order or reachability claim was made.
+- Not verified: the provider result is advisory and was not asserted by tests;
+  the model used one local loopback run, not a multi-seed evaluation.
 
 ---
 

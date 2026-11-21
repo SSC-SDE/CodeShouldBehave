@@ -15,6 +15,14 @@ struct Fixture(PathBuf);
 
 impl Fixture {
     fn new() -> Self {
+        Self::build(false)
+    }
+
+    fn with_callers() -> Self {
+        Self::build(true)
+    }
+
+    fn build(callers: bool) -> Self {
         let root = std::env::temp_dir().join(format!(
             "csb-explain-test-{}-{}",
             std::process::id(),
@@ -25,10 +33,25 @@ impl Fixture {
         fixture.git(&["init", "-q"]);
         fixture.git(&["config", "user.name", "csb test"]);
         fixture.git(&["config", "user.email", "test@example.invalid"]);
-        fixture.write(
-            "Cargo.toml",
-            "[workspace]\nmembers = [\"crates/core\"]\nresolver = \"2\"\n",
-        );
+        if callers {
+            fixture.write(
+                "Cargo.toml",
+                "[workspace]\nmembers = [\"crates/core\", \"crates/api\"]\nresolver = \"2\"\n",
+            );
+            fixture.write(
+                "crates/api/Cargo.toml",
+                "[package]\nname = \"api\"\nversion = \"0.1.0\"\nedition = \"2021\"\n\n[dependencies]\ncore = { path = \"../core\" }\n",
+            );
+            fixture.write(
+                "crates/api/src/lib.rs",
+                "pub fn handle(a: i32, b: i32) -> i32 {\n    core::add(a, b)\n}\n\npub fn other(a: i32, b: i32) -> i32 {\n    core::add(b, a)\n}\n",
+            );
+        } else {
+            fixture.write(
+                "Cargo.toml",
+                "[workspace]\nmembers = [\"crates/core\"]\nresolver = \"2\"\n",
+            );
+        }
         fixture.write(
             "crates/core/Cargo.toml",
             "[package]\nname = \"core\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
@@ -385,6 +408,133 @@ fn explain_requires_a_design_artifact() {
     ]);
     assert_eq!(explain.status.code(), Some(2));
     assert!(stderr(&explain).contains("no design"));
+}
+
+fn component_id(out: &Path, name: &str) -> String {
+    let artifact: Value =
+        serde_json::from_slice(&fs::read(out.join("artifact.json")).unwrap()).unwrap();
+    artifact["hld"]["baseline"]["elements"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|element| element["kind"] == "component" && element["name"] == name)
+        .and_then(|element| element["id"].as_str())
+        .unwrap()
+        .to_owned()
+}
+
+#[test]
+fn component_preview_aggregates_relations_declarations_and_lexical_callers() {
+    let fixture = Fixture::with_callers();
+    let (out, _boundary) = fixture.review();
+    let core = component_id(&out, "core");
+    let manifest_before = fs::read(out.join("manifest.json")).unwrap();
+    let output = csb(&[
+        "explain",
+        "--dir",
+        out.to_str().unwrap(),
+        "--component",
+        &core,
+        "--model",
+        "fixture-model",
+    ]);
+    assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
+    let preview: Value =
+        serde_json::from_slice(&fs::read(out.join("ai-preview.json")).unwrap()).unwrap();
+    assert_eq!(preview["boundary"], format!("component:{core}"));
+    let evidence = preview["evidence"].as_array().unwrap();
+    assert!(evidence.len() <= 16, "{preview}");
+    assert!(
+        evidence
+            .iter()
+            .filter(|item| item["source_kind"] == "component")
+            .count()
+            >= 2,
+        "missing component evidence: {preview}"
+    );
+    assert!(
+        evidence
+            .iter()
+            .filter(|item| item["source_kind"] == "call_candidate")
+            .count()
+            >= 2,
+        "missing two lexical callers: {preview}"
+    );
+    assert!(
+        evidence
+            .iter()
+            .any(|item| item["source_kind"] == "lld_body"),
+        "missing component declarations: {preview}"
+    );
+    assert!(
+        evidence
+            .iter()
+            .filter_map(|item| item["bytes"].as_u64())
+            .sum::<u64>()
+            <= 16 * 1024
+    );
+    assert_eq!(
+        fs::read(out.join("manifest.json")).unwrap(),
+        manifest_before
+    );
+    assert!(!out.join("ai.md").exists());
+}
+
+#[test]
+fn component_boundary_prefix_selects_the_same_component() {
+    let fixture = Fixture::with_callers();
+    let (out, _boundary) = fixture.review();
+    let core = component_id(&out, "core");
+    let output = csb(&[
+        "explain",
+        "--dir",
+        out.to_str().unwrap(),
+        "--boundary",
+        &format!("component:{core}"),
+        "--model",
+        "fixture-model",
+    ]);
+    assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
+    let preview: Value =
+        serde_json::from_slice(&fs::read(out.join("ai-preview.json")).unwrap()).unwrap();
+    assert_eq!(preview["boundary"], format!("component:{core}"));
+    assert!(
+        preview["evidence"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|item| item["source_kind"] == "call_candidate")
+    );
+}
+
+#[test]
+fn list_prints_boundaries_deterministically_without_a_provider() {
+    let fixture = Fixture::new();
+    let (out, boundary) = fixture.review();
+    let run = || csb(&["explain", "--dir", out.to_str().unwrap(), "--list"]);
+    let first = run();
+    assert_eq!(first.status.code(), Some(0), "{}", stderr(&first));
+    let first_stdout = String::from_utf8_lossy(&first.stdout).into_owned();
+    assert!(first_stdout.starts_with("id\tkind\tpath\tdeclaration\tevidence_bytes\tuncertain\n"));
+    let rows = first_stdout.lines().skip(1).collect::<Vec<_>>();
+    assert!(rows.iter().any(|row| row.starts_with(&boundary)));
+    let mut ids = rows
+        .iter()
+        .map(|row| row.split('\t').next().unwrap().to_owned())
+        .collect::<Vec<_>>();
+    let sorted = {
+        let mut sorted = ids.clone();
+        sorted.sort();
+        sorted
+    };
+    assert_eq!(ids, sorted);
+    ids.clear();
+    let second = run();
+    assert_eq!(
+        first_stdout,
+        String::from_utf8_lossy(&second.stdout).into_owned()
+    );
+    assert!(!out.join("ai-preview.json").exists());
 }
 
 #[test]
