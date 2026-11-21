@@ -738,8 +738,18 @@ fn list_boundaries(
             .iter()
             .find_map(|key| change.get(*key).and_then(Value::as_str))
             .unwrap_or("");
-        let evidence = collect_evidence(hld, lld, change, baseline, proposal).unwrap_or_default();
-        let bytes = evidence.iter().map(|item| item.text.len()).sum::<usize>();
+        let mut evidence =
+            collect_evidence(hld, lld, change, baseline, proposal).unwrap_or_default();
+        let mut total = evidence.iter().map(|item| item.text.len()).sum::<usize>();
+        append_callers(
+            &mut evidence,
+            &mut total,
+            lld,
+            &selected_names(change),
+            baseline,
+            proposal,
+        );
+        let bytes = total;
         let path = evidence
             .first()
             .map(|item| item.path.as_str())
