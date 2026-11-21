@@ -95,6 +95,11 @@ runs:
         path: ${{ steps.review.outputs.out-dir }}
       continue-on-error: true
 
+    - name: Wait for Pages artifact
+      if: ${{ inputs.pages == 'true' && steps.pages-upload.outcome == 'success' }}
+      shell: bash
+      run: sleep 10
+
     - name: Deploy Pages
       id: pages-deploy
       if: ${{ inputs.pages == 'true' && steps.pages-upload.outcome == 'success' }}
