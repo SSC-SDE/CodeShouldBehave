@@ -1,6 +1,6 @@
 # AI extension contract v1 (7.1 candidate freeze)
 
-Status: **candidate for owner approval, not yet frozen.**
+Status: **approved and frozen on 2026-11-21 by `SSC-SDE`.**
 Contract: `ai-extension-v1`. Target: server/Focus AI in
 `docs/AI_EXTENSION_IMPLEMENTATION_PLAN.md` work packages 7.1–7.4.
 
@@ -41,9 +41,10 @@ checks or export.
 | Security reviewer | unassigned; required before live dispatch | Reviews authorization, egress, logs and secret handling |
 | AI evaluator | unassigned; required before pilot | Freezes thresholds and judges the representative corpus |
 
-This contract is not frozen until the decision owner records approval. The
-security reviewer and evaluator are not required to start 7.2 isolation work, but
-both block any real-data dispatch and the pilot.
+Approval record: `SSC-SDE`, 2026-11-21. Decisions 1–8 in §10 are approved as
+written. The security reviewer and evaluator remain unassigned; they are not
+required to start 7.2 isolation work, but both block any real-data dispatch and
+the pilot.
 
 ## 3. Disclosure policy
 
@@ -192,7 +193,7 @@ the public result is the server-validated shape.
 - The existing CLI `ai-v1` may evolve independently; it cannot be silently
   retargeted to this contract.
 
-## 10. Proposed decisions requiring owner approval
+## 10. Approved decisions (2026-11-21)
 
 | # | Decision | Proposed value |
 |---|---|---|

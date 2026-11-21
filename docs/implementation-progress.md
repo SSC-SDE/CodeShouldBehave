@@ -51,8 +51,9 @@ request, untrusted provider result, public result, error and capability response
   schema, rule and generation versions.
 - Server assigns `inferred` labels; model output cannot set identity, labels,
   confidence, observed status or Mermaid.
-- Owner approval is pending for provider scope, baseline model, token budgets,
-  request cap, error mapping and evaluator thresholds. 7.2 is not started.
+- Owner approved the contract on 2026-11-21, including provider scope, baseline
+  model, token budgets, request cap and error mapping. 7.2 isolation is in
+  progress; evaluator thresholds still block only the pilot.
 - Validation: all five JSON Schema files parse; no endpoint, adapter or UI is
   implemented by this draft.
 
