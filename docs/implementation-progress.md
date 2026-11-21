@@ -35,6 +35,15 @@ Public `main` carries the local CLI/container track through `v0.6.0`.
   activation, hosted-model qualification and live hosted fresh-repository
   acceptance.
 
+## 2026-11-21 — csb-demo template repository
+
+- Created public template repository `SSC-SDE/csb-demo` with a single
+  CodeShouldBehave action workflow and a Rust demo change.
+- Demo PR #1 ran the action successfully, posted one summary comment and
+  uploaded the interactive artifact. The run surfaces incomplete coverage
+  honestly because non-Rust files and provisional boundaries are outside scope.
+- Marked the repository as a template and added Rust/code-review/actions topics.
+
 ## 2026-11-21 — v0.7.0 action tag
 
 - Tag `v0.7.0` points at `702f8f3a78333be1acc37eb06b103c95fc5e8d25`.
