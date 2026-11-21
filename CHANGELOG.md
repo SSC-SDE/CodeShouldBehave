@@ -42,6 +42,8 @@
   reports complete/incomplete coverage separately.
 - Pin every adoption CI template to the immutable `v0.6.0` image digest; the
   GitHub template now uses the action instead of a mutable `:latest` tag.
+- Make the README action-first for the GitHub Marketplace listing: one-line
+  workflow, proof links, supported scope and explicit limits above project status.
 - Put the local CLI/container path on the landing page and document it in
   `docs/CLI_USAGE.md`.
 

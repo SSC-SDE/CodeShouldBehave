@@ -1,16 +1,58 @@
 # CodeShouldBehave
 
-CodeShouldBehave shows how a pull request changes Rust structure and local
-behavior. Open the PR's **CodeShouldBehave / Architecture** check, then follow
-HLD → component → LLD declaration/function → exact baseline/proposal source.
-The same dark workspace provides combined, before/after and split/unified views.
+[![GitHub Marketplace](https://img.shields.io/badge/GitHub%20Marketplace-Listed-6f42c1?logo=github)](https://github.com/marketplace/actions/codeshouldbehave-review)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+Review how a pull request changes a Rust workspace's architecture and local
+behavior. CodeShouldBehave produces a deterministic, hash-verified HLD/LLD
+report with exact baseline/proposal source, without executing reviewed code.
+
+## Add to GitHub in one step
+
+```yaml
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: SSC-SDE/CodeShouldBehave@v0.7.0
+        with:
+          design: auto
+```
+
+The action:
+
+- runs a pinned, verified image digest;
+- rechecks every report hash with `csb verify`;
+- posts or updates one pull-request summary comment;
+- uploads the interactive report as a 30-day artifact;
+- reports `coverage` as `complete`, `incomplete` or `failed`. Set
+  `fail-on-incomplete: true` to block the job when coverage is incomplete.
+
+[View a real report](https://ssc-sde.github.io/CodeShouldBehave/) ·
+[Marketplace listing](https://github.com/marketplace/actions/codeshouldbehave-review) ·
+[CLI and container](docs/CLI_USAGE.md) ·
+[CI templates](templates/csb-ci/)
+
+Supported today: Rust-first Cargo workspaces on Linux GitHub runners, or any
+Docker-capable CI with the pinned container. The deterministic review needs no
+token, App install, telemetry or network access; the runner still pulls the
+pinned image. HLD/LLD boundaries are provisional and analysis is bounded.
+Unsupported files, deferred detail and incomplete coverage are labeled, never
+hidden. This is an advisory review, not a merge approval or runtime proof.
 
 **Open source · MIT · experimental.** Created by Shankhya Subhra Chatterjee,
 with contributor attribution retained in [LICENSE](LICENSE). Development,
 issues and contributions belong in the public
 [CodeShouldBehave repository](https://github.com/SSC-SDE/CodeShouldBehave).
 
-## Current status
+## Project status
 
 The repository's **Actions → Architecture check → hosted Focus dashboard** demo
 is working. The [public index](https://ssc-sde.github.io/CodeShouldBehave/index.json)
@@ -81,21 +123,6 @@ Container: `docker run --rm ghcr.io/ssc-sde/csb:v0.6.0 --help`.
 CI templates for GitHub Actions, GitLab and Bitbucket live in
 [`templates/csb-ci/`](templates/csb-ci/). Full reference:
 [`docs/CLI_USAGE.md`](docs/CLI_USAGE.md).
-
-Fastest GitHub integration (pin the action to a reviewed release):
-
-```yaml
-- uses: actions/checkout@v4
-  with:
-    fetch-depth: 0
-- uses: SSC-SDE/CodeShouldBehave@v0.7.0
-  with:
-    design: auto
-```
-
-The action runs the pinned `v0.6.0` image digest, verifies every report hash,
-posts one PR summary comment and uploads the interactive report. Set
-`fail-on-incomplete: true` to block the job when coverage is incomplete.
 
 ## Reviewer journey
 
