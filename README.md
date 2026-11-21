@@ -21,10 +21,19 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: SSC-SDE/CodeShouldBehave@v0.7.0
+      - uses: SSC-SDE/CodeShouldBehave@v1
         with:
           design: auto
 ```
+
+`v1` is a convenience tag that tracks compatible action releases. For an
+immutable production pin, use the current v1 commit instead:
+
+```yaml
+- uses: SSC-SDE/CodeShouldBehave@702f8f3a78333be1acc37eb06b103c95fc5e8d25
+```
+
+The exact action release is also available as `@v0.7.0`.
 
 The action:
 

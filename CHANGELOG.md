@@ -46,6 +46,8 @@
   workflow, proof links, supported scope and explicit limits above project status.
 - Add three pinned public-repository case studies for `fd`, `thiserror` and
   `ripgrep`, with verified report archives and exact commits.
+- Add the `v1` convenience action tag and document immutable SHA pinning for
+  production workflows.
 - Put the local CLI/container path on the landing page and document it in
   `docs/CLI_USAGE.md`.
 

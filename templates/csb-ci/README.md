@@ -10,9 +10,13 @@ Copy the file for your provider into the repository you want reviewed.
 | Bitbucket Pipelines | `bitbucket-pipelines.yml` | merge into `bitbucket-pipelines.yml` |
 
 The GitHub template uses the first-party composite action
-`SSC-SDE/CodeShouldBehave@v0.7.0`. It runs the pinned image, verifies the report,
-posts one pull-request comment and uploads the artifact. Pin the action to a
-reviewed release tag; do not use `@main`.
+`SSC-SDE/CodeShouldBehave@v1`. It runs the pinned image, verifies the report,
+posts one pull-request comment and uploads the artifact.
+
+`v1` is a convenience tag that tracks compatible action releases. For an
+immutable production pin, use the current v1 commit SHA:
+`702f8f3a78333be1acc37eb06b103c95fc5e8d25`. The exact action release is also
+available as `@v0.7.0`. Do not use `@main`.
 
 All non-action templates pin the `v0.6.0` image by immutable digest:
 `ghcr.io/ssc-sde/csb@sha256:53e53a1f6374c58dacf90e1c52eca4130d1c82531f217edb56f31a43e507c075`.
