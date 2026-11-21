@@ -28,9 +28,30 @@ Public `main` carries the local CLI/container track through `v0.6.0`.
 - Real Ollama evaluation: `qwen2.5-coder:7b` is the default; 1.5B/3B work only
   on narrow declaration boundaries. Broad boundaries need 7B or richer context.
 - M4 component/caller context merged in PR #101 at
-  `94bc0273fe02b70dd4c3e63dba389ab6645b66ac`.
-- Remaining: M3 `csb init` (conditional), server/Focus AI (7.2–7.4), App
-  activation, hosted-model qualification and live fresh-repository acceptance.
+  `94bc0273fe02b70dd4c3e63dba389ab6645b66ac` and released in `v0.6.0`.
+- M3 `csb init` is skipped: the `v0.6.0` fresh-repository acceptance observed no
+  trigger. Evidence: `docs/evidence/v0.6.0-fresh-repo/acceptance.md`.
+- Remaining: server/Focus AI (7.2–7.4), App activation, hosted-model
+  qualification and live hosted fresh-repository acceptance.
+
+## 2026-11-21 — v0.6.0 fresh-repository acceptance
+
+Ran the published image against a clean two-member workspace with two callers:
+
+- `review --design auto` wrote the review; coverage was explicitly incomplete
+  for the unowned workspace-root manifest. `verify` passed with 8 artifacts.
+- A second review produced a byte-identical manifest.
+- `explain --list` returned two deterministic boundaries.
+- `explain --component core` produced 9 evidence items (991 bytes): 3
+  `component`, 3 `lld_body`, 2 `call_candidate`; no `ai.md` and the manifest
+  hash was unchanged.
+- Component roots matched `crates/core` and `crates/api`; the `api → core`
+  package dependency was retained. The unowned workspace-root `Cargo.toml` was
+  disclosed as a gap, with no invented boundary.
+- No M3 trigger was observed; `csb init` remains skipped and `--design off`
+  remains the default.
+
+Full evidence: `docs/evidence/v0.6.0-fresh-repo/acceptance.md`.
 
 ## 2026-11-21 — v0.6.0 release
 
