@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codeshouldbehave.dev/contracts/ai-extension-v1/request.schema.json",
+  "title": "AI extension explanation request v1",
+  "description": "Client-to-server request for one selected HLD boundary. The server resolves evidence; clients cannot supply source, prompts, provider URLs or scope.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "review_id", "boundary", "comparison_mode", "expected"],
+  "properties": {
+    "schema": {"const": "csb-ai-extension-request-v1"},
+    "review_id": {"type": "string", "minLength": 1, "maxLength": 128},
+    "boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": {"enum": ["change", "component"]},
+        "id": {"type": "string", "minLength": 1, "maxLength": 256}
+      }
+    },
+    "comparison_mode": {"enum": ["exact", "merge_base"]},
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "design_id",
+        "boundary_id",
+        "evidence_id",
+        "baseline",
+        "proposal",
+        "scope_version",
+        "grant_version"
+      ],
+      "properties": {
+        "design_id": {"type": "string", "minLength": 1, "maxLength": 128},
+        "boundary_id": {"type": "string", "minLength": 1, "maxLength": 256},
+        "evidence_id": {"type": "string", "minLength": 1, "maxLength": 128},
+        "baseline": {"$ref": "#/$defs/commit"},
+        "proposal": {"$ref": "#/$defs/commit"},
+        "scope_version": {"type": "string", "minLength": 1, "maxLength": 128},
+        "grant_version": {"type": "string", "minLength": 1, "maxLength": 128}
+      }
+    }
+  },
+  "$defs": {
+    "commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}(?:[0-9a-f]{24})?$"
+    }
+  }
+}

@@ -31,8 +31,31 @@ Public `main` carries the local CLI/container track through `v0.6.0`.
   `94bc0273fe02b70dd4c3e63dba389ab6645b66ac` and released in `v0.6.0`.
 - M3 `csb init` is skipped: the `v0.6.0` fresh-repository acceptance observed no
   trigger. Evidence: `docs/evidence/v0.6.0-fresh-repo/acceptance.md`.
-- Remaining: server/Focus AI (7.2–7.4), App activation, hosted-model
-  qualification and live hosted fresh-repository acceptance.
+- Remaining: server/Focus AI (7.1 owner approval; 7.2–7.4 implementation), App
+  activation, hosted-model qualification and live hosted fresh-repository
+  acceptance.
+
+## 2026-11-21 — AI extension 7.1 candidate contract
+
+Drafted the `ai-extension-v1` contract at
+`docs/contracts/ai-extension-v1/README.md` with machine-readable schemas for the
+request, untrusted provider result, public result, error and capability response.
+
+- Scope: local Ollama only, one selected HLD boundary, non-streaming, server-side
+  evidence resolution and no browser model access. CLI `ai-v1` is unchanged.
+- Frozen ceilings: 1 global / 1 tenant concurrency, 60 s deadline, no retries,
+  16 spans / 16 KiB, 4096 input and 512 generated tokens, 64 KiB response,
+  10 admissions per principal per hour, 128-entry / 16 MiB / 1 h memory cache.
+- Result identity binds review/design/boundary, baseline/proposal, evidence bundle,
+  scope/grant versions, provider/model digest, destination policy and prompt,
+  schema, rule and generation versions.
+- Server assigns `inferred` labels; model output cannot set identity, labels,
+  confidence, observed status or Mermaid.
+- Owner approved the contract on 2026-11-21, including provider scope, baseline
+  model, token budgets, request cap and error mapping. 7.2 isolation is in
+  progress; evaluator thresholds still block only the pilot.
+- Validation: all five JSON Schema files parse; no endpoint, adapter or UI is
+  implemented by this draft.
 
 ## 2026-11-21 — v0.6.0 fresh-repository acceptance
 
